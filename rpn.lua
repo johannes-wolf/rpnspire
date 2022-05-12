@@ -453,10 +453,36 @@ function UIMenu:invalidate()
   platform.window:invalidate(self:getFrame())
 end
 
+function UIMenu:hide()
+  if self.parent ~= nil then
+    focusView(self.parent)
+  end
+end
+
 function UIMenu:present(parent, items)
   self.items = items or {}
   self.parent = parent
   focusView(self)
+end
+
+function UIMenu:numPages()
+  return math.floor(#self.items / 9) + 1
+end
+
+function UIMenu:prevPage()
+  self.page = self.page - 1
+  if self.page < 0 then
+    self.page = self:numPages() - 1
+  end
+  self:invalidate()
+end
+
+function UIMenu:nextPage()
+  self.page = self.page + 1
+  if self.page >= self:numPages() then
+    self.page = 0
+  end
+  self:invalidate()
 end
 
 function UIMenu:onFocus()
@@ -477,12 +503,15 @@ function UIMenu:onTab()
 end
 
 function UIMenu:onEnter()
+  self:hide()
 end
 
 function UIMenu:onArrowLeft()
+  self:prevPage()
 end
 
 function UIMenu:onArrowRight()
+  self:nextPage()
 end
 
 function UIMenu:onArrowUp()
@@ -492,14 +521,19 @@ function UIMenu:onArrowDown()
 end
 
 function UIMenu:onEscape()
-  -- TODO: Hide self
+  self:hide()
+end
+
+function UIMenu:onClear()
+  self.page = 0
+  self:invalidate()
 end
 
 function UIMenu:onCharIn(c)
   if c:byte(1) >= 49 and c:byte(1) <= 57 then -- [1]-[9]
     local n = c:byte(1) - 49
     local row, col = 2 - math.floor(n / 3), n % 3
-    local item = self.items[row * 3 + (col+1)]
+    local item = self.items[self.page * 9 + row * 3 + (col+1)]
     if not item then return end
     
     if type(item[2]) == "function" then
