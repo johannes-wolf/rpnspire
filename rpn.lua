@@ -555,13 +555,19 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
   y = y + margin
   w = w - 2*margin
   h = h - 2*margin
-  
-  gc:setColorRGB(theme[options.theme].selectionColor) --rowColor)
+
+  if w < 0 or h < 0 then return end
+  gc:clipRect("set", x-1, y-1, w+2, h+2)
+
   if item then
+    gc:setColorRGB(theme[options.theme].altRowColor)
     gc:fillRect(x,y,w,h)
-    gc:setColorRGB(theme[options.theme].selectionColor)
+    gc:setColorRGB(theme[options.theme].borderColor)
     gc:drawRect(x,y,w,h)
   else
+    gc:setColorRGB(theme[options.theme].rowColor)
+    gc:fillRect(x,y,w,h)
+    gc:setColorRGB(theme[options.theme].borderColor)
     gc:drawRect(x,y,w,h)
     return
   end
