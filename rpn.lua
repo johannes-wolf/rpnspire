@@ -833,6 +833,13 @@ function UIStack:onBackspace()
   self:onCharIn("x")
 end
 
+function UIStack:onClear()
+  recordUndo()
+  self.stack = {}
+  self:selectIdx()
+  focusView(input)
+end
+
 function UIStack:onCharIn(c)
   if c == "x" then
     recordUndo()
@@ -1256,8 +1263,27 @@ function UIInput:onTab()
   self:nextCompletion()
 end
 
+function UIInput:onClear()
+  if self.cursor.pos < #self.text then
+    self.cursor.size = #self.text - self.cursor.pos
+    self:_insertChar("")
+    self:scrollToPos()
+    self:cancelCompletion()
+  else
+    self:clear()
+  end
+end
+
+function UIInput:clear()
+  self.text = ""
+  -- Do not change the prefix!
+  self:setCursor(0)
+  self:cancelCompletion()
+  self:invalidate()
+end
+
 function UIInput:setText(s, prefix)
-  self.text = s
+  self.text = s or ""
   self.prefix = prefix or ""
   self:setCursor(#self.text)
   self:cancelCompletion()
@@ -1354,6 +1380,8 @@ function showBigView(show, idx)
       end,
       onEnter = function()
         focusView(input)
+      end,
+      onClear = function()
       end
     })
     local item = stack.stack[idx or #stack.stack]
@@ -1556,7 +1584,7 @@ end
 -- UI
 input = UIInput()
 stack = UIStack()
-menu = UIMenu()
+menu  = UIMenu()
 focus = input
 
 function focusView(v)
@@ -1566,7 +1594,6 @@ function focusView(v)
     focus:onFocus()
   end
 end
---
 
 input.completionFun = function(prefix)
   local catmatch = function(tab, prefix, res)
@@ -1700,6 +1727,10 @@ end
 
 function on.backspaceKey()
   focus:onBackspace()
+end
+
+function on.clearKey()
+  focus:onClear()
 end
 
 function on.contextMenu()
