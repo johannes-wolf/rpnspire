@@ -1655,6 +1655,25 @@ function on.construction()
   bigview = D2Editor.newRichText() -- TODO: Refactor to custom view
 
   mode = "RPN"
+  
+  toolpalette.register({
+    {"Stack",
+      {"DUP 2",  function() stack:dup(2) end},
+      {"SWAP",   function() stack:swap() end},
+      {"PICK 2", function() stack:pick(2) end},
+      {"ROLL 3", function() stack:roll(3) end},
+      {"DEL",    function() stack:pop() end},
+      {"UNDO",   function() undo() end},
+      {SYM_CONVERT.."List", function() stack:toList() end}
+    },
+    {"Settings",
+      {"Light theme", function() options.theme = "light" end},
+      {"Dark theme",  function() options.theme = "dark" end},
+      {"Toggle fringe", function() options.showFringe = not options.showFringe end},
+      {"Toggle calculation", function() options.showExpr = not options.showExpr end},
+      {"Toggle smart parens", function() options.autoClose = not options.autoClose; options.autoKillParen = options.autoClose end},
+    }
+  })
 end
 
 function on.resize(w, h)
