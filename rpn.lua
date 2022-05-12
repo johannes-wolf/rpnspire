@@ -104,6 +104,11 @@ SYM_LIMP   = "⇒"
 SYM_DLIMP  = "⇔"
 SYM_RAD    = "∠"
 SYM_TRANSP = ""
+SYM_DEGREE = "\194\176"
+SYM_CONVERT= "\226\150\182"
+
+SYM_LIST   = "@LIST" -- RPN list operator
+SYM_MAT    = "@MAT"  -- RPN matrix operator
 
 operators = {
   --[[                 string, lvl, #, side ]]--
@@ -265,7 +270,9 @@ rpnFunctions = {
   ["pick2"]= function() stack:pick(2) end,
   ["pick3"]= function() stack:pick(3) end,
   ["del"]  = function() stack:pop() end,
-  
+  ["tlist"]= function() stack:toList() end,
+
+  -- History
   ["undo"] = function() popUndo(); undo() end, -- HACK: popUndo to remove the undo of the undo
   -- Weird features
   ["label"]= function() stack:label() end,
@@ -412,6 +419,23 @@ function RPNExpression:_infixString(top, parentPrec)
     end
 
     return out, top
+  elseif sym == SYM_LIST or sym == SYM_MAT then
+    local argc = tonumber(self.stack[top - 1])
+    assert(argc)
+    top = top - 1
+
+    local out = sym==SYM_LIST and "{" or "["
+
+    local argidx = argc
+    while argidx > 0 do
+      local tmpStr, tmpTop = self:_infixString(top - 1, opPrec)
+      out = out .. (argidx < argc and "," or "") .. tmpStr
+
+      argidx = argidx - 1
+      top = tmpTop
+    end
+
+    return out..(sym==SYM_LIST and "}" or "]"), top
   else
     return sym, top
   end
@@ -681,6 +705,33 @@ end
 function UIStack:pick(n)
   local idx = #self.stack - ((n or 1) - 1)
   table.insert(self.stack, clone(self.stack[idx]))
+end
+
+function UIStack:toList(n)
+  if #self.stack <= 0 then return end
+
+  if n == nil then
+    n = tonumber(self:pop().result)
+  end
+
+  assert(type(n)=="number")
+  assert(n >= 0)
+
+  local rpn = RPNExpression()
+  for i=1, n do
+    local arg = stack:pop(#stack.stack)
+    if arg ~= nil then
+      rpn:appendStack(arg.rpn)
+    else
+      -- TODO: Error
+      rpn:push(0)
+    end
+  end
+
+  rpn:push(n)
+  rpn:push(SYM_LIST)
+
+  self:pushEval(rpn)  
 end
 
 function UIStack:label(text)
