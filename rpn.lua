@@ -80,6 +80,7 @@ options = {
   autoKillParen = true, -- Auto kill righthand paren when killing left one
   showFringe = true,    -- Show fringe (stack number)
   showExpr = true,      -- Show stack expression (infix)
+  autoPop = true,       -- Pop stack when pressing backspace
   theme = "light",      -- Well...
   cursorWidth = 2,      -- Width of the cursor
 }
@@ -1230,7 +1231,7 @@ function UIInput:_insertChar(c)
 end
 
 function UIInput:onBackspace()
-  if self.text:len() <= 0 then
+  if options.autoPop == true and self.text:len() <= 0 then
     recordUndo()
     stack:pop()
     stack:scrollToIdx()
