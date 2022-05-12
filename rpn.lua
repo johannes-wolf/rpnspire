@@ -1753,12 +1753,15 @@ function on.contextMenu()
       }}
     })
   elseif focus == input then
-    menu:present(stack, {
+    menu:present(input, {
+      {"Const", {
+        {"g", "_g"}, {"c", "_c"},
+      }},
       {"Units", {
         {"Mass", {
-          {"kg", "_kg"}, {"g", "_g"}
+          {"kg", "_kg"}
         }}
-      }}, {"Solve", {
+      }}, {"CAS", {
         {"solve", "solve"}, {"zeros", "zeros"}
       }}
     })
