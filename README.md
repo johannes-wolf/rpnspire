@@ -1,7 +1,7 @@
 # rpnspire
 An RPN interface for the TI Nspire CX
 
-![Demo Video](doc/demo.gif)
+https://raw.githubusercontent.com/johannes-wolf/rpnspire/main/doc/demo.mp4
 
 ## Usage
 ### Global
