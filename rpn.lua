@@ -661,9 +661,7 @@ function UIStack:push(item)
 end
 
 function UIStack:swap(idx1, idx2)
-  if #self.stack < 2 then
-    return
-  end
+  if #self.stack < 2 then return end
   
   idx1 = idx1 or (#self.stack - 1)
   idx2 = idx2 or #self.stack
@@ -676,12 +674,16 @@ function UIStack:swap(idx1, idx2)
 end
 
 function UIStack:pop(idx)
-  local v = table.remove(self.stack, idx or #self.stack)
+  idx = idx or #self.stack
+  if idx <= 0 or idx > #self.stack then return end
+  local v = table.remove(self.stack, idx)
   self:invalidate()
   return v
 end
 
 function UIStack:roll(n)
+  if #self.stack < 2 then return end
+
   n = n or 1
   if n > 0 then
     for i=1,n do
@@ -696,14 +698,18 @@ function UIStack:roll(n)
 end
 
 function UIStack:dup(n)
-  local idx = #self.stack - ((n or 1) - 1)
-  for i=1,(n or 1) do
+  if #self.stack <= 0 then return end
+
+  n = n or 1
+  local idx = #self.stack - (n - 1)
+  for i=1,n do
     table.insert(self.stack, clone(self.stack[idx + i - 1]))
   end
 end
 
 function UIStack:pick(n)
-  local idx = #self.stack - ((n or 1) - 1)
+  n = n or 1
+  local idx = #self.stack - (n - 1)
   table.insert(self.stack, clone(self.stack[idx]))
 end
 
