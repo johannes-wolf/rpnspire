@@ -1696,12 +1696,20 @@ function on.resize(w, h)
               stack.frame.height)
 end
 
+function on.escapeKey()
+  --focus:onEscape()
+end
+
 function on.tabKey()
   if focus ~= input then
     focusView(input)
   else
     input:onTab()
   end
+end
+
+function on.backtabKey()
+  --focus:onBackTab()
 end
 
 function on.returnKey()
@@ -1739,6 +1747,10 @@ function on.charIn(c)
   if c == "C" then clear(); return end
   if c == "L" then stack:roll(); return end
 
+  --for i=1,#c do
+  --  print(c:byte(i))
+  --end
+  
   focus:onCharIn(c)
 end
 
@@ -1760,8 +1772,6 @@ function on.contextMenu()
   -- FIXME: this is just a test
   if focus == stack then
     menu:present(stack, {
-      {"ROLL", function() stack:roll() end},
-      {"SWAP", function() stack:swap() end},
       {"Options", {
         {"Fringe", function() options.showFringe = not options.showFringe end},
         {"Calc", function() options.showExpr = not options.showExpr end},
