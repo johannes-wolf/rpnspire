@@ -1363,16 +1363,13 @@ function showBigView(show, idx)
     focusView({
       onArrowRight = function() end,
       onArrowLeft = function() end,
-      onArrowUp = function()
-        focusView(stack)
-      end,
-      onArrowDown = function()
-        focusView(input)
-      end,
+      onArrowUp = function() end,
+      onArrowDown = function() end,
       onCharIn = function(c) end,
       onBackspace = function(c) 
         focusView(input)
       end,
+      onEscape = function() end,
       onFocus = function()
         local margin = 8
         bigview:setBorder(2)
@@ -1655,7 +1652,7 @@ input.completionFun = function(prefix)
 end
 
 function on.construction()
-  bigview = D2Editor.newRichText()
+  bigview = D2Editor.newRichText() -- TODO: Refactor to custom view
 
   mode = "RPN"
 end
