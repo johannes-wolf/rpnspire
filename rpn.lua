@@ -1490,7 +1490,25 @@ function _dispatchPushInput(op)
   end
 end
 
+function _dispatchOperatorSpecial(op)
+  if op == "^2" then
+    _dispatchPushInput(op)
+    stack:push("2")
+    return "^"
+  elseif op == "10^" then
+    _dispatchPushInput(op)
+    stack:push("10")
+    stack:swap()
+    return "^"
+  end
+  
+  return op
+end
+
 function dispatchOperator(op)
+  -- Special case for nspire keys that input operators with arguments
+  op = _dispatchOperatorSpecial(op)
+  
   local opStr, _, opArgs = quertyOperatorInfo(op)
     if opStr ~= nil then
       _dispatchPushInput(op)
