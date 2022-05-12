@@ -1715,7 +1715,9 @@ function on.resize(w, h)
 end
 
 function on.escapeKey()
-  --focus:onEscape()
+  if focus.onEscape then
+    focus:onEscape()
+  end
 end
 
 function on.tabKey()
@@ -1727,7 +1729,9 @@ function on.tabKey()
 end
 
 function on.backtabKey()
-  --focus:onBackTab()
+  if focus.onBackTab then
+    focus:onBackTab()
+  end
 end
 
 function on.returnKey()
@@ -1744,19 +1748,27 @@ function on.returnKey()
 end
 
 function on.arrowRight()
-  focus:onArrowRight()
+  if focus.onArrowRight then
+    focus:onArrowRight()
+  end
 end
 
 function on.arrowLeft()
-  focus:onArrowLeft()
+  if focus.onArrowLeft then
+    focus:onArrowLeft()
+  end
 end
 
 function on.arrowUp()
-  focus:onArrowUp()
+  if focus.onArrowUp then
+    focus:onArrowUp()
+  end
 end
 
 function on.arrowDown()
-  focus:onArrowDown()
+  if focus.onArrowDown then
+    focus:onArrowDown()
+  end
 end
 
 function on.charIn(c)
@@ -1769,7 +1781,9 @@ function on.charIn(c)
   --  print(c:byte(i))
   --end
   
-  focus:onCharIn(c)
+  if focus.onCharIn then
+    focus:onCharIn(c)
+  end
 end
 
 function on.enterKey()
@@ -1779,14 +1793,22 @@ function on.enterKey()
 end
 
 function on.backspaceKey()
-  focus:onBackspace()
+  if focus.onBackspace then
+    focus:onBackspace()
+  end
 end
 
 function on.clearKey()
-  focus:onClear()
+  if focus.onClear then
+    focus:onClear()
+  end
 end
 
 function on.contextMenu()
+  if focus.onContextMenu then
+    focus:onContextMenu()
+  end
+
   -- FIXME: this is just a test
   if focus == stack then
     menu:present(stack, {
