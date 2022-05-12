@@ -900,11 +900,11 @@ function UIInput:init(frame)
   self.scrollx = 0
   self.margin = 2
   -- Completion
-  self.completionFun = 0    -- Current completion handler function
-  self.completionIdx = 0    -- Current completion index
-  self.completionList = {}  -- Current completion candidates
+  self.completionFun = nil   -- Current completion handler function
+  self.completionIdx = nil   -- Current completion index
+  self.completionList = nil  -- Current completion candidates
   -- Prefix
-  self.prefix = ""          -- Non-Editable prefix shown on the left
+  self.prefix = ""           -- Non-Editable prefix shown on the left
 end
 
 function UIInput:invalidate()
@@ -926,7 +926,7 @@ end
 -- Starts a completion with the given list
 -- No prefix matching takes place 
 function UIInput:customCompletion(tab)
-  if self.completionIdx == 0 then
+  if not self.completionIdx then
     self.completionIdx = #tab
     self.completionList = tab
   end
@@ -934,7 +934,9 @@ function UIInput:customCompletion(tab)
 end
 
 function UIInput:nextCompletion(offset)
-  if #self.completionList == 0 and self.completionFun ~= 0 then
+  if self.completionList == nil then
+    if self.completionFun == nil then return end
+
     local prefixSize = 0
     for i=self.cursor.pos,1,-1 do
       local b = self.text:byte(i)
@@ -952,10 +954,10 @@ function UIInput:nextCompletion(offset)
       return
     end
     
-    self.completionIdx = #self.completionList
+    self.completionIdx = 1
   else
     -- Advance completion index
-    self.completionIdx = self.completionIdx + (offset or 1)
+    self.completionIdx = (self.completionIdx or 0) + (offset or 1)
     
     -- Reset completion list
     if self.completionIdx > #self.completionList then
@@ -1601,7 +1603,7 @@ end
 
 function on.enterKey()
   focus:onEnter()
-  stack:invalidate()
+  stack:invalidate() -- TODO: ?
   input:invalidate()
 end
 
@@ -1610,7 +1612,7 @@ function on.backspaceKey()
 end
 
 function on.contextMenu()
-  -- FIXME: This is just for testing menus
+  -- FIXME: this is just a test
   if focus == stack then
     menu:present(stack, {
       {"ROLL", function() stack:roll() end},
