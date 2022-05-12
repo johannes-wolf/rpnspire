@@ -986,8 +986,15 @@ function UIStack:draw(gc)
   local yoffset = y + self.scrolly
   
   gc:clipRect("set", x, y, w, h)
-  gc:setColorRGB(theme[options.theme].backgroundColor)
+  
+  if #self.stack == 0 and focus == self then
+    gc:setColorRGB(theme[options.theme].selectionColor)
+  else
+    gc:setColorRGB(theme[options.theme].backgroundColor)
+  end
+   
   gc:fillRect(x,y,w,h)
+ 
   for idx, item in ipairs(self.stack) do
     yoffset = yoffset + self:drawItem(gc, x, yoffset, w, idx, item)
   end
