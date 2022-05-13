@@ -112,7 +112,7 @@ SYM_LIST   = "@LIST" -- RPN list operator
 SYM_MAT    = "@MAT"  -- RPN matrix operator
 
 operators = {
-  --[[                 string, lvl, #, side ]]--
+  --[[                 string, lvl, #, side, assoc ]]--
   -- Parentheses
   ["#"]             = {nil,     18, 1, -1},
   --
@@ -124,7 +124,7 @@ operators = {
   -- [" "]             = {nil, 17, 1,  1}, -- SUBSCRIPT
   -- [SYM_TRANSP]      = {nil, 17, 1,  1}, -- TRANSPOSE
   --
-  ["^"]             = {nil,     16, 2,  0},
+  ["^"]             = {nil,     16, 2,  0, 'r'}, -- Matching V200 RPN behavior
   --
   ["(-)"]           = {SYM_NEGATE,15,1,-1},
   [SYM_NEGATE]      = {nil,     15, 1, -1},
@@ -137,15 +137,15 @@ operators = {
   ["+"]             = {nil,     12, 2,  0},
   ["-"]             = {nil,     12, 2,  0},
   --
-  ["="]             = {nil,     11, 2,  0},
-  [SYM_NEQ]         = {nil,     11, 2,  0},
-  ["/="]            = {SYM_NEQ, 11, 2,  0},
-  ["<"]             = {nil,     11, 2,  0},
-  [">"]             = {nil,     11, 2,  0},
-  [SYM_LEQ]         = {nil,     11, 2,  0},
-  ["<="]            = {SYM_LEQ, 11, 2,  0},
-  [SYM_GEQ]         = {nil,     11, 2,  0},
-  [">="]            = {SYM_GEQ, 11, 2,  0},
+  ["="]             = {nil,     11, 2,  0, 'r'},
+  [SYM_NEQ]         = {nil,     11, 2,  0, 'r'},
+  ["/="]            = {SYM_NEQ, 11, 2,  0, 'r'},
+  ["<"]             = {nil,     11, 2,  0, 'r'},
+  [">"]             = {nil,     11, 2,  0, 'r'},
+  [SYM_LEQ]         = {nil,     11, 2,  0, 'r'},
+  ["<="]            = {SYM_LEQ, 11, 2,  0, 'r'},
+  [SYM_GEQ]         = {nil,     11, 2,  0, 'r'},
+  [">="]            = {SYM_GEQ, 11, 2,  0, 'r'},
   --
   ["not"]           = {"not ",  10, 1, -1},
   ["and"]           = {" and ", 10, 2,  0},
@@ -155,17 +155,17 @@ operators = {
   ["nor"]           = {" nor ",  9, 2,  0},
   ["nand"]          = {" nand ", 9, 2,  0},
   --
-  [SYM_LIMP]        = {nil,      8, 2,  0},
-  ["=>"]            = {SYM_LIMP, 8, 2,  0},
+  [SYM_LIMP]        = {nil,      8, 2,  0, 'r'},
+  ["=>"]            = {SYM_LIMP, 8, 2,  0, 'r'},
   --
-  [SYM_DLIMP]       = {nil,      7, 2,  0},
-  ["<=>"]           = {SYM_DLIMP,7, 2,  0},
+  [SYM_DLIMP]       = {nil,      7, 2,  0, 'r'},
+  ["<=>"]           = {SYM_DLIMP,7, 2,  0, 'r'},
   --
   ["|"]             = {nil,      6, 2,  0},
   --
-  [SYM_STORE]       = {nil,      5, 2,  0},
-  ["=:"]            = {SYM_STORE,5, 2,  0},
-  [":="]            = {nil,      5, 2,  0}
+  [SYM_STORE]       = {nil,      5, 2,  0, 'r'},
+  ["=:"]            = {SYM_STORE,5, 2,  0, 'r'},
+  [":="]            = {nil,      5, 2,  0, 'r'}
 }
 
 -- Query operator information
@@ -173,8 +173,8 @@ function quertyOperatorInfo(s)
   local tab = operators[s]
   if tab == nil then return nil end
   
-  local str, lvl, args, side = unpack(tab)
-  return (str or s), lvl, args, side
+  local str, lvl, args, side, assoc = unpack(tab)
+  return (str or s), lvl, args, side, assoc
 end
 
 -- Returns the number of arguments for the nspire function `nam`.
@@ -391,7 +391,7 @@ function RPNExpression:_infixString(top, parentPrec)
     return out..")", top
   end
   
-  local opStr, opPrec, opArgs, opPos = quertyOperatorInfo(sym)
+  local opStr, opPrec, opArgs, opPos, opAssoc = quertyOperatorInfo(sym)
   if opStr ~= nil then
     local out = ""
     if opPos < 0 then
@@ -399,8 +399,9 @@ function RPNExpression:_infixString(top, parentPrec)
     end
     
     local argidx = opArgs
+    local minTop = top
     while argidx > 0 do
-      local tmpStr, tmpTop = self:_infixString(top - 1, opPrec)
+      local tmpStr, tmpTop = self:_infixString(top - argidx, opPrec)
       if opPos == 0 then
         out = out .. (argidx == 1 and opStr or "") .. tmpStr
       else
@@ -408,10 +409,12 @@ function RPNExpression:_infixString(top, parentPrec)
       end
 
       argidx = argidx - 1
-      top = tmpTop
+      --top = tmpTop
+      minTop = math.min(minTop, tmpTop)
     end
+    top = minTop
     
-    if (parentPrec ~= nil and opPrec < parentPrec) or (opPos ~= 0 and opArgs > 1) then
+    if (parentPrec ~= nil and (opPrec < parentPrec or opAssoc == 'r')) or (opPos ~= 0 and opArgs > 1) then
       out = "("..out..")"
     end
 
@@ -1525,8 +1528,8 @@ function dispatchOperator(op)
       end
   
       local rpn = RPNExpression()
-      for i=1, opArgs do
-        local arg = stack:pop(#stack.stack)
+      for i=opArgs-1,0,-1 do
+        local arg = stack:pop(#stack.stack-i)
         rpn:appendStack(arg.rpn)
       end
       
