@@ -53,7 +53,6 @@ end
 function string.ulen(str)
   return select(2, str:gsub('[^\128-\193]', ''))
 end
-end
 
 -- Prefix
 Trie = {}
@@ -115,14 +114,15 @@ theme = {
 
 -- Global options
 options = {
-  autoClose = true,     -- Auto close parentheses
-  autoKillParen = true, -- Auto kill righthand paren when killing left one
-  showFringe = true,    -- Show fringe (stack number)
-  showExpr = true,      -- Show stack expression (infix)
-  autoPop = true,       -- Pop stack when pressing backspace
-  theme = "light",      -- Well...
-  cursorWidth = 2,      -- Width of the cursor
-  mode = "RPN"          -- What else
+  autoClose = true,      -- Auto close parentheses
+  autoKillParen = true,  -- Auto kill righthand paren when killing left one
+  showFringe = true,     -- Show fringe (stack number)
+  showExpr = true,       -- Show stack expression (infix)
+  autoPop = true,        -- Pop stack when pressing backspace
+  theme = "light",       -- Well...
+  cursorWidth = 2,       -- Width of the cursor
+  mode = "RPN",          -- What else
+  saneHexDigits = false, -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
 }
 
 
@@ -153,7 +153,7 @@ SYM_LIST   = "@LIST" -- RPN list operator
 SYM_MAT    = "@MAT"  -- RPN matrix operator
 
 operators = {
-  --[[                 string, lvl, #, side, assoc ]]--
+  --[[                 string, lvl, #, side, assoc, aggressive-assoc ]]--
   -- Parentheses
   ["#"]             = {nil,     18, 1, -1},
   --
@@ -165,7 +165,7 @@ operators = {
   -- [" "]             = {nil, 17, 1,  1}, -- SUBSCRIPT
   -- [SYM_TRANSP]      = {nil, 17, 1,  1}, -- TRANSPOSE
   --
-  ["^"]             = {nil,     16, 2,  0, 'l'}, -- Matching V200 RPN behavior
+  ["^"]             = {nil,     16, 2,  0, 'r', true}, -- Matching V200 RPN behavior
   --
   ["(-)"]           = {SYM_NEGATE,15,1,-1},
   [SYM_NEGATE]      = {nil,     15, 1, -1},
@@ -173,10 +173,10 @@ operators = {
   ["&"]             = {nil,     14, 2,  0},
   --
   ["*"]             = {nil,     13, 2,  0},
-  ["/"]             = {nil,     13, 2,  0, 'r'},
+  ["/"]             = {nil,     13, 2,  0, 'l'},
   --
   ["+"]             = {nil,     12, 2,  0},
-  ["-"]             = {nil,     12, 2,  0, 'r'},
+  ["-"]             = {nil,     12, 2,  0, 'l'},
   --
   ["="]             = {nil,     11, 2,  0, 'l'},
   [SYM_NEQ]         = {nil,     11, 2,  0, 'l'},
@@ -215,8 +215,8 @@ function queryOperatorInfo(s)
   local tab = operators[s]
   if tab == nil then return nil end
   
-  local str, lvl, args, side, assoc = unpack(tab)
-  return (str or s), lvl, args, side, assoc
+  local str, lvl, args, side, assoc, aggro = unpack(tab)
+  return (str or s), lvl, args, side, assoc, aggro
 end
 
 -- Returns the number of arguments for the nspire function `nam`.
@@ -398,11 +398,21 @@ function Infix.tokenize(input)
         i, j, token = input:find('^([10]+)', j+1)
       elseif prefix == "h" then
         i, j, token = input:find('^([%x]+)', j+1)
+
+        -- Non standard behaviour
+        if options.saneHexDigits and input:find('^[%a%.]', j+1) then
+          return nil
+        end
       else
         return
       end
       if token then
         token = "0"..prefix..token
+      end
+
+      -- Fail if followed by additional digit or point
+      if input:find('^[%d%.]', j+1) then
+        return nil
       end
     else
       -- Normal number
@@ -421,6 +431,11 @@ function Infix.tokenize(input)
         if ei then
           j, token = ej, token..etoken
         end
+      end
+
+      -- Fail if followed by additional digit or point
+      if input:find('^[%d%.]', j+1) then
+        return nil
       end
     end
 
@@ -537,13 +552,6 @@ function RPNExpression:fromInfix(tokens)
     return false
   end
   
-  local function printResult()
-    print("result:")
-    for _,v in ipairs(result) do
-      print("  "..v[1])
-    end
-  end
-  
   for _,v in ipairs(tokens) do
     local val, kind = unpack(v)
     if kind == 'number' or
@@ -558,12 +566,10 @@ function RPNExpression:fromInfix(tokens)
         print("error: RPNExpression.fromInfix missing '('")
         return nil
       end
-      printResult()
     elseif val == '(' then
       table.insert(stack, v)
     elseif val == ')' then
       if popUntil('(') then
-        printResult()
         table.remove(stack, #stack)
         if #stack > 0 and stack[#stack][2] == 'function' then
           popTop()
@@ -634,8 +640,8 @@ end
 function RPNExpression:infixString()
   local stack = {}
   
-  local function pushOperator(name, prec, argc, pos, assoc)
-    local assoc = assoc == "r" and 1 or (assoc == "l" and 2 or 0)
+  local function pushOperator(name, prec, argc, pos, assoc, aggrassoc)
+    local assoc = assoc == "r" and 2 or (assoc == "l" and 1 or 0)
  
     local args = {}
     for i=1,argc do
@@ -646,8 +652,8 @@ function RPNExpression:infixString()
     local str = ""
     for i,v in ipairs(args) do
       if pos == 0 and str:len() > 0 then str = name .. str end
-      
-      if v.prec and ((v.prec < prec) or (i == assoc and v.prec < prec + assoc)) then
+
+      if v.prec and ((v.prec < prec) or ((aggrassoc or i == assoc) and v.prec < prec + (assoc ~= 0 and 1 or 0))) then
         str = "(" .. v.expr .. ")" .. str
       else
         str = v.expr .. str
@@ -663,7 +669,7 @@ function RPNExpression:infixString()
     local args = {}
     for i=1,argc do
       local item = table.remove(stack, #stack)
-      table.insert(args, item)
+      table.insert(args, 1, item)
     end
     
     local str = ""
@@ -677,9 +683,9 @@ function RPNExpression:infixString()
   end
   
   local function push(str)
-    local opname, opprec, opargc, oppos, opassoc = queryOperatorInfo(str)
+    local opname, opprec, opargc, oppos, opassoc, opaggrassoc = queryOperatorInfo(str)
     if opname then
-      return pushOperator(opname, opprec, opargc, oppos, opassoc)
+      return pushOperator(opname, opprec, opargc, oppos, opassoc, opaggrassoc)
     end
     
     local fname, fargc = functionInfo(str, false)
@@ -1858,10 +1864,10 @@ function dispatchOperator(op)
         return false, "Argument error"
       end
   
+      local newTop = #stack.stack - opArgs + 1
       local rpn = RPNExpression()
-      for i=opArgs-1,0,-1 do
-        local arg = stack:pop(#stack.stack-i)
-        --local arg = stack:pop(#stack.stack)
+      for i=1,opArgs do
+        local arg = stack:pop(newTop)
         rpn:appendStack(arg.rpn)
       end
       
@@ -1887,9 +1893,10 @@ function dispatchImmediate(op)
       return false, "Argument error"
     end
     
+    local newTop = #stack.stack - fnArgs + 1
     local rpn = RPNExpression()
-    for i=1, fnArgs do
-      local arg = stack:pop(#stack.stack)
+    for i=1,fnArgs do
+      local arg = stack:pop(newTop)
       rpn:appendStack(arg.rpn)
     end
       
@@ -1926,9 +1933,10 @@ function dispatchFull(op)
       return false, "Argument error"
     end
     
+    local newTop = #stack.stack - fnArgs + 1
     local rpn = RPNExpression()
     for i=1, fnArgs do
-      local arg = stack:pop(#stack.stack)
+      local arg = stack:pop(newTop)
       rpn:appendStack(arg.rpn)
     end
       
