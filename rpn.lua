@@ -160,7 +160,7 @@ operators = {
   -- [" "]             = {nil, 17, 1,  1}, -- SUBSCRIPT
   -- [SYM_TRANSP]      = {nil, 17, 1,  1}, -- TRANSPOSE
   --
-  ["^"]             = {nil,     16, 2,  0, 'r'}, -- Matching V200 RPN behavior
+  ["^"]             = {nil,     16, 2,  0, 'l'}, -- Matching V200 RPN behavior
   --
   ["(-)"]           = {SYM_NEGATE,15,1,-1},
   [SYM_NEGATE]      = {nil,     15, 1, -1},
@@ -171,17 +171,17 @@ operators = {
   ["/"]             = {nil,     13, 2,  0, 'r'},
   --
   ["+"]             = {nil,     12, 2,  0},
-  ["-"]             = {nil,     12, 2,  0},
+  ["-"]             = {nil,     12, 2,  0, 'r'},
   --
-  ["="]             = {nil,     11, 2,  0, 'r'},
-  [SYM_NEQ]         = {nil,     11, 2,  0, 'r'},
-  ["/="]            = {SYM_NEQ, 11, 2,  0, 'r'},
-  ["<"]             = {nil,     11, 2,  0, 'r'},
-  [">"]             = {nil,     11, 2,  0, 'r'},
-  [SYM_LEQ]         = {nil,     11, 2,  0, 'r'},
-  ["<="]            = {SYM_LEQ, 11, 2,  0, 'r'},
-  [SYM_GEQ]         = {nil,     11, 2,  0, 'r'},
-  [">="]            = {SYM_GEQ, 11, 2,  0, 'r'},
+  ["="]             = {nil,     11, 2,  0, 'l'},
+  [SYM_NEQ]         = {nil,     11, 2,  0, 'l'},
+  ["/="]            = {SYM_NEQ, 11, 2,  0, 'l'},
+  ["<"]             = {nil,     11, 2,  0, 'l'},
+  [">"]             = {nil,     11, 2,  0, 'l'},
+  [SYM_LEQ]         = {nil,     11, 2,  0, 'l'},
+  ["<="]            = {SYM_LEQ, 11, 2,  0, 'l'},
+  [SYM_GEQ]         = {nil,     11, 2,  0, 'l'},
+  [">="]            = {SYM_GEQ, 11, 2,  0, 'l'},
   --
   ["not"]           = {"not ",  10, 1, -1},
   ["and"]           = {" and ", 10, 2,  0},
@@ -630,7 +630,7 @@ function RPNExpression:infixString()
   local stack = {}
   
   local function pushOperator(name, prec, argc, pos, assoc)
-    assoc = assoc == "r" and 1 or 0
+    local assoc = assoc == "r" and 1 or (assoc == "l" and 2 or 0)
  
     local args = {}
     for i=1,argc do
@@ -642,7 +642,7 @@ function RPNExpression:infixString()
     for i,v in ipairs(args) do
       if pos == 0 and str:len() > 0 then str = name .. str end
       
-      if v.prec and ((v.prec < prec) or (i == 1 and v.prec < prec + assoc)) then
+      if v.prec and ((v.prec < prec) or (i == assoc and v.prec < prec + assoc)) then
         str = "(" .. v.expr .. ")" .. str
       else
         str = v.expr .. str
@@ -1856,6 +1856,7 @@ function dispatchOperator(op)
       local rpn = RPNExpression()
       for i=opArgs-1,0,-1 do
         local arg = stack:pop(#stack.stack-i)
+        --local arg = stack:pop(#stack.stack)
         rpn:appendStack(arg.rpn)
       end
       
