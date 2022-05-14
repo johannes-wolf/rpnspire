@@ -41,13 +41,18 @@ function clone(t)
     return target
 end
 
--- Remove quotes from `s`
-function string.unquote(s)
-  if s:sub(1,1) == "\"" and
-     s:sub(#s) == "\"" then
-    return s:sub(2, #s-1)
+-- Remove quotes from `str`
+function string.unquote(str)
+  if str:sub(1, 1) == '"' and
+     str:sub(-1)   == '"' then
+    return str:sub(2, -1)
   end
-  return s
+  return str
+end
+
+function string.ulen(str)
+  return select(2, str:gsub('[^\128-\193]', ''))
+end
 end
 
 -- Prefix
@@ -1477,8 +1482,8 @@ function UIInput:onCharIn(c)
     if c == " " then return end
     
     -- Remove trailing '(' inserted by some keys
-    if #c > 1 and c:byte(#c) == 40 then
-      c = c:sub(1, #c-1)
+    if c:sub(-1) == '(' then
+      c = c:sub(1, -2)
     end 
     
     recordUndo()
