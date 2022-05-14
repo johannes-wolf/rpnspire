@@ -2176,7 +2176,7 @@ function on.contextMenu()
         }}
       }}, {"CAS", {
         {"solve", "solve"}, {"zeros", "zeros"}
-      }}
+      }}, {options.mode == "RPN" and "ALG" or "RPN", function() options.mode = options.mode == "RPN" and "ALG" or "RPN" end},
     })
   end
 end
