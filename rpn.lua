@@ -2112,6 +2112,14 @@ function on.charIn(c)
   if c == "R" then redo(); return end
   if c == "C" then clear(); return end
   if c == "L" then stack:roll(); return end
+  if c == "E" then
+    if #stack.stack > 0 then
+      focusView(input)
+      input:setTempMode("ALG")
+      input:setText(stack:pop().infix, "Edit")
+      return
+    end
+  end
 
   --for i=1,#c do
   --  print(c:byte(i))

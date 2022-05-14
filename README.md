@@ -7,12 +7,13 @@ https://raw.githubusercontent.com/johannes-wolf/rpnspire/main/doc/demo.mp4
 ### Global
 Uppercase letters are used as global shortcuts, even if the input view is focused!
 
-| Key          | Function            |
-|--------------|---------------------|
-| <kbd>U</kbd> | Undo                |
-| <kbd>R</kbd> | Redo                |
-| <kbd>L</kbd> | Roll stack          |
-| <kbd>C</kbd> | Clear stack & input |
+| Key          | Function             |
+|--------------|----------------------|
+| <kbd>U</kbd> | Undo                 |
+| <kbd>R</kbd> | Redo                 |
+| <kbd>L</kbd> | Roll stack           |
+| <kbd>C</kbd> | Clear stack & input  |
+| <kbd>E</kbd> | Edit last item (ALG) |
 
 ### Input
 | Key                            | Function                           |
@@ -45,23 +46,24 @@ Uppercase letters are used as global shortcuts, even if the input view is focuse
 | <kbd>tab</kbd>                 | Focus input                                                     |
 
 ### Special functions
-| Name      | Function                       |
-|-----------|--------------------------------|
-| @swap     | Swap 1 & 2                     |
-| @roll     | Roll                           |
-| @dup      | Duplicate 1                    |
-| @dup2     | Duplicate 1 & 2                |
-| @dup3     | Duplicate 1, 2 & 3             |
-| @pick     | Pick 1                         |
-| @pick2    | Pick 2                         |
-| @pick3    | Pick 3                         |
-| @del      | Pop 1                          |
-| *History* |                                |
-| @undo     | Undo                           |
-| *Misc*    |                                |
-| @label    | Set last expression text to @1 |
-| *Macro*   |                                |
-| @mcall    | Call macro @1                  |
+| Name      | Function                               |
+|-----------|----------------------------------------|
+| @swap     | Swap 1 & 2                             |
+| @roll     | Roll                                   |
+| @dup      | Duplicate 1                            |
+| @dup2     | Duplicate 1 & 2                        |
+| @dup3     | Duplicate 1, 2 & 3                     |
+| @pick     | Pick 1                                 |
+| @pick2    | Pick 2                                 |
+| @pick3    | Pick 3                                 |
+| @del      | Pop 1                                  |
+| *History* |                                        |
+| @undo     | Undo                                   |
+| *Misc*    |                                        |
+| @label    | Set last expression text to @1         |
+| @postfix  | Push last expression as postfix string |
+| *Macro*   |                                        |
+| @mcall    | Call macro @1                          |
 
 
 ## Features
