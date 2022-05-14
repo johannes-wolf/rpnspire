@@ -132,7 +132,7 @@ operators = {
   ["&"]             = {nil,     14, 2,  0},
   --
   ["*"]             = {nil,     13, 2,  0},
-  ["/"]             = {nil,     13, 2,  0},
+  ["/"]             = {nil,     13, 2,  0, 'r'},
   --
   ["+"]             = {nil,     12, 2,  0},
   ["-"]             = {nil,     12, 2,  0},
@@ -169,7 +169,7 @@ operators = {
 }
 
 -- Query operator information
-function quertyOperatorInfo(s)
+function queryOperatorInfo(s)
   local tab = operators[s]
   if tab == nil then return nil end
   
@@ -391,7 +391,7 @@ function RPNExpression:_infixString(top, parentPrec)
     return out..")", top
   end
   
-  local opStr, opPrec, opArgs, opPos, opAssoc = quertyOperatorInfo(sym)
+  local opStr, opPrec, opArgs, opPos, opAssoc = queryOperatorInfo(sym)
   if opStr ~= nil then
     local out = ""
     if opPos < 0 then
@@ -414,7 +414,7 @@ function RPNExpression:_infixString(top, parentPrec)
     end
     top = minTop
     
-    if (parentPrec ~= nil and (opPrec < parentPrec or opAssoc == 'r')) or (opPos ~= 0 and opArgs > 1) then
+    if (parentPrec ~= nil and (opPrec < parentPrec or (opPrec == parentPrec and opAssoc == 'r'))) or (opPos ~= 0 and opArgs > 1) then
       out = "("..out..")"
     end
 
@@ -1049,8 +1049,8 @@ function UIInput:customCompletion(tab)
 end
 
 function UIInput:nextCompletion(offset)
-  if self.completionList == nil then
-    if self.completionFun == nil then return end
+  if not self.completionList then
+    if not self.completionFun then return end
 
     local prefixSize = 0
     for i=self.cursor.pos,1,-1 do
@@ -1087,9 +1087,12 @@ function UIInput:nextCompletion(offset)
     tail = self.text:sub(self.cursor.pos + self.cursor.size + 1)
   end
   
+  if not self.completionList[self.completionIdx] then return end
+  
   self.text = self.text:sub(1, self.cursor.pos) .. 
               self.completionList[self.completionIdx] ..
               tail
+
   self.cursor.size = #self.completionList[self.completionIdx]
   self:invalidate()
   
@@ -1339,7 +1342,7 @@ function UIInput:drawText(gc)
   end
   
   if self.prefix:len() > 0 then
-    local prefixWidth = gc:getStringWidth(self.prefix) + margin 
+    local prefixWidth = gc:getStringWidth(self.prefix) + 2*margin
   
     --gc:setColorRGB(theme[options.theme].altRowColor)
     --gc:fillRect(x, y+1, prefixWidth, h-2)
@@ -1519,11 +1522,10 @@ function dispatchOperator(op)
   -- Special case for nspire keys that input operators with arguments
   op = _dispatchOperatorSpecial(op)
   
-  local opStr, _, opArgs = quertyOperatorInfo(op)
+  local opStr, _, opArgs = queryOperatorInfo(op)
     if opStr ~= nil then
       _dispatchPushInput(op)
       if not assertN(opArgs) then
-        input:setText("")
         return false, "Argument error"
       end
   
