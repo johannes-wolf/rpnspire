@@ -50,6 +50,38 @@ function string.unquote(s)
   return s
 end
 
+-- Prefix
+Trie = {}
+
+-- Build a prefix tree from `tab` keys
+function Trie.build(tab)
+  local trie = {}
+  for key, _ in pairs(tab) do
+    local root = trie
+    for i=1,#key do
+      local k = string.sub(key, i, i)
+      root[k] = root[k] or {}
+      root = root[k]
+    end
+    root['@LEAF@'] = true
+  end
+  return trie
+end
+
+function Trie.find(str, tab, pos)
+  assert(str)
+  assert(tab)
+  local i, j = (pos or 1), (pos or 1) - 1
+  while tab do
+    j = j+1
+    tab = tab[str:sub(j, j)]
+    if tab and tab['@LEAF@'] then 
+      return i, j, str:sub(i, j)
+    end
+  end
+  return nil
+end
+
 -- Themes
 theme = {
   ["light"] = {
@@ -59,6 +91,7 @@ theme = {
     fringeTextColor = 0xAAAAAA,
     textColor = 0,
     cursorColor = 0xFF0000,
+    cursorColorAlg = 0x0000FF,
     backgroundColor = 0xFFFFFF,
     borderColor = 0,
   },
@@ -69,6 +102,7 @@ theme = {
     fringeTextColor = 0xAAAAAA,
     textColor = 0xFFFFFF,
     cursorColor = 0xFF0000,
+    cursorColorAlg = 0xFF00FF,
     backgroundColor = 0x111111,
     borderColor = 0x888888,
   },
@@ -83,6 +117,7 @@ options = {
   autoPop = true,       -- Pop stack when pressing backspace
   theme = "light",      -- Well...
   cursorWidth = 2,      -- Width of the cursor
+  mode = "RPN"          -- What else
 }
 
 
@@ -107,6 +142,7 @@ SYM_RAD    = "∠"
 SYM_TRANSP = ""
 SYM_DEGREE = "\194\176"
 SYM_CONVERT= "\226\150\182"
+SYM_EE     = "\239\128\128"
 
 SYM_LIST   = "@LIST" -- RPN list operator
 SYM_MAT    = "@MAT"  -- RPN matrix operator
@@ -167,6 +203,7 @@ operators = {
   ["=:"]            = {SYM_STORE,5, 2,  0, 'r'},
   [":="]            = {nil,      5, 2,  0, 'r'}
 }
+operators_trie = Trie.build(operators)
 
 -- Query operator information
 function queryOperatorInfo(s)
@@ -271,13 +308,14 @@ rpnFunctions = {
   ["pick2"]= function() stack:pick(2) end,
   ["pick3"]= function() stack:pick(3) end,
   ["del"]  = function() stack:pop() end,
-  ["tlist"]= function() stack:toList() end,
-
+  ["tolist"]= function() stack:toList() end,
   -- History
   ["undo"] = function() popUndo(); undo() end, -- HACK: popUndo to remove the undo of the undo
   -- Weird features
   ["label"]= function() stack:label() end,
   ["killexpr"] = function() stack:killexpr() end,
+  -- Debugging
+  ["postfix"]  = function() stack:toPostfix() end,
   -- Macros
   ["mcall"] = function()
     -- TODO: this is a hack for testing out macros
@@ -287,12 +325,6 @@ rpnFunctions = {
       m:exec()
     end
   end,
-  
-  -- Options
-  ["setopt"]= function()
-    local option, value = string.unquote(stack:pop().result), string.unquote(stack:pop().result)
-    options[option] = value
-  end
 }
 
 --[[ MACRO ]]--
@@ -333,6 +365,143 @@ macros = {
   ["sumSeq"] = Macro{"?>f(x)", "x", "?>x:", "?>end:", "sumSeq"},
 }
 
+-- Lexer for TI math expressions being as close to the original as possible
+Infix = {}
+
+function Infix.tokenize(input)
+  local function operator(input, i)
+    return Trie.find(input, operators_trie, i)
+  end
+  
+  local function syntax(input, i)
+    return input:find('^([(){}[%],])', i)
+  end
+
+  local function word(input, i)
+    return input:find('^(%a+[_%w]*)', i)
+  end
+
+  local function unit(input, i)
+    return input:find('^(_%a+)', i)
+  end
+
+  local function number(input, pos)
+    -- Binary or hexadecimal number
+    local i, j, prefix = input:find('^0([bh])', pos)
+    if i then
+      if prefix == "b" then
+        i, j, token = input:find('^([10]+)', j+1)
+      elseif prefix == "h" then
+        i, j, token = input:find('^([%x]+)', j+1)
+      else
+        return
+      end
+      if token then
+        token = "0"..prefix..token
+      end
+    else
+      -- Normal number
+      i, j, token = input:find('^(%d*%.?%d*)', pos)
+      
+      -- '.' is not a number
+      if i and (token == '' or token == '.') then i = nil end
+      
+      -- SCI notation exponent
+      if i then
+        local ei, ej, etoken = input:find('^('..SYM_EE..'[%-%+]?%d+)', j+1)
+        if not ei then
+          -- SYM_NEGATE is a multibyte char, so we can not put it into the char-class above
+          ei, ej, etoken = input:find('^('..SYM_EE..SYM_NEGATE..'%d+)', j+1)
+        end
+        if ei then
+          j, token = ej, token..etoken
+        end
+      end
+    end
+
+    return i, j, token
+  end
+
+  local function str(input, i)
+    if input:sub(i, i) == '"' then
+      local j = input:find('"', i+1)
+      if j then
+        return i, j, input:sub(i, j)
+      end
+    end
+  end
+
+  local function whitespace(input, i)
+    return input:find('^%s+', i)
+  end
+
+  local function isImplicitMultiplication(token, kind, top)
+    if not top then return false end
+    
+    if kind == 'operator' or
+       top[2] == 'operator' then
+       return false
+    end
+    
+    -- 1(...)
+    if token == '(' and (top[2] == 'number' or top[2] == 'unit' or top[2] == 'string' or top[1] == ')') then
+      return true
+    end
+    
+    -- (...)1
+    if kind ~= 'syntax' then
+      if top[2] ~= 'syntax' or top[1] == ')' then
+        return true
+      end
+    end
+  end
+
+  local matcher = {
+    {fn=operator,   kind='operator'},
+    {fn=syntax,     kind='syntax'},
+    {fn=unit,       kind='unit'},
+    {fn=number,     kind='number'},
+    {fn=word,       kind='word'},
+    {fn=str,        kind='string'},
+    {fn=whitespace, kind='ws'},
+  }
+
+  local tokens = {}
+ 
+  local pos = 1
+  while pos <= #input do
+    local oldPos = pos
+    for _,m in ipairs(matcher) do
+      local i, j, token = m.fn(input, pos)
+      if i then
+        if token then
+          if isImplicitMultiplication(token, m.kind, tokens[#tokens]) then
+            table.insert(tokens, {'*', 'operator'})
+          end
+          if token == '(' and #tokens > 0 and tokens[#tokens][2] == 'word' then
+            tokens[#tokens][2] = 'function'
+          end
+          table.insert(tokens, {token, m.kind})
+        end
+        pos = j+1
+        break
+      end
+    end
+    
+    if pos <= oldPos then
+      print("error: Infix.tokenize no match at "..pos.." '"..input:sub(pos).."'")
+      return nil, pos
+    end
+  end
+
+  print("tokens:")
+  for _,v in ipairs(tokens) do
+    print("  "..v[1].." ("..v[2]..")")
+  end
+
+  return tokens
+end
+
 
 -- RPN Expression stack for transforming from and to infix notation
 RPNExpression = class()
@@ -341,8 +510,88 @@ function RPNExpression:init(stack)
   self.stack = stack or {}
 end
 
-function RPNExpression:parseInfix(s)
-  -- TODO: ...
+function RPNExpression:fromInfix(tokens)
+  local stack, result = {}, {}
+  
+  if not tokens then 
+    self.stack = {}
+    return nil
+  end
+  
+  local function popTop()
+    table.insert(result, table.remove(stack, #stack))
+  end
+  
+  local function popUntil(v)
+    while #stack > 0 do
+      if stack[#stack][1] == v then
+        return true
+      end
+      table.insert(result, table.remove(stack, #stack))
+    end
+    return false
+  end
+  
+  local function printResult()
+    print("result:")
+    for _,v in ipairs(result) do
+      print("  "..v[1])
+    end
+  end
+  
+  for _,v in ipairs(tokens) do
+    local val, kind = unpack(v)
+    if kind == 'number' or
+       kind == 'word' or
+       kind == 'unit' or
+       kind == 'string' then
+      table.insert(result, v)
+    elseif kind == 'function' then
+      table.insert(stack, v)
+    elseif val == ',' then
+      if not popUntil('(') then
+        print("error: RPNExpression.fromInfix missing '('")
+        return nil
+      end
+      printResult()
+    elseif val == '(' then
+      table.insert(stack, v)
+    elseif val == ')' then
+      if popUntil('(') then
+        printResult()
+        table.remove(stack, #stack)
+        if #stack > 0 and stack[#stack][2] == 'function' then
+          popTop()
+        end
+      else
+        print("error: RPNExpression.fromInfix missing '('")
+        return nil
+      end
+    elseif kind == 'operator' then
+      local _, lvl, _, _, assoc = queryOperatorInfo(val)
+      while #stack > 0 and stack[#stack][2] == 'operator' do
+        local _, topLvl, _, _, _ = queryOperatorInfo(stack[#stack][1])
+        if assoc == 'r' or lvl > topLvl then break end
+        popTop()
+      end
+      table.insert(stack, v)
+    end
+  end
+  
+  for _,v in ipairs(stack) do
+    if v[1] == '(' then
+      print("error: RPNExpression.fromInfix paren missmatch")
+      return nil
+    end
+    table.insert(result, v)
+  end
+  
+  self.stack = {}
+  for _,v in ipairs(result) do
+    table.insert(self.stack, v[1])
+  end
+
+  return self.stack
 end
 
 function RPNExpression:_isReverseOp(sym)
@@ -372,82 +621,70 @@ function RPNExpression:appendStack(o)
   end
 end
 
-function RPNExpression:_infixString(top, parentPrec)
-  local sym = self.stack[top]
-  if not sym then return "ERR", top end
-  
-  local fnStr, fnArgs = functionInfo(sym, false)
-  if fnStr ~= nil then
-    local out = fnStr.."("
-    
-    local argidx = fnArgs
-    while argidx > 0 do
-      local tmpOut, tmpTop = self:_infixString(top - 1, nil)
-      out = out .. tmpOut .. (argidx > 1 and "," or "")
-      argidx = argidx - 1
-      top = tmpTop
-    end
-      
-    return out..")", top
-  end
-  
-  local opStr, opPrec, opArgs, opPos, opAssoc = queryOperatorInfo(sym)
-  if opStr ~= nil then
-    local out = ""
-    if opPos < 0 then
-      out = opStr
-    end
-    
-    local argidx = opArgs
-    local minTop = top
-    while argidx > 0 do
-      local tmpStr, tmpTop = self:_infixString(top - argidx, opPrec)
-      if opPos == 0 then
-        out = out .. (argidx == 1 and opStr or "") .. tmpStr
-      else
-        out = out .. (argidx > 1 and ", " or "") .. tmpStr
-      end
-
-      argidx = argidx - 1
-      --top = tmpTop
-      minTop = math.min(minTop, tmpTop)
-    end
-    top = minTop
-    
-    if (parentPrec ~= nil and (opPrec < parentPrec or (opPrec == parentPrec and opAssoc == 'r'))) or (opPos ~= 0 and opArgs > 1) then
-      out = "("..out..")"
-    end
-
-    if opPos > 0 then
-      out = out .. opStr
-    end
-
-    return out, top
-  elseif sym == SYM_LIST or sym == SYM_MAT then
-    local argc = tonumber(self.stack[top - 1])
-    assert(argc)
-    top = top - 1
-
-    local out = sym==SYM_LIST and "{" or "["
-
-    local argidx = argc
-    while argidx > 0 do
-      local tmpStr, tmpTop = self:_infixString(top - 1, opPrec)
-      out = out .. (argidx < argc and "," or "") .. tmpStr
-
-      argidx = argidx - 1
-      top = tmpTop
-    end
-
-    return out..(sym==SYM_LIST and "}" or "]"), top
-  else
-    return sym, top
-  end
-end
-
 function RPNExpression:infixString()
-  local str, _ = self:_infixString(#self.stack, nil)
-  return str
+  local stack = {}
+  
+  local function pushOperator(name, prec, argc, pos, assoc)
+    assoc = assoc == "r" and 1 or 0
+ 
+    local args = {}
+    for i=1,argc do
+      local item = table.remove(stack, #stack)
+      table.insert(args, item)
+    end
+    
+    local str = ""
+    for i,v in ipairs(args) do
+      if pos == 0 and str:len() > 0 then str = name .. str end
+      
+      if v.prec and ((v.prec < prec) or (i == 1 and v.prec < prec + assoc)) then
+        str = "(" .. v.expr .. ")" .. str
+      else
+        str = v.expr .. str
+      end
+    end
+    if pos < 0 then str = name .. str end
+    if pos > 0 then str = str .. name end
+    
+    table.insert(stack, {expr=str, prec=prec})
+  end
+  
+  local function pushFunction(name, argc)
+    local args = {}
+    for i=1,argc do
+      local item = table.remove(stack, #stack)
+      table.insert(args, item)
+    end
+    
+    local str = ""
+    for _,v in ipairs(args) do
+      if str:len() > 0 then str = str .. ',' end
+      str = str .. v.expr
+    end
+    str = name .. "(" .. str .. ")"
+    
+    table.insert(stack, {expr=str, prec=99})
+  end
+  
+  local function push(str)
+    local opname, opprec, opargc, oppos, opassoc = queryOperatorInfo(str)
+    if opname then
+      return pushOperator(opname, opprec, opargc, oppos, opassoc)
+    end
+    
+    local fname, fargc = functionInfo(str, false)
+    if fname then
+      return pushFunction(fname, fargc)
+    end
+    
+    return table.insert(stack, {expr=str})
+  end
+  
+  for _,v in ipairs(self.stack) do
+    push(v)
+  end
+  
+  return #stack > 0 and stack[#stack].expr or nil
 end
 
 
@@ -644,6 +881,33 @@ function UIStack:invalidate()
   platform.window:invalidate()
 end
 
+function UIStack:pushInfix(input)
+  print("info: UIStack.pushInfix call with '"..input.."'")
+
+  local tokens = Infix.tokenize(input)
+  if not tokens then
+    print("error: UIStack.pushInfix tokens is nil")
+    return false
+  end
+
+  local rpn = RPNExpression()
+  local stack = rpn:fromInfix(tokens)
+  if not stack then
+    print("error: UIStack.pushInfix rpn is nil")
+    return false
+  end
+
+  local infix = rpn:infixString()
+  if not infix then
+    print("error: UIStack.pushInfix infix is nil")
+    return false
+  end
+  
+  local res, err = math.evalStr(infix)
+  self:push({["rpn"]=stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
+  return true
+end
+
 function UIStack:pushEval(item)
   local infix = item:infixString()
   local res, err = math.evalStr(infix)
@@ -741,7 +1005,23 @@ function UIStack:toList(n)
   rpn:push(n)
   rpn:push(SYM_LIST)
 
-  self:pushEval(rpn)  
+  self:pushEval(rpn)
+end
+
+function UIStack:toPostfix()
+  if #self.stack <= 0 then return end
+  local rpn = self:pop().rpn
+  
+  local str = ""
+  for _,v in ipairs(rpn) do
+    if str:len() > 0 then str = str .. " " end
+    str = str .. v
+  end
+  str = '"' .. str .. '"'
+  
+  local rpn = RPNExpression()
+  rpn:push(str)
+  self:pushEval(rpn)
 end
 
 function UIStack:label(text)
@@ -1020,6 +1300,8 @@ function UIInput:init(frame)
   self.completionList = nil  -- Current completion candidates
   -- Prefix
   self.prefix = ""           -- Non-Editable prefix shown on the left
+  -- Mode
+  self.tempMode = nil
 end
 
 function UIInput:invalidate()
@@ -1186,16 +1468,15 @@ end
 function UIInput:onCharIn(c)
   self:cancelCompletion()
 
-  if isBalanced(self.text:sub(1, self.cursor.pos)) then
+  if self:getMode() == "RPN" and isBalanced(self.text:sub(1, self.cursor.pos)) then
     if c == " " then return end
     
     -- Remove trailing '(' inserted by some keys
     if #c > 1 and c:byte(#c) == 40 then
       c = c:sub(1, #c-1)
     end 
-     
+    
     recordUndo()
-
     if not dispatchImmediate(c) then
       popUndo()
       self:_insertChar(c)
@@ -1216,6 +1497,19 @@ function UIInput:_insertChar(c)
     if c=="{"  then expanded = c.."}"  end
     if c=="\"" then expanded = c.."\"" end
     if c=="'"  then expanded = c.."'"  end
+    
+    local rhsPos = self.cursor.pos + 1
+    local rhs = #self.text >= rhsPos and self.text:byte(rhsPos) or 0
+    if self.cursor.size == 0 and
+       c==")" and rhs == ASCII_RPAREN or
+       c=="]" and rhs == ASCII_RBRACK or
+       c=="}" and rhs == ASCII_RBRACE or
+       c=='"' and rhs == ASCII_DQUOTE or
+       c=="'" and rhs == ASCII_SQUOTE then
+      self:moveCursor(1)
+      self:invalidate()
+      return
+    end
   end
   
   if self.cursor.pos == self.text:len() then
@@ -1268,12 +1562,19 @@ function UIInput:onEnter()
 
   recordUndo(self.text)
   local c = self.text
-  if dispatchFull(c) ~= true then
-    --stack:pushEval(c) -- TODO: Parse ALG to RPN
-    stack:push(c)
+  if self:getMode() ~= "RPN" or not dispatchFull(c) then
+    if stack:pushInfix(c) then
+      input:setText("")
+    else
+      popUndo()
+      input:selAll()
+      return
+    end
+  else
+    input:setText("")
   end
-  input:setText("")
   
+  self.tempMode = nil
   if currentMacro ~= nil then
     coroutine.resume(currentMacro)
   end
@@ -1302,11 +1603,27 @@ function UIInput:clear()
   self:invalidate()
 end
 
+function UIInput:setTempMode(mode)
+  self.tempMode = mode or options.mode
+  self:invalidate()
+end
+
+function UIInput:getMode()
+  return self.tempMode or options.mode
+end
+
 function UIInput:setText(s, prefix)
   self.text = s or ""
   self.prefix = prefix or ""
   self:setCursor(#self.text)
   self:cancelCompletion()
+  self:invalidate()
+end
+
+function UIInput:selAll()
+  self:cancelCompletion()
+  self.cursor.pos = 0
+  self.cursor.size = #self.text
   self:invalidate()
 end
 
@@ -1357,7 +1674,9 @@ function UIInput:drawText(gc)
   gc:drawString(self.text, x + margin + self.scrollx, y)
   
   if focus == self then
-    gc:setColorRGB(theme[options.theme].cursorColor)
+    gc:setColorRGB(self:getMode() == "RPN" and 
+        theme[options.theme].cursorColor or
+        theme[options.theme].cursorColorAlg)
     gc:fillRect(cursorx+1, y+2, options.cursorWidth, h-3)
   end
   
@@ -1417,6 +1736,7 @@ function assertN(n)
   if #stack.stack < (n or 1) then
     print("Error!")
     -- TODO: Display error message .. handle errors at all
+    input:selAll()
     return false
   end
   return true
@@ -1454,7 +1774,8 @@ function clear()
   recordUndo()
   stack.stack = {}
   stack:invalidate()
-  input:setText("")
+  input:setText("", "")
+  input:setTempMode()
   input:invalidate()
   currentMacro = nil
 end
@@ -1496,9 +1817,7 @@ end
 function _dispatchPushInput(op)
   assert(op)
   if input.text:len() > 0 and input.text ~= op then
-    --stack:pushEval(input.text)
-    -- TODO: We need RPN parsing here!
-    stack:push(input.text)
+    stack:pushInfix(input.text)
     input:setText("")
   end
 end
