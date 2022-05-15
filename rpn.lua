@@ -251,48 +251,289 @@ function tiGetFnArgs(nam)
   return nil
 end
 
+functions = {
+  ["abs"]             = {n = 1},
+  ["amortTbl"]        = {n = 10, min = 4},
+  ["angle"]           = {n = 1},
+  ["approx"]          = {n = 1},
+  ["approxFraction"]  = {n = 1, min = 0},
+  ["approxRational"]  = {n = 2, min = 1},
+  ["arccos"]          = {n = 1},
+  ["arccosh"]         = {n = 1},
+  ["arccot"]          = {n = 1},
+  ["arccoth"]         = {n = 1},
+  ["arccsc"]          = {n = 1},
+  ["arccsch"]         = {n = 1},
+  ["arcLen"]          = {n = 4},
+  ["arcsec"]          = {n = 1},
+  ["arcsech"]         = {n = 1},
+  ["arcsin"]          = {n = 1},
+  ["arcsinh"]         = {n = 1},
+  ["arctan"]          = {n = 1},
+  ["arctanh"]         = {n = 1},
+  ["augment"]         = {n = 2},
+  ["avgRC"]           = {n = 3, min = 2},
+  ["bal"]             = {{n = 10, min = 4},
+                         {n = 2}},
+  ["binomCdf"]        = {{n = 5},
+                         {n = 3},
+                         {n = 2}},
+  ["binomPdf"]        = {{n = 2},
+                         {n = 3}},
+  ["ceiling"]         = {n = 1},
+  ["centralDiff"]     = {n = 3, min = 2},
+  ["cFactor"]         = {n = 2, min = 1},
+  ["char"]            = {n = 1},
+  ["charPoly"]        = {n = 2},
+  ["colAugment"]      = {n = 2},
+  ["colDim"]          = {n = 1},
+  ["colNorm"]         = {n = 1},
+  ["comDenom"]        = {n = 2, min = 1},
+  ["completeSquare"]  = {n = 2},
+  ["conj"]            = {n = 1},
+  ["constructMat"]    = {n = 5},
+  ["corrMat"]         = {n = 20, min = 2},
+  ["cos"]             = {n = 1},
+  ["cos"..SYM_POWN1]  = {n = 1},
+  ["cosh"]            = {n = 1},
+  ["cosh"..SYM_POWN1] = {n = 1},
+  ["cot"]             = {n = 1},
+  ["cot"..SYM_POWN1]  = {n = 1},
+  ["coth"]            = {n = 1},
+  ["coth"..SYM_POWN1] = {n = 1},
+  ["count"]           = {min = 1},
+  ["countif"]         = {n = 2},
+  ["cPolyRoots"]      = {{n = 1},
+                         {n = 2}},
+  ["crossP"]          = {n = 2},
+  ["csc"]             = {n = 1},
+  ["csc"..SYM_POWN1]  = {n = 1},
+  ["csch"]            = {n = 1},
+  ["csch"..SYM_POWN1] = {n = 1},
+  ["cSolve"]          = {{n = 2},
+                         {min = 3}},
+  ["cumulativeSum"]   = {n = 1},
+  ["cZeros"]          = {n = 2},
+  ["dbd"]             = {n = 2},
+  ["deltaList"]       = {n = 1},
+  ["deltaTmpCnv"]     = {n = 2}, -- FIXME: Check n
+  ["delVoid"]         = {n = 1},
+  ["derivative"]      = {n = 2}, -- FIXME: Check n
+  ["deSolve"]         = {n = 3},
+  ["det"]             = {n = 2, min = 1},
+  ["diag"]            = {n = 1},
+  ["dim"]             = {n = 1},
+  ["domain"]          = {n = 2},
+  ["dominantTerm"]    = {n = 3, min = 2},
+  ["dotP"]            = {n = 2},
+  --["e^"]              = {n = 1},
+  ["eff"]             = {n = 2},
+  ["eigVc"]           = {n = 1},
+  ["eigVl"]           = {n = 1},
+  ["euler"]           = {n = 7, min = 6},
+  ["exact"]           = {n = 2, min = 1},
+  ["exp"]             = {n = 1},
+  ["expand"]          = {n = 2, min = 1},
+  ["expr"]            = {n = 1},
+  ["factor"]          = {n = 2, min = 1},
+  ["floor"]           = {n = 1},
+  ["fMax"]            = {n = 4, min = 2},
+  ["fMin"]            = {n = 4, min = 2},
+  ["format"]          = {n = 2, min = 1},
+  ["fPart"]           = {n = 1},
+  ["frequency"]       = {n = 2},
+  ["gcd"]             = {n = 2},
+  ["geomCdf"]         = {n = 3, min = 2},
+  ["geomPdf"]         = {n = 2},
+  ["getDenom"]        = {n = 1},
+  ["getLangInfo"]     = {n = 0},
+  ["getLockInfo"]     = {n = 1},
+  ["getMode"]         = {n = 1},
+  ["getNum"]          = {n = 1},
+  ["getType"]         = {n = 1},
+  ["getVarInfo"]      = {n = 1, min = 0},
+  ["identity"]        = {n = 1},
+  ["ifFn"]            = {n = 4, min = 2},
+  ["imag"]            = {n = 1},
+  ["impDif"]          = {n = 4, min = 3},
+  ["inString"]        = {n = 3, min = 2},
+  ["int"]             = {n = 1},
+  ["integral"]        = {n = 2},
+  ["intDiv"]          = {n = 2},
+  ["interpolate"]     = {n = 4},
+  --["invX^2"]          = {n = 1},
+  --["invF"]            = {n = 1},
+  ["invNorm"]         = {n = 3, min = 2},
+  ["invt"]            = {n = 2},
+  ["iPart"]           = {n = 1},
+  ["irr"]             = {n = 3, min = 2},
+  ["isPrime"]         = {n = 1},
+  ["isVoid"]          = {n = 1},
+  ["lcm"]             = {n = 2},
+  ["left"]            = {n = 2, min = 1},
+  ["libShortcut"]     = {n = 3, min = 2},
+  ["limit"]           = {n = 4, min = 3},
+  ["lim"]             = {n = 4, min = 3},
+  ["linSolve"]        = {n = 2},
+  ["ln"]              = {n = 1},
+  ["log"]             = {n = 2, min = 1},
+  ["max"]             = {n = 2},
+  ["mean"]            = {n = 2},
+  ["median"]          = {n = 2, min = 1},
+  ["mid"]             = {n = 3, min = 2},
+  ["min"]             = {n = 2},
+  ["mirr"]            = {n = 5, min = 4},
+  ["mod"]             = {n = 2},
+  ["mRow"]            = {n = 3},
+  ["mRowAdd"]         = {n = 4},
+  ["nCr"]             = {n = 2},
+  ["nDerivative"]     = {n = 3, min = 2},
+  ["newList"]         = {n = 1},
+  ["newMat"]          = {n = 2},
+  ["nfMax"]           = {n = 4, min = 2},
+  ["nfMin"]           = {n = 4, min = 2},
+  ["nInt"]            = {n = 4},
+  ["nom"]             = {n = 2},
+  ["norm"]            = {n = 1},
+  ["normalLine"]      = {n = 3, min = 2},
+  ["normCdf"]         = {n = 4, min = 2},
+  ["normPdf"]         = {n = 3, min = 1},
+  ["nPr"]             = {n = 2},
+  ["pnv"]             = {n = 4, min = 3},
+  ["nSolve"]          = {n = 4, min = 2},
+  ["ord"]             = {n = 1},
+  ["piecewise"]       = {min = 1},
+  ["poissCdf"]        = {n = 3, min = 2},
+  ["poissPdf"]        = {n = 2},
+  ["polyCoeffs"]      = {n = 2, min = 1},
+  ["polyDegree"]      = {n = 2, min = 1},
+  ["polyEval"]        = {n = 2},
+  ["polyGcd"]         = {n = 2},
+  ["polyQuotient"]    = {n = 3, min = 2},
+  ["polyRemainder"]   = {n = 3, min = 2},
+  ["polyRoots"]       = {n = 2, min = 1},
+  ["prodSeq"]         = {n = 4}, -- FIXME: Check n
+  ["product"]         = {n = 3, min = 0},
+  ["propFrac"]        = {n = 2, min = 1},
+  ["rand"]            = {n = 1, min = 0},
+  ["randBin"]         = {n = 3, min = 2},
+  ["randInt"]         = {n = 3, min = 2},
+  ["randMat"]         = {n = 2},
+  ["randNorm"]        = {n = 3, min = 2},
+  ["randSamp"]        = {n = 3, min = 2},
+  ["real"]            = {n = 1},
+  ["ref"]             = {n = 2, min = 1},
+  ["remain"]          = {n = 2},
+  ["right"]           = {n = 2, min = 1},
+  ["rk23"]            = {n = 7, min = 6},
+  ["root"]            = {n = 2, min = 1},
+  ["rotate"]          = {n = 2, min = 1},
+  ["round"]           = {n = 2, min = 1},
+  ["rowAdd"]          = {n = 3},
+  ["rowDim"]          = {n = 1},
+  ["rowNorm"]         = {n = 1},
+  ["rowSwap"]         = {n = 3},
+  ["rref"]            = {n = 2, min = 1},
+  ["sec"]             = {n = 1},
+  ["sec"..SYM_POWN1]  = {n = 1},
+  ["sech"]            = {n = 1},
+  ["sech"..SYM_POWN1] = {n = 1},
+  ["seq"]             = {n = 5, min = 4},
+  ["seqGen"]          = {n = 7, min = 4},
+  ["seqn"]            = {n = 4, min = 1},
+  ["series"]          = {n = 4, min = 3},
+  ["setMode"]         = {n = 2, min = 1},
+  ["shift"]           = {n = 2, min = 1},
+  ["sign"]            = {n = 1},
+  ["simult"]          = {n = 3, min = 2},
+  ["sin"]             = {n = 1},
+  ["sin"..SYM_POWN1]  = {n = 1},
+  ["sinh"]            = {n = 1},
+  ["sinh"..SYM_POWN1] = {n = 1},
+  ["solve"]           = {n = 2},
+  ["sqrt"]            = {n = 1, pretty = SYM_ROOT},
+  [SYM_ROOT]          = {n = 1},
+  ["stDefPop"]        = {n = 2, min = 1},
+  ["stDefSamp"]       = {n = 2, min = 1},
+  ["string"]          = {n = 1},
+  ["subMat"]          = {n = 5, min = 1},
+  ["sum"]             = {n = 3, min = 1},
+  ["sumIf"]           = {n = 3, min = 2},
+  ["sumSeq"]          = {n = 5, min = 4}, -- FIXME: Check n
+  ["system"]          = {min = 1},
+  ["tan"]             = {n = 1},
+  ["tan"..SYM_POWN1]  = {n = 1},
+  ["tangentLine"]     = {n = 3, min = 2},
+  ["tanh"]            = {n = 1},
+  ["tanh"..SYM_POWN1] = {n = 1},
+  ["taylor"]          = {n = 4, min = 3},
+  ["tCdf"]            = {n = 3},
+  ["tCollect"]        = {n = 1},
+  ["tExpand"]         = {n = 1},
+  ["tmpCnv"]          = {n = 2},
+  ["deltaTmpCnv"]     = {n = 2},
+  ["tPdf"]            = {n = 2},
+  ["trace"]           = {n = 1},
+  ["tvmFV"]           = {n = 7, min = 4},
+  ["tvml"]            = {n = 7, min = 4},
+  ["tvmN"]            = {n = 7, min = 4},
+  ["tvmPmt"]          = {n = 7, min = 4},
+  ["tvmPV"]           = {n = 7, min = 4},
+  ["unitV"]           = {n = 1},
+  ["varPop"]          = {n = 2, min = 1},
+  ["varSamp"]         = {n = 2, min = 1},
+  ["warnCodes"]       = {n = 2},
+  ["when"]            = {n = 4, min = 2},
+  ["zeros"]           = {n = 2},
+}
+
 --[[
 Function info table
   str, args
 --]]
 function functionInfo(s, builtinOnly)
-  -- TODO: THIS IMPLEMENTATION IS ONLY FOR TESTING.
-  --       Replace with a table, see `operators`
+  local name, argc = s, nil
+  
+  if s:find('^%d') then
+    return nil
+  end
+  
+  local argcBegin = s:find('%d+$')
+  if argcBegin and argcBegin > 1 then
+    argc = tonumber(s:sub(argcBegin))
+    name = name:sub(1, argcBegin-1)
+  end
 
-  if s=="root" then return s, 2 end
-  if s=="sqrt" or s==SYM_ROOT then return SYM_ROOT, 1 end
-  if s=="exp"      then return s, 1 end
-  if s=="abs"      then return s, 1 end
-  if s=="ceiling" then return "ceiling", 1 end
-  if s=="floor" then return "floor", 1 end
-  if s=="int" or s=="real" then return s, 1 end
-  
-  -- CAS
-  if s=="solve" or s=="zeros" or s=="nsolve" or s=="derivative" then
-    return s, 2
+  local info = functions[name]
+  if info then
+    if not argc then
+      if #info > 1 then -- Overloaded function
+        for _,v in ipairs(info) do -- Take first default
+          if v.def then
+            argc = v.def
+            break
+          end
+        end
+        if not argc then -- Take first overload
+          argc = info[1].min or info[1].n
+        end
+      else
+        if info.def then
+          argc = info.def
+        else
+          argc = info.min
+        end
+        
+        argc = argc or info.n
+      end
+    end
+
+    return info.pretty or name, argc
   end
-  -- TRIG
-  if s=="sin" or s=="cos" or s=="tan" or
-     s=="arcsin" or s=="arccos" or s=="arctan" or 
-     s=="sin\239\128\133" or s=="cos\239\128\133" or s=="tan\239\128\133" then
-    return s, 1
-  end
-  
-  -- OTHER
-  if s=="when"     then return s, 3 end
-  if s=="string"   then return s, 1 end
-  if s=="approx"   then return s, 1 end
-  if s=="store"    then return s, 2 end
-  
-  if s=="seq" then return s, 4 end
-  if s=="sumSeq" then return s, 4 end
-  if s=="sum" then return s, 3 end
-  
-  if s=="left" or s=="right" then return s, 1 end
   
   -- User function
   if builtinOnly == false then
-    local argc = tiGetFnArgs(s)
+    argc = tiGetFnArgs(s)
     if argc ~= nil then
       return s, argc
     end  
