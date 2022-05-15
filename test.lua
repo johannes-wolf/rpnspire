@@ -89,6 +89,12 @@ function test:tokenize_infix()
   -- String
   expect('"hello"', {{'"hello"', 'str'}})
 
+  -- List
+  expect('{1,2}', {{'{', 'sy'}, {'1', 'n'}, {',', 'sy'}, {'2', 'n'}, {'}', 'sy'}})
+
+  -- Matrix
+  expect('[1,2]', {{'[', 'sy'}, {'1', 'n'}, {',', 'sy'}, {'2', 'n'}, {']', 'sy'}})
+
   -- Implicit multiplication
   expect("2x",   {{'2', 'n'}, {'*', 'o'}, {'x', 'w'}})
   expect("2(1)", {{'2', 'n'}, {'*', 'o'}, {'(', 'sy'}, {'1', 'n'}, {')', 'sy'}})
@@ -168,6 +174,17 @@ function test.infix_to_rpn_to_infix()
   -- Preserve function calls
   expect("sin(pi)")
 
+  -- Lists
+  expect("{}")
+  expect("{1}")
+  expect("{1,2}")
+  expect("{1,2,3}")
+  expect("{(1+a)*2,2+b,3+c}")
+
+  -- Matrix (NOT YET IMPLEMENTED)
+  --expect("[1]", "[[1]]")
+  --expect("[[1,2,3],[4,5,6]]")
+
   -- Remove parens
   expect("(2^2)", "2^2")
   expect("(((2^2)))", "2^2")
@@ -200,7 +217,7 @@ function test.rpn_to_infix()
   -- Functions
   expect({1, 'sin'}, "sin(1)")
   expect({1, 2, '+', 'sin'}, "sin(1+2)")
-  expect({2, 'x', '*', 10, '=', 'x', 'solve'}, "solve(2*x=10,x)") -- BUG
+  expect({2, 'x', '*', 10, '=', 'x', 'solve'}, "solve(2*x=10,x)")
 end
 
 Test.run(test)

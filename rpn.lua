@@ -514,11 +514,6 @@ function Infix.tokenize(input)
     end
   end
 
-  print("tokens:")
-  for _,v in ipairs(tokens) do
-    print("  "..v[1].." ("..v[2]..")")
-  end
-
   return tokens
 end
 
@@ -531,67 +526,198 @@ function RPNExpression:init(stack)
 end
 
 function RPNExpression:fromInfix(tokens)
-  local stack, result = {}, {}
-  
-  if not tokens then 
+  if not tokens then
     self.stack = {}
     return nil
+  end
+
+  local stack, result = {}, {}
+
+  -- Forward declarations
+  local beginFunction = nil
+  local beginList = nil
+  local beginMatrix = nil
+
+  -- State
+  local listLevel = 0
+  local matrixLevel = 0
+
+  local idx = 1
+  local function next()
+    local token = idx <= #tokens and tokens[idx] or nil
+    idx = idx + 1
+    return token
+  end
+
+  local function testTop(kind)
+    return #stack > 0 and stack[#stack][2] == kind or nil
   end
   
   local function popTop()
     table.insert(result, table.remove(stack, #stack))
   end
   
-  local function popUntil(v)
+  local function popUntil(value)
     while #stack > 0 do
-      if stack[#stack][1] == v then
+      if stack[#stack][1] == value then
         return true
       end
       table.insert(result, table.remove(stack, #stack))
     end
     return false
   end
-  
-  for _,v in ipairs(tokens) do
-    local val, kind = unpack(v)
-    if kind == 'number' or
-       kind == 'word' or
-       kind == 'unit' or
-       kind == 'string' then
-      table.insert(result, v)
-    elseif kind == 'function' then
-      table.insert(stack, v)
-    elseif val == ',' then
-      if not popUntil('(') then
-        print("error: RPNExpression.fromInfix missing '('")
-        return nil
+
+  local function handleOperator(sym)
+    local _, prec, _, _, assoc = queryOperatorInfo(sym)
+
+    while testTop('operator') do
+      local topName, top_prec, _, _, _ = queryOperatorInfo(stack[#stack][1])
+      if (assoc ~= 'r' and prec <= top_prec) or
+         (assoc == 'r' and prec < top_prec) then
+        popTop()
+      else
+        break
       end
-    elseif val == '(' then
-      table.insert(stack, v)
-    elseif val == ')' then
+    end
+    table.insert(stack, {sym, 'operator'})
+  end
+
+  local function handleDefault(value, kind)
+    assert(value)
+    assert(kind)
+
+    if kind == 'number' or kind == 'word' or kind == 'unit' or kind == 'string' then
+      table.insert(result, {value, kind})
+    elseif kind == 'function' then
+      beginFunction(value)
+    elseif kind == 'syntax' and value == '(' then
+      table.insert(stack, {value, kind})
+    elseif kind == 'syntax' and value == ')' then
       if popUntil('(') then
         table.remove(stack, #stack)
-        if #stack > 0 and stack[#stack][2] == 'function' then
-          popTop()
-        end
       else
         print("error: RPNExpression.fromInfix missing '('")
-        return nil
       end
+    elseif kind == 'syntax' and value == '{' then
+      table.insert(stack, {value, kind})
+      listLevel = listLevel + 1
+      if not beginList() then return end
+      listLevel = listLevel - 1
+    elseif kind == 'syntax' and value == '[' then
+      table.insert(stack, {value, kind})
+      matrixLevel = matrixLevel + 1
+      if not beginMatrix() then return end
+      matrixLevel = matrixLevel - 1
     elseif kind == 'operator' then
-      local _, lvl, _, _, assoc = queryOperatorInfo(val)
-      while #stack > 0 and stack[#stack][2] == 'operator' do
-        local topName, topLvl, _, _, _ = queryOperatorInfo(stack[#stack][1])
-        if (assoc ~= 'r' and lvl <= topLvl) or (assoc == 'r' and lvl < topLvl) then
-          popTop()
-        else
-          break
+      handleOperator(value)
+    else
+      return false
+    end
+
+    return true
+  end
+
+  beginFunction = function(name)
+    local argc = 0
+    for token in next do
+      local value, kind = token[1], token[2]
+      if value == ',' then
+        argc = argc + 1
+        if not popUntil('(') then
+          print("error: RPNExpression.fromInfix missing '('")
+          return
         end
+      elseif value == ')' then
+        if popUntil('(') then
+          table.remove(stack, #stack)
+          table.insert(result, {name, 'function'})
+          return
+        else
+          print("error: RPNExpression.fromInfix missing '('")
+          return
+        end
+      else
+        if argc == 0 then argc = 1 end
+        handleDefault(value, kind)
       end
-      table.insert(stack, v)
     end
   end
-  
+
+  beginList = function()
+    if listLevel > 1 then
+      print("error: RPNExpression.fromInfix Nested lists are not allowed")
+      return
+    end
+
+    local argc = 0
+    for token in next do
+      local value, kind = token[1], token[2]
+      if value == ',' then
+        argc = argc + 1
+        if not popUntil('{') then
+          print("error: RPNExpression.fromInfix missing '{'")
+          return
+        end
+      elseif value == '}' then
+        if popUntil('{') then
+          table.remove(stack, #stack)
+          table.insert(result, {tostring(argc), 'number'})
+          table.insert(result, {'}', 'syntax'})
+          return
+        else
+          print("error: RPNExpression.fromInfix missing '{'")
+          return
+        end
+      else
+        if argc == 0 then argc = 1 end
+        handleDefault(value, kind)
+      end
+    end
+  end
+
+  beginMatrix = function()
+    if matrixLevel > 1 then
+      print("error: RPNExpression.fromInfix nested matrices are not allowed")
+      return
+    end
+
+    local rows, cols = 0, 0
+    for token in next do
+      local value, kind = token[1], token[2]
+      if value == ',' then
+        argc = argc + 1
+        if not popUntil('[') then
+          print("error: RPNExpression.fromInfix missing '['")
+          return
+        end
+      elseif value == '[' and matrixLevel == 1 then
+        argc = argc + 1
+        if not popUntil('[') then
+          print("error: RPNExpression.fromInfix missing '['")
+          return
+        end
+        handleDefault(value, kind)
+      elseif value == ']' then
+        if popUntil('[') then
+          table.remove(stack, #stack)
+          table.insert(result, {tostring(argc), 'number'})
+          table.insert(result, {']', 'syntax'})
+          return
+        else
+          print("error: RPNExpression.fromInfix missing '['")
+          return
+        end
+      else
+        if argc == 0 then argc = 1 end
+        handleDefault(value, kind)
+      end
+    end
+  end
+
+  for token in next do
+    handleDefault(token[1], token[2])
+  end
+
   while #stack > 0 do
     if stack[#stack][1] == '(' then
       print("error: RPNExpression.fromInfix paren missmatch")
@@ -601,10 +727,8 @@ function RPNExpression:fromInfix(tokens)
   end
 
   self.stack = {}
-  print("rpn:")
   for _,v in ipairs(result) do
     table.insert(self.stack, v[1])
-    print("  "..v[1])
   end
 
   return self.stack
@@ -681,8 +805,48 @@ function RPNExpression:infixString()
     
     table.insert(stack, {expr=str, prec=99})
   end
+
+  local function pushList()
+    local length = tonumber(table.remove(stack, #stack).expr)
+    assert(length)
+
+    local str = ""
+    while length > 0 do
+      str = table.remove(stack, #stack).expr .. str
+      if length > 1 then str = "," .. str end
+      length = length - 1
+    end
+    str = "{" .. str .. "}"
+
+    table.insert(stack, {expr=str, prec=99})
+  end
+
+  local function pushMatrix()
+    local rows = tonumber(table.remove(stack, #stack).expr)
+    local cols = tonumber(table.remove(stack, #stack).expr)
+    assert(rows and rows >= 1)
+    assert(cols and cols >= 1)
+
+    local str = ""
+    while rows > 0 do
+      str = str .. "["
+      for col=cols,0,-1 do
+        str = table.remove(stack, #stack).expr .. str
+        if col > 1 then str = "," .. str end
+        rows = rows - 1
+      end
+      str = str .. "]"
+    end
+    str = "[" .. str .. "]"
+
+    table.insert(stack, {expr=str, prec=99})
+  end
   
   local function push(str)
+    if str == '}' then
+      return pushList()
+    end
+
     local opname, opprec, opargc, oppos, opassoc, opaggrassoc = queryOperatorInfo(str)
     if opname then
       return pushOperator(opname, opprec, opargc, oppos, opassoc, opaggrassoc)
