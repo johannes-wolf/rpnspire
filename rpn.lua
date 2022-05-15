@@ -1665,18 +1665,10 @@ function UIInput:drawText(gc)
   
   gc:clipRect("set", x, y, w, h)
   
-  if self.cursor.size ~= 0 then
-    local cursor2x = gc:getStringWidth(string.sub(self.text, 1, self.cursor.pos + self.cursor.size))
-    cursor2x = cursor2x + x + margin + self.scrollx
-    
-    local cursorLeft, cursorRight = math.min(cursorx, cursor2x), math.max(cursorx, cursor2x)
-    
-    gc:drawRect(cursorLeft + 1, y + 2, cursorRight - cursorLeft, h-3)
-  end
-  
+  -- Draw prefix text
   if self.prefix:len() > 0 then
     local prefixWidth = gc:getStringWidth(self.prefix) + 2*margin
-  
+
     --gc:setColorRGB(theme[options.theme].altRowColor)
     --gc:fillRect(x, y+1, prefixWidth, h-2)
     gc:setColorRGB(theme[options.theme].fringeTextColor)
@@ -1684,6 +1676,14 @@ function UIInput:drawText(gc)
     
     x = x + prefixWidth
     cursorx = cursorx + prefixWidth
+  end
+  
+  -- Draw cursor selection box  
+  if self.cursor.size ~= 0 then
+    local selWidth = gc:getStringWidth(string.sub(self.text, self.cursor.pos+1, self.cursor.pos + self.cursor.size))
+    local cursorLeft, cursorRight = math.min(cursorx, cursorx + selWidth), math.max(cursorx, cursorx + selWidth)
+    
+    gc:drawRect(cursorLeft + 1, y + 2, cursorRight - cursorLeft, h-3)
   end
   
   gc:setColorRGB(theme[options.theme].textColor)
