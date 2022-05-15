@@ -1,0 +1,15 @@
+name: test
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@master
+
+    - uses: leafo/gh-actions-lua@v9
+
+    - name: test
+      run: |
+        lua test.lua
