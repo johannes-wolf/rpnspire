@@ -933,30 +933,29 @@ function RPNExpression:fromInfix(tokens)
     for token in next do
       local value, kind = token[1], token[2]
       if value == ',' then
-        argc = argc + 1
+        cols = cols + 1
         if not popUntil('[') then
           print("error: RPNExpression.fromInfix missing '['")
           return
         end
-      elseif value == '[' and matrixLevel == 1 then
-        argc = argc + 1
+      elseif value == '[' then
+        rows = rows + 1
         if not popUntil('[') then
           print("error: RPNExpression.fromInfix missing '['")
           return
         end
-        handleDefault(value, kind)
+        --handleDefault(value, kind)
       elseif value == ']' then
         if popUntil('[') then
           table.remove(stack, #stack)
-          table.insert(result, {tostring(argc), 'number'})
-          table.insert(result, {']', 'syntax'})
+          --table.insert(result, {tostring(argc), 'number'})
+          --table.insert(result, {']', 'syntax'})
           return
         else
           print("error: RPNExpression.fromInfix missing '['")
           return
         end
       else
-        if argc == 0 then argc = 1 end
         handleDefault(value, kind)
       end
     end
