@@ -557,6 +557,8 @@ rpnFunctions = {
   ["pick3"]= function() stack:pick(3) end,
   ["del"]  = function() stack:pop() end,
   ["tolist"]= function() stack:toList() end,
+  
+  ["clearaz"] = function() math.evalStr("clearaz") end,
   -- History
   ["undo"] = function() popUndo(); undo() end, -- HACK: popUndo to remove the undo of the undo
   -- Weird features
