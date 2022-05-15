@@ -45,7 +45,7 @@ end
 function string.unquote(str)
   if str:sub(1, 1) == '"' and
      str:sub(-1)   == '"' then
-    return str:sub(2, -1)
+    return str:sub(2, -2)
   end
   return str
 end
