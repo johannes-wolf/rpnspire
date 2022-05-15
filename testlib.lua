@@ -45,4 +45,7 @@ function Test.run(tests)
   end
 
   print("Ran "..(ok + failed).." tests ("..ok.." succeeded, "..failed.." failed)")
+  if failed > 0 then
+    os.exit(1)
+  end
 end
