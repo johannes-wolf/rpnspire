@@ -148,9 +148,7 @@ SYM_TRANSP = ""
 SYM_DEGREE = "\194\176"
 SYM_CONVERT= "\226\150\182"
 SYM_EE     = "\239\128\128"
-
-SYM_LIST   = "@LIST" -- RPN list operator
-SYM_MAT    = "@MAT"  -- RPN matrix operator
+SYM_POWN1  = "\239\128\133" -- ^-1
 
 operators = {
   --[[                 string, lvl, #, side, assoc, aggressive-assoc ]]--
@@ -163,7 +161,8 @@ operators = {
   ["%"]             = {nil,     17, 1,  1},
   [SYM_RAD]         = {nil,     17, 1,  1},
   -- [" "]             = {nil, 17, 1,  1}, -- SUBSCRIPT
-  -- [SYM_TRANSP]      = {nil, 17, 1,  1}, -- TRANSPOSE
+  ["@t"]            = {SYM_TRANSP, 17, 1, 1},
+  [SYM_TRANSP]      = {nil,     17, 1,  1},
   --
   ["^"]             = {nil,     16, 2,  0, 'r', true}, -- Matching V200 RPN behavior
   --
@@ -206,7 +205,10 @@ operators = {
   --
   [SYM_STORE]       = {nil,      5, 2,  0, 'r'},
   ["=:"]            = {SYM_STORE,5, 2,  0, 'r'},
-  [":="]            = {nil,      5, 2,  0, 'r'}
+  [":="]            = {nil,      5, 2,  0, 'r'},
+  
+  [SYM_CONVERT]     = {nil, 1, 2, 0},
+  ["@>"]            = {SYM_CONVERT, 1, 2,  0}
 }
 operators_trie = Trie.build(operators)
 
