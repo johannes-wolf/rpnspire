@@ -626,7 +626,11 @@ function Infix.tokenize(input)
   end
 
   local function word(input, i)
-    return input:find('^(%a+[_%w]*)', i)
+    local li, lj, ltoken = input:find('^(%a[_%w]*%.%a[_%w]*)', i)
+    if not li then
+      return input:find('^(%a[_%w]*)', i)
+    end
+    return li, lj, ltoken
   end
 
   local function unit(input, i)
