@@ -1392,6 +1392,7 @@ function UIInput:nextCompletion(offset)
               tail
 
   self.cursor.size = #self.completionList[self.completionIdx]
+  self:scrollToPos()
   self:invalidate()
   
   -- Apply single entry using [tab]
@@ -1423,20 +1424,21 @@ function UIInput:setCursor(pos, scroll)
   self:cancelCompletion()
 end
 
-function UIInput:_cursorX()
+function UIInput:getCursorX(pos)
   local x = platform.withGC(function(gc)
-    return gc:getStringWidth(string.sub(self.text, 1, self.cursor.pos))
+    local offset = 0
+    if self.prefix then
+      offset = gc:getStringWidth(self.prefix) + 2*self.margin
+    end
+    return offset + gc:getStringWidth(string.sub(self.text, 1, pos or self.cursor.pos))
   end)
-  
   return x
 end
 
 function UIInput:scrollToPos(pos)
-  pos = pos or self.cursor.pos + self.cursor.size
-  
   local _,_,w,_ = self:getFrame()
   local margin = self.margin
-  local cx = self:_cursorX()
+  local cx = self:getCursorX(pos or self.cursor.pos + self.cursor.size)
   local sx = self.scrollx
   
   if cx + sx > w - margin then
@@ -1660,8 +1662,9 @@ end
 function UIInput:drawText(gc)
   local margin = self.margin
   local x,y,w,h = self:getFrame()
+  local scrollx = self.scrollx
   local cursorx = gc:getStringWidth(string.sub(self.text, 1, self.cursor.pos))
-  cursorx = cursorx + x + self.scrollx
+  cursorx = cursorx + x + scrollx
   
   gc:clipRect("set", x, y, w, h)
   
@@ -1676,18 +1679,19 @@ function UIInput:drawText(gc)
     
     x = x + prefixWidth
     cursorx = cursorx + prefixWidth
+    gc:clipRect("set", x, y, w, h)
   end
   
   -- Draw cursor selection box  
   if self.cursor.size ~= 0 then
     local selWidth = gc:getStringWidth(string.sub(self.text, self.cursor.pos+1, self.cursor.pos + self.cursor.size))
     local cursorLeft, cursorRight = math.min(cursorx, cursorx + selWidth), math.max(cursorx, cursorx + selWidth)
-    
+
     gc:drawRect(cursorLeft + 1, y + 2, cursorRight - cursorLeft, h-3)
   end
   
   gc:setColorRGB(theme[options.theme].textColor)
-  gc:drawString(self.text, x + margin + self.scrollx, y)
+  gc:drawString(self.text, x + margin + scrollx, y)
   
   if focus == self then
     gc:setColorRGB(self:getMode() == "RPN" and 
