@@ -1419,19 +1419,19 @@ function UIStack:toList(n)
   assert(type(n)=="number")
   assert(n >= 0)
 
+  local newTop = math.max(#stack.stack - n + 1, 1)
   local rpn = RPNExpression()
-  for i=1, n do
-    local arg = stack:pop(#stack.stack)
-    if arg ~= nil then
+  for i=1,n do
+    local arg = stack:pop(newTop)
+    if arg then
       rpn:appendStack(arg.rpn)
     else
-      -- TODO: Error
-      rpn:push(0)
+      n = n - 1
     end
   end
-
-  rpn:push(n)
-  rpn:push(SYM_LIST)
+  
+  rpn:push(tostring(n))
+  rpn:push('}')
 
   self:pushEval(rpn)
 end
