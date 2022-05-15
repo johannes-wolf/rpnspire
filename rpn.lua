@@ -1902,7 +1902,7 @@ function UIInput:onCharIn(c)
     if c == " " then return end
     
     -- Remove trailing '(' inserted by some keys
-    if c:sub(-1) == '(' then
+    if c:len() > 1 and c:sub(-1) == '(' then
       c = c:sub(1, -2)
     end 
     
@@ -2301,6 +2301,10 @@ end
 
 function dispatchImmediate(op)
   if mode ~= "RPN" then return false end
+  
+  if input.text:sub(-2) == '@' then
+    return false
+  end
 
   local fnStr, fnArgs = functionInfo(op, true)
   if fnStr ~= nil then
@@ -2330,7 +2334,7 @@ end
 
 function dispatchFull(op)
   -- Call internal function
-  if op:sub(1,1) == "@" then
+  if op:find('^@%w') then
     local fnStr = op:sub(2)
     local fn = rpnFunctions[fnStr]
     if fn ~= nil then
