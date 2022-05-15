@@ -464,13 +464,14 @@ function Infix.tokenize(input)
     end
     
     -- 1(...)
-    if token == '(' and (top[2] == 'number' or top[2] == 'unit' or top[2] == 'string' or top[1] == ')') then
+    if (token == '(' or token == '{' or token == '[') and
+       (top[2] == 'number' or top[2] == 'unit' or top[2] == 'string' or top[1] == ')') then
       return true
     end
     
     -- (...)1
     if kind ~= 'syntax' then
-      if top[2] ~= 'syntax' or top[1] == ')' then
+      if top[2] ~= 'syntax' or top[1] == ')' or top[1] == '}' or top[1] == ']' then
         return true
       end
     end

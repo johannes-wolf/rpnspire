@@ -170,6 +170,8 @@ function test.infix_to_rpn_to_infix()
   expect("1(3)", "1*3")
   expect("(3)1", "3*1")
   expect("5_m", "5*_m")
+  expect("5{1}", "5*{1}")
+  expect("{1}5", "{1}*5")
 
   -- Preserve function calls
   expect("sin(pi)")
