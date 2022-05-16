@@ -72,15 +72,15 @@ Uppercase letters are used as global shortcuts, even if the input view is focuse
 * [x] Unlimmited* undo and redo (`U` - undo, `R` - redo)
 * [x] Autocompletion for functions, variables and units
 * [x] A fast numblock driven menu system
+- [x] Support for lists
+- [x] Writing glue for all of the nspires functions
 * [x] Theming support 🔥 
 
 ## Not implemented yet
 - [ ] Error handling
-- [ ] Support for lists (parser)
 - [ ] Support for matrixes (parser)
-- [ ] Writing glue for all of the nspires functions
 - [ ] Correct handling of unicode charactes in the input entry
 - [ ] Touchpad support (scrolling etc.)
 
 ## What is not working
-* It is not possible (yet?) to call TI-Basic Apps from Lua
+* It is not possible to call TI-Basic Apps from Lua
