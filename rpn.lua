@@ -561,7 +561,8 @@ rpnFunctions = {
   ["pick3"]= function() stack:pick(3) end,
   ["del"]  = function() stack:pop() end,
   ["tolist"]= function() stack:toList() end,
-  
+  ["rpn"]  = function() options.mode = "RPN" end,
+  ["alg"]  = function() options.mode = "ALG" end,
   ["clearaz"] = function() math.evalStr("clearaz") end,
   -- History
   ["undo"] = function() popUndo(); undo() end, -- HACK: popUndo to remove the undo of the undo
@@ -2529,7 +2530,10 @@ function on.construction()
       {"ROLL 3", function() stack:roll(3) end},
       {"DEL",    function() stack:pop() end},
       {"UNDO",   function() undo() end},
-      {SYM_CONVERT.."List", function() stack:toList() end}
+      {SYM_CONVERT.."List", function() stack:toList() end},
+    },
+    {"Clear",
+      {"Clear A-Z", function() math.evalStr("ClearAZ") end},
     },
     {"Settings",
       {"Light theme", function() options.theme = "light" end},
@@ -2680,7 +2684,8 @@ function on.contextMenu()
           {"light", function() options.theme="light" end},
           {"dark",  function() options.theme="dark" end},
         }}
-      }}
+      }},
+      {"Clear A-Z", function() math.evalStr("ClearAZ") end},
     })
   elseif focus == input then
     menu:present(input, {
@@ -2688,12 +2693,17 @@ function on.contextMenu()
         {"g", "_g"}, {"c", "_c"},
       }},
       {"Units", {
+        {"Length", {
+          {"m", "_m"}
+        }},
         {"Mass", {
           {"kg", "_kg"}
         }}
-      }}, {"CAS", {
+      }},
+      {"CAS", {
         {"solve", "solve"}, {"zeros", "zeros"}
-      }}, {options.mode == "RPN" and "ALG" or "RPN", function() options.mode = options.mode == "RPN" and "ALG" or "RPN" end},
+      }}, 
+      {options.mode == "RPN" and "ALG" or "RPN", function() options.mode = options.mode == "RPN" and "ALG" or "RPN" end},
     })
   end
 end
