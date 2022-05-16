@@ -775,7 +775,7 @@ function Infix.tokenize(input)
     end
     
     if pos <= oldPos then
-      print("error: Infix.tokenize no match at "..pos.." '"..input:sub(pos).."'")
+      print("error: Infix.tokenize no match at "..pos.." '"..input:usub(pos).."' ("..input:byte(pos)..")")
       return nil, pos
     end
   end
@@ -1964,7 +1964,7 @@ function UIInput:_insertChar(c)
   local expanded = c
   if options.autoClose == true then
     -- Add closing paren
-    local matchingParen, isOpening = unpack(parenPairs[c] or {})
+    local matchingParen, isOpening = unpack(parenPairs[c:usub(-1)] or {})
     if matchingParen and isOpening then
       expanded = c..matchingParen
     end
