@@ -2005,6 +2005,15 @@ function UIInput:onEnter()
   recordUndo(self.text)
   local c = self.text
   if self:getMode() ~= "RPN" or not dispatchFull(c) then
+    -- Since dispatchFull is not called in ALG mode,
+    -- we need this special check here.
+    if c == "@rpn" then
+      options.mode = "RPN"
+      input:setText()
+      popUndo()
+      return
+    end 
+ 
     if stack:pushInfix(c) then
       input:setText("")
     else
@@ -2259,7 +2268,6 @@ end
 
 --[[ === EVALUATION == ]]--
 function _dispatchPushInput(op)
-  assert(op)
   if input.text:len() > 0 and input.text ~= op then
     stack:pushInfix(input.text)
     input:setText("")
@@ -2520,8 +2528,6 @@ end
 function on.construction()
   bigview = D2Editor.newRichText() -- TODO: Refactor to custom view
 
-  mode = "RPN"
-  
   toolpalette.register({
     {"Stack",
       {"DUP 2",  function() stack:dup(2) end},
