@@ -2320,7 +2320,7 @@ function dispatchOperator(op)
 end
 
 function dispatchImmediate(op)
-  if input.text:sub(-2) == '@' then
+  if input.text:sub(-1) == '@' then
     return false
   end
 
