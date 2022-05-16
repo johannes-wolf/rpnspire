@@ -175,6 +175,8 @@ function test.infix_to_rpn_to_infix()
 
   -- Preserve function calls
   expect("sin(pi)")
+  expect("root(x)", "root(x)")
+  expect("root(x,y)", "root(x,y)")
 
   -- Lists
   expect("{}")
@@ -217,9 +219,9 @@ function test.rpn_to_infix()
   expect({1, 2, '^', 3, '^'}, "(1^2)^3")
 
   -- Functions
-  expect({1, 'sin'}, "sin(1)")
-  expect({1, 2, '+', 'sin'}, "sin(1+2)")
-  expect({2, 'x', '*', 10, '=', 'x', 'solve'}, "solve(2*x=10,x)")
+  expect({1, 1, 'sin'}, "sin(1)")
+  expect({1, 2, '+', 1, 'sin'}, "sin(1+2)")
+  expect({2, 'x', '*', 10, '=', 'x', 2, 'solve'}, "solve(2*x=10,x)")
 end
 
 Test.run(test)

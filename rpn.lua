@@ -885,6 +885,7 @@ function RPNExpression:fromInfix(tokens)
       elseif value == ')' then
         if popUntil('(') then
           table.remove(stack, #stack)
+          table.insert(result, {tostring(argc), 'number'})
           table.insert(result, {name, 'function'})
           return
         else
@@ -1017,7 +1018,7 @@ end
 
 function RPNExpression:infixString()
   local stack = {}
-  
+
   local function pushOperator(name, prec, argc, pos, assoc, aggrassoc)
     local assoc = assoc == "r" and 2 or (assoc == "l" and 1 or 0)
  
@@ -1043,7 +1044,10 @@ function RPNExpression:infixString()
     table.insert(stack, {expr=str, prec=prec})
   end
   
-  local function pushFunction(name, argc)
+  local function pushFunction(name)
+    argc = tonumber(table.remove(stack, #stack).expr)
+    assert(argc)
+
     local args = {}
     for i=1,argc do
       local item = table.remove(stack, #stack)
@@ -1106,9 +1110,9 @@ function RPNExpression:infixString()
       return pushOperator(opname, opprec, opargc, oppos, opassoc, opaggrassoc)
     end
     
-    local fname, fargc = functionInfo(str, false)
+    local fname = functionInfo(str, false)
     if fname then
-      return pushFunction(fname, fargc)
+      return pushFunction(fname)
     end
     
     return table.insert(stack, {expr=str})
@@ -2337,7 +2341,8 @@ function dispatchImmediate(op)
       local arg = stack:pop(newTop)
       rpn:appendStack(arg.rpn)
     end
-      
+
+    rpn:push(tostring(fnArgs))
     rpn:push(fnStr)
       
     local infix = rpn:infixString()
@@ -2377,7 +2382,8 @@ function dispatchFull(op)
       local arg = stack:pop(newTop)
       rpn:appendStack(arg.rpn)
     end
-      
+
+    rpn:push(tostring(fnArgs))
     rpn:push(fnStr)
       
     local infix = rpn:infixString()
