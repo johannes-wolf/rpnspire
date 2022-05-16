@@ -136,6 +136,17 @@ ASCII_RBRACE = 125  -- }
 ASCII_DQUOTE = 34   -- "
 ASCII_SQUOTE = 39   -- '
 
+parenPairs = {
+  ['('] = {')', true},
+  [')'] = {'(', false},
+  ['{'] = {'}', true},
+  ['}'] = {'{', false},
+  ['['] = {']', true},
+  [']'] = {'[', false},
+  ['"'] = {'"', true},
+  ["'"] = {"'", true},
+}
+
 SYM_NEGATE = "\226\136\146"
 SYM_STORE  = "→"
 SYM_ROOT   = "\226\136\154"
@@ -1871,7 +1882,7 @@ function UIInput:getCursorX(pos)
     if self.prefix then
       offset = gc:getStringWidth(self.prefix) + 2*self.margin
     end
-    return offset + gc:getStringWidth(string.sub(self.text, 1, pos or self.cursor.pos))
+    return offset + gc:getStringWidth(string.usub(self.text, 1, pos or self.cursor.pos))
   end)
   return x
 end
@@ -1931,8 +1942,8 @@ function UIInput:onCharIn(c)
     if c == " " then return end
     
     -- Remove trailing '(' inserted by some keys
-    if c:len() > 1 and c:sub(-1) == '(' then
-      c = c:sub(1, -2)
+    if c:ulen() > 1 and c:sub(-1) == '(' then
+      c = c:usub(1, -2)
     end 
     
     recordUndo()
@@ -1952,46 +1963,41 @@ function UIInput:_insertChar(c)
   
   local expanded = c
   if options.autoClose == true then
-    if c=="("  then expanded = c..")"  end
-    if c=="["  then expanded = c.."]"  end
-    if c=="{"  then expanded = c.."}"  end
-    if c=="\"" then expanded = c.."\"" end
-    if c=="'"  then expanded = c.."'"  end
+    -- Add closing paren
+    local matchingParen, isOpening = unpack(parenPairs[c] or {})
+    if matchingParen and isOpening then
+      expanded = c..matchingParen
+    end
     
+    -- Skip closing paren
     local rhsPos = self.cursor.pos + 1
-    local rhs = #self.text >= rhsPos and self.text:byte(rhsPos) or 0
-    if self.cursor.size == 0 and
-       c==")" and rhs == ASCII_RPAREN or
-       c=="]" and rhs == ASCII_RBRACK or
-       c=="}" and rhs == ASCII_RBRACE or
-       c=='"' and rhs == ASCII_DQUOTE or
-       c=="'" and rhs == ASCII_SQUOTE then
+    local rhs = self.text:ulen() >= rhsPos and self.text:usub(rhsPos, rhsPos) or nil
+    if self.cursor.size == 0 and c == rhs then
       self:moveCursor(1)
       self:invalidate()
       return
     end
   end
   
-  if self.cursor.pos == self.text:len() then
+  if self.cursor.pos == self.text:ulen() then
     self.text = self.text .. expanded
   else
-    local left, mid, right = string.sub(self.text, 1, self.cursor.pos),
-                             string.sub(self.text, self.cursor.pos+1, self.cursor.size+self.cursor.pos),
-                             string.sub(self.text, self.cursor.pos+1+self.cursor.size)
+    local left, mid, right = string.usub(self.text, 1, self.cursor.pos),
+                             string.usub(self.text, self.cursor.pos + 1, self.cursor.size + self.cursor.pos),
+                             string.usub(self.text, self.cursor.pos + 1 + self.cursor.size)
 
     -- Kill the matching character right to the selection
-    if options.autoKillParen == true and mid:len() == 1 then   
-      if (mid:byte(1) == ASCII_LPAREN and right:byte(1) == ASCII_RPAREN) or
-         (mid:byte(1) == ASCII_LBRACK and right:byte(1) == ASCII_RBRACK) or
-         (mid:byte(1) == ASCII_LBRACE and right:byte(1) == ASCII_RBRACE) or
-         (mid:byte(1) == ASCII_DQUOTE and right:byte(1) == ASCII_DQUOTE) or
-         (mid:byte(1) == ASCII_SQUOTE and right:byte(1) == ASCII_SQUOTE) then
-        right = right:sub(2)
+    if options.autoKillParen == true and mid:ulen() == 1 then
+      local matchingParen, isOpening = unpack(parenPairs[mid] or {})
+      if matchingParen and isOpening and right:usub(1, 1) == matchingParen then
+        right = right:usub(2)
       end
     end
+    
     self.text = left .. expanded .. right
   end
-  self.cursor.pos = self.cursor.pos + string.len(c) -- c!
+  
+  self.cursor.pos = self.cursor.pos + string.ulen(c) -- c!
   self.cursor.size = 0
   
   self:invalidate()
@@ -1999,7 +2005,7 @@ end
 
 function UIInput:onBackspace()
   self:cancelCompletion()
-  if options.autoPop == true and self.text:len() <= 0 then
+  if options.autoPop == true and self.text:ulen() <= 0 then
     recordUndo()
     stack:pop()
     stack:scrollToIdx()
@@ -2018,7 +2024,7 @@ function UIInput:onBackspace()
 end
 
 function UIInput:onEnter()
-  if self.text:len() == 0 then return end
+  if self.text:ulen() == 0 then return end
 
   recordUndo(self.text)
   local c = self.text
@@ -2114,7 +2120,7 @@ function UIInput:drawText(gc)
   local margin = self.margin
   local x,y,w,h = self:getFrame()
   local scrollx = self.scrollx
-  local cursorx = gc:getStringWidth(string.sub(self.text, 1, self.cursor.pos))
+  local cursorx = gc:getStringWidth(string.usub(self.text, 1, self.cursor.pos))
   cursorx = cursorx + x + scrollx
   
   gc:clipRect("set", x, y, w, h)
@@ -2135,7 +2141,7 @@ function UIInput:drawText(gc)
   
   -- Draw cursor selection box  
   if self.cursor.size ~= 0 then
-    local selWidth = gc:getStringWidth(string.sub(self.text, self.cursor.pos+1, self.cursor.pos + self.cursor.size))
+    local selWidth = gc:getStringWidth(string.usub(self.text, self.cursor.pos+1, self.cursor.pos + self.cursor.size))
     local cursorLeft, cursorRight = math.min(cursorx, cursorx + selWidth), math.max(cursorx, cursorx + selWidth)
 
     gc:drawRect(cursorLeft + 1, y + 2, cursorRight - cursorLeft, h-3)
