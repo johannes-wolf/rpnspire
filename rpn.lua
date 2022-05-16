@@ -1800,6 +1800,7 @@ function UIInput:nextCompletion(offset)
     local prefixSize = 0
     do
       local prevb = 0xff
+      -- FIXME: This does not work with unicode chars!
       for i=self.cursor.pos,1,-1 do
         local b = self.text:byte(i)
         if b >= 65 and prevb < 65 then break end
@@ -2451,8 +2452,7 @@ input.completionFun = function(prefix)
   if options.smartComplete then
     local tokens, semanticValue, semanticKind = nil, nil, nil
 
-    -- BUG: If cursor is not at end, this is wrong!!!
-    tokens = Infix.tokenize(input.text:sub(1, #input.text - (prefix and prefix:ulen() or 0)))
+    tokens = Infix.tokenize(input.text:usub(1, input.cursor.pos + 1 - (prefix and prefix:ulen() + 1 or 0)))
     if tokens and #tokens > 0 then
       semanticValue, semanticKind = unpack(tokens[#tokens])
       semantic = {}
