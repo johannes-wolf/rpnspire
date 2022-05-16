@@ -1842,31 +1842,35 @@ function UIInput:nextCompletion(offset)
   
   local tail = ""
   if self.cursor.pos + self.cursor.size < #self.text then
-    tail = self.text:sub(self.cursor.pos + self.cursor.size + 1)
+    tail = self.text:usub(self.cursor.pos + self.cursor.size + 1)
   end
   
   if not self.completionList[self.completionIdx] then return end
   
-  self.text = self.text:sub(1, self.cursor.pos) .. 
+  self.text = self.text:usub(1, self.cursor.pos) .. 
               self.completionList[self.completionIdx] ..
               tail
 
-  self.cursor.size = #self.completionList[self.completionIdx]
+  self.cursor.size = self.completionList[self.completionIdx]:ulen()
   self:scrollToPos()
   self:invalidate()
 end
 
 function UIInput:moveCursor(offset)
   if self.cursor.size > 0 then
+    -- Jump to edge of selection
     if offset > 0 then
       offset = self.cursor.size
     end
   end
+  
   self:setCursor(self.cursor.pos + offset)
 end
 
 function UIInput:setCursor(pos, scroll)
-  self.cursor.pos = math.min(math.max(0, pos), self.text:len())
+  local oldPos, oldSize = unpack(self.cursor)
+  
+  self.cursor.pos = math.min(math.max(0, pos), self.text:ulen())
   self.cursor.size = 0
   
   scroll = scroll or true
@@ -1875,6 +1879,11 @@ function UIInput:setCursor(pos, scroll)
   end
   
   self:cancelCompletion()
+  
+  if oldPos ~= self.cursor.pos or
+     oldSize ~= self.cursor.size then
+    self:invalidate()
+  end
 end
 
 function UIInput:getCursorX(pos)
@@ -2444,6 +2453,8 @@ input.completionFun = function(prefix)
         end
       end
     end
+    
+    table.sort(res)
     return res
   end
 
