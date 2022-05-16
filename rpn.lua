@@ -644,9 +644,9 @@ function Infix.tokenize(input)
   end
 
   local function word(input, i)
-    local li, lj, ltoken = input:find('^(%a[_%w]*%.%a[_%w]*)', i)
+    local li, lj, ltoken = input:find('^([%a\128-\255][_%w\128-\255]*%.[%a\128-\255][_%w\128-\255]*)', i)
     if not li then
-      return input:find('^(%a[_%w]*)', i)
+      return input:find('^([%a\128-\255][_%w\128-\255]*)', i)
     end
     return li, lj, ltoken
   end
@@ -743,10 +743,10 @@ function Infix.tokenize(input)
   end
 
   local matcher = {
-    {fn=operator,   kind='operator'},
     {fn=syntax,     kind='syntax'},
-    {fn=unit,       kind='unit'},
+    {fn=operator,   kind='operator'},
     {fn=number,     kind='number'},
+    {fn=unit,       kind='unit'},
     {fn=word,       kind='word'},
     {fn=str,        kind='string'},
     {fn=whitespace, kind='ws'},
