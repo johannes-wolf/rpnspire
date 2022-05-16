@@ -123,6 +123,7 @@ options = {
   cursorWidth = 2,       -- Width of the cursor
   mode = "RPN",          -- What else
   saneHexDigits = false, -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
+  smartComplete = true,  -- Try to be smart when completing
 }
 
 
@@ -251,12 +252,15 @@ function tiGetFnArgs(nam)
   return nil
 end
 
+-- n: Number of args (max)
+-- min: Min number of args
+-- conv: Conversion function (@>...)
 functions = {
   ["abs"]             = {n = 1},
   ["amortTbl"]        = {n = 10, min = 4},
   ["angle"]           = {n = 1},
   ["approx"]          = {n = 1},
-  ["approxFraction"]  = {n = 1, min = 0},
+  ["approxFraction"]  = {n = 1, min = 0, conv = true},
   ["approxRational"]  = {n = 2, min = 1},
   ["arccos"]          = {n = 1},
   ["arccosh"]         = {n = 1},
@@ -1764,10 +1768,15 @@ function UIInput:nextCompletion(offset)
     if not self.completionFun then return end
 
     local prefixSize = 0
-    for i=self.cursor.pos,1,-1 do
-      local b = self.text:byte(i)
-      if b == nil or b < 64 then break end -- Stop at char < '@'
-      prefixSize = prefixSize + 1
+    do
+      local prevb = 0xff
+      for i=self.cursor.pos,1,-1 do
+        local b = self.text:byte(i)
+        if b >= 65 and prevb < 65 then break end
+        if b == nil or b < 64 then break end -- Stop at char < '@'
+        prefixSize = prefixSize + 1
+        prevb = b
+      end
     end
 
     local prefix = "" 
@@ -1776,12 +1785,19 @@ function UIInput:nextCompletion(offset)
     end
 
     self.completionList = self.completionFun(prefix)
-    if #self.completionList == 0 then
+    if not self.completionList or #self.completionList == 0 then
       return
     end
     
     self.completionIdx = 1
   else
+    -- Apply single entry using [tab]
+    if #self.completionList == 1 then
+      self:moveCursor(1)
+      self:cancelCompletion()
+      return
+    end
+   
     -- Advance completion index
     self.completionIdx = (self.completionIdx or 0) + (offset or 1)
     
@@ -1807,13 +1823,6 @@ function UIInput:nextCompletion(offset)
   self.cursor.size = #self.completionList[self.completionIdx]
   self:scrollToPos()
   self:invalidate()
-  
-  -- Apply single entry using [tab]
-  if #self.completionList == 1 then
-    self:moveCursor(1)
-    self:cancelCompletion()
-    return
-  end
 end
 
 function UIInput:moveCursor(offset)
@@ -1920,6 +1929,7 @@ end
 
 function UIInput:_insertChar(c)
   c = c or ""
+  self:cancelCompletion()
   
   local expanded = c
   if options.autoClose == true then
@@ -1969,6 +1979,7 @@ function UIInput:_insertChar(c)
 end
 
 function UIInput:onBackspace()
+  self:cancelCompletion()
   if options.autoPop == true and self.text:len() <= 0 then
     recordUndo()
     stack:pop()
@@ -1985,7 +1996,6 @@ function UIInput:onBackspace()
     self:onBackspace()
   end
   self:scrollToPos()
-  self:cancelCompletion()
 end
 
 function UIInput:onEnter()
@@ -2301,8 +2311,6 @@ function dispatchOperator(op)
 end
 
 function dispatchImmediate(op)
-  if mode ~= "RPN" then return false end
-  
   if input.text:sub(-2) == '@' then
     return false
   end
@@ -2391,9 +2399,9 @@ end
 input.completionFun = function(prefix)
   local catmatch = function(tab, prefix, res)
     res = res or {}
-    local plen = #prefix
-    for _,v in ipairs(tab) do
-      if v:sub(1, plen) == prefix then
+    local plen = prefix and #prefix or 0
+    for _,v in ipairs(tab or {}) do
+      if plen == 0 or v:lower():sub(1, plen) == prefix then
         local m = v:sub(plen + 1)
         if #m > 0 then
           table.insert(res, m)
@@ -2403,13 +2411,47 @@ input.completionFun = function(prefix)
     return res
   end
 
-  local varTab = var.list()
+  -- Semantic autocompletion
+  local semantic = nil
+  if options.smartComplete then
+    local tokens, semanticValue, semanticKind = nil, nil, nil
 
-  local functionTab = {
-    "solve", "nSolve", "zeros",
-    "approx",
-    "delvar x,y,z"
-  }
+    -- BUG: If cursor is not at end, this is wrong!!!
+    tokens = Infix.tokenize(input.text:sub(1, #input.text - (prefix and prefix:ulen() or 0)))
+    if tokens and #tokens > 0 then
+      semanticValue, semanticKind = unpack(tokens[#tokens])
+      semantic = {}
+    end
+
+    if semanticValue == '@>' or semanticValue == SYM_CONVERT or semanticKind == 'number' then
+      semantic['unit'] = true
+    end 
+    
+    if semanticValue == '@>' or semanticValue == SYM_CONVERT then
+      semantic['conversion_fn'] = true
+    end
+    
+    if semanticKind == 'unit' then
+      semantic['conversion_op'] = true
+    end
+    
+    if semanticValue ~= '@>' and semanticValue ~= SYM_CONVERT and semanticKind == 'operator'  then
+      semantic['function'] = true
+      semantic['variable'] = true
+    end
+    
+    if not semanticValue then
+      semantic = semantic or {}
+      semantic['common'] = true
+    end
+  end
+
+  local functionTab = {}
+  for k,v in pairs(functions) do
+    if not v.conv then
+      table.insert(functionTab, k)
+    end
+  end
   
   local macroTab = (function ()
     local r = {}
@@ -2434,8 +2476,42 @@ input.completionFun = function(prefix)
     "_ohm",                                 -- Resistance
     "_g","_c"                               -- Constants
   }
-  
-  return catmatch(varTab, prefix,
+
+  -- Provide semantic
+  if semantic then 
+    local candidates = {}
+    if semantic['unit'] then
+      candidates = catmatch(unitTab, prefix, candidates)
+    end
+    if semantic['conversion_op'] then
+      candidates = catmatch({'@>'}, prefix, candidates) -- TODO: Use unicode when input is ready
+    end
+    if semantic['conversion_fn'] then
+      candidates = catmatch({
+        'approxFraction()',
+        'Base2', 'Base10', 'Base16',
+        'Decimal',
+        'Grad', 'Rad'
+      }, prefix, candidates)
+    end
+    if semantic['function'] then
+      candidates = catmatch(functionTab, prefix, candidates)
+    end
+    if semantic['variable'] then
+      candidates = catmatch(var.list(), prefix, candidates)
+    end
+    if semantic['common'] then
+      candidates = catmatch(commonTab, prefix, candidates) -- TODO: Add common tab
+      candidates = catmatch(var.list(), prefix,
+                   catmatch(functionTab, prefix,
+                   catmatch(unitTab, prefix, candidates)))
+    end
+
+    return candidates
+  end
+
+  -- Provide all
+  return catmatch(var.list(), prefix,
          catmatch(functionTab, prefix,
          catmatch(unitTab, prefix)))
 end
@@ -2461,6 +2537,7 @@ function on.construction()
       {"Toggle fringe", function() options.showFringe = not options.showFringe end},
       {"Toggle calculation", function() options.showExpr = not options.showExpr end},
       {"Toggle smart parens", function() options.autoClose = not options.autoClose; options.autoKillParen = options.autoClose end},
+      {"Toggle smart complete", function() options.smartComplete = not options.smartComplete end},
     }
   })
 end
@@ -2513,7 +2590,7 @@ function on.returnKey()
     --  {"[", "["},  {"]", "]"}, {"'", "'"}
     --})
     input:customCompletion({
-      "=:", ":=", "{", "[", "?", "!", "%", "@"
+      "=:", ":=", "{}", "[]", "@>"
     })
   end
 end
@@ -2547,6 +2624,7 @@ function on.charIn(c)
   if c == "R" then redo(); return end
   if c == "C" then clear(); return end
   if c == "L" then stack:roll(); return end
+  if c == "T" then input:onCharIn("@"); return end
   if c == "E" then
     if #stack.stack > 0 then
       focusView(input)
@@ -2594,6 +2672,10 @@ function on.contextMenu()
       {"Options", {
         {"Fringe", function() options.showFringe = not options.showFringe end},
         {"Calc", function() options.showExpr = not options.showExpr end},
+        {"Complete", {
+          {"Smart", function() options.smartComplete = true end},
+          {"Prefix", function() options.smartComplete = false end},
+        }},
         {"Theme", {
           {"light", function() options.theme="light" end},
           {"dark",  function() options.theme="dark" end},
