@@ -873,11 +873,15 @@ function RPNExpression:fromInfix(tokens)
   end
 
   beginFunction = function(name)
-    local argc = 0
+    local argc = nil
     for token in next do
       local value, kind = token[1], token[2]
       if value == ',' then
-        argc = argc + 1
+        if argc then
+          argc = argc + 1
+        else
+          print("error: RPNExpression.fromInfix expected '('")
+        end
         if not popUntil('(') then
           print("error: RPNExpression.fromInfix missing '('")
           return
@@ -885,7 +889,7 @@ function RPNExpression:fromInfix(tokens)
       elseif value == ')' then
         if popUntil('(') then
           table.remove(stack, #stack)
-          table.insert(result, {tostring(argc), 'number'})
+          table.insert(result, {tostring(argc or 0), 'number'})
           table.insert(result, {name, 'function'})
           return
         else
@@ -893,7 +897,10 @@ function RPNExpression:fromInfix(tokens)
           return
         end
       else
-        if argc == 0 then argc = 1 end
+        -- Begin argument count at first non '(' token
+        if value ~= '(' and not argc then
+          argc = 1
+        end
         handleDefault(value, kind)
       end
     end
@@ -905,11 +912,15 @@ function RPNExpression:fromInfix(tokens)
       return
     end
 
-    local argc = 0
+    local argc = nil
     for token in next do
       local value, kind = token[1], token[2]
       if value == ',' then
-        argc = argc + 1
+        if argc then
+          argc = argc + 1
+        else
+          print("error: RPNExpression.fromInfix expected '{'")
+        end
         if not popUntil('{') then
           print("error: RPNExpression.fromInfix missing '{'")
           return
@@ -917,7 +928,7 @@ function RPNExpression:fromInfix(tokens)
       elseif value == '}' then
         if popUntil('{') then
           table.remove(stack, #stack)
-          table.insert(result, {tostring(argc), 'number'})
+          table.insert(result, {tostring(argc or 0), 'number'})
           table.insert(result, {'}', 'syntax'})
           return
         else
@@ -925,7 +936,10 @@ function RPNExpression:fromInfix(tokens)
           return
         end
       else
-        if argc == 0 then argc = 1 end
+        -- Begin argument count at first non '(' token
+        if value ~= '{' and not argc then
+          argc = 1
+        end
         handleDefault(value, kind)
       end
     end
