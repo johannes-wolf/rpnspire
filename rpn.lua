@@ -3152,3 +3152,19 @@ function on.paint(gc)
   ErrorToast:draw(gc)
   menu:draw(gc)
 end
+
+function on.save()
+  return {
+    ['options'] = options,
+    ['stack'] = stack.stack,
+    ['input'] = input.text,
+    ['undo'] = {undoStack, redoStack}
+  }
+end
+
+function on.restore(state)
+  undoStack, redoStack = unpack(state.undo)
+  stack.stack = state.stack
+  options = state.options
+  input:setText(state.input)
+end
