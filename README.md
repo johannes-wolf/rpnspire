@@ -7,13 +7,18 @@ https://raw.githubusercontent.com/johannes-wolf/rpnspire/main/doc/demo.mp4
 ### Global
 Uppercase letters are used as global shortcuts, even if the input view is focused!
 
-| Key          | Function             |
-|--------------|----------------------|
-| <kbd>U</kbd> | Undo                 |
-| <kbd>R</kbd> | Redo                 |
-| <kbd>L</kbd> | Roll stack           |
-| <kbd>C</kbd> | Clear stack & input  |
-| <kbd>E</kbd> | Edit last item (ALG) |
+| Key                                      | Function                       |
+|------------------------------------------|--------------------------------|
+| <kbd>U</kbd>                             | Undo                           |
+| <kbd>R</kbd>                             | Redo                           |
+| <kbd>C</kbd>                             | Clear stack & input            |
+| <kbd>E</kbd>                             | Edit last item                 |
+| <kbd>S</kbd><kbd>d</kbd><kbd>[0-9]</kbd> | Duplicate #n stack items       |
+| <kbd>S</kbd><kbd>p</kbd><kbd>[0-9]</kbd> | Pick stack item #n             |
+| <kbd>S</kbd><kbd>x</kbd><kbd>[0-9]</kbd> | Drop stack item #n             |
+| <kbd>S</kbd><kbd>x</kbd><kbd>x</kbd>     | Clear stack                    |
+| <kbd>S</kbd><kbd>r</kbd><kbd>[0-9]</kbd> | Roll stack #n times            |
+| <kbd>S</kbd><kbd>l</kbd><kbd>[0-9]</kbd> | Create list from last #n items |
 
 ### Input
 | Key                            | Function                           |
@@ -72,15 +77,16 @@ Uppercase letters are used as global shortcuts, even if the input view is focuse
 * [x] Unlimmited* undo and redo (`U` - undo, `R` - redo)
 * [x] Autocompletion for functions, variables and units
 * [x] A fast numblock driven menu system
-- [x] Support for lists
-- [x] Writing glue for all of the nspires functions
+* [x] Nested keyboard shortcuts
+* [x] Support for lists
+* [x] Writing glue for all of the nspires functions
 * [x] Theming support 🔥 
+* [x] Correct handling of unicode charactes in the input entry
 
 ## Not implemented yet
-- [ ] Error handling
-- [ ] Support for matrixes (parser)
-- [ ] Correct handling of unicode charactes in the input entry
-- [ ] Touchpad support (scrolling etc.)
+* [-] Error handling
+* [ ] Support for matrixes (parser)
+* [ ] Touchpad support (scrolling etc.)
 
 ## What is not working
 * It is not possible to call TI-Basic Apps from Lua
