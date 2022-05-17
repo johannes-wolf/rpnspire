@@ -1864,7 +1864,7 @@ end
 
 
 -- Text input widget
-UIInput = class(Widget.Base)
+UIInput = class(Widgets.Base)
 function UIInput:init(frame)
   self.frame = frame or {x=0, y=0, width=0, height=0}
   self.text = ""
@@ -2662,7 +2662,7 @@ end
 
 
 -- Toast Widget
-Widgets.Toast = class()
+Widgets.Toast = class(Widgets.Base)
 function Widgets.Toast:init(options)
   options = options or {}
   self.location = options.location or 'top'
