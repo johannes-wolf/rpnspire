@@ -128,6 +128,7 @@ options = {
   mode = "RPN",          -- What else
   saneHexDigits = false, -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
   smartComplete = true,  -- Try to be smart when completing
+  maxUndo = 99,          -- Max num of undo steps
 }
 
 
@@ -2336,6 +2337,9 @@ end
 
 function recordUndo(input)
   table.insert(undoStack, makeUndoState(input))
+  if #undoStack > options.maxUndo then
+    table.remove(undoStack, 1)
+  end
   redoStack = {}
 end
 
