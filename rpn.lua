@@ -98,6 +98,8 @@ theme = {
     cursorColorAlg = 0x0000FF,
     backgroundColor = 0xFFFFFF,
     borderColor = 0,
+    errorBackgroundColor = 0xff0000,
+    errorTextColor = 0xffffff,
   },
   ["dark"] = {
     rowColor = 0x444444,
@@ -109,6 +111,8 @@ theme = {
     cursorColorAlg = 0xFF00FF,
     backgroundColor = 0x111111,
     borderColor = 0x888888,
+    errorBackgroundColor = 0x0000ff,
+    errorTextColor = 0x000000,
   },
 }
 
@@ -1069,6 +1073,10 @@ function RPNExpression:infixString()
   end
   
   local function pushFunction(name)
+    if not stack or #stack < 1 then
+      return Error.show("Missing function argument size")
+    end
+  
     argc = tonumber(table.remove(stack, #stack).expr)
     assert(argc)
 
@@ -1089,6 +1097,10 @@ function RPNExpression:infixString()
   end
 
   local function pushList()
+    if not stack or #stack < 1 then
+      return Error.show("Missing list length")
+    end
+      
     local length = tonumber(table.remove(stack, #stack).expr)
     assert(length)
 
@@ -1150,12 +1162,18 @@ function RPNExpression:infixString()
 end
 
 
+Widgets = {}
+
+-- Widget Base Class
+Widgets.Base = class()
+
 -- Fullscreen 9-tile menu which is navigated using the numpad
-UIMenu = class()
+UIMenu = class(Widgets.Base)
 function UIMenu:init()
   self.frame = {width=0, height=0, x=0, y=0}
-  self.items = {}
   self.page = 0
+  self.pageStack = {}
+  self.items = {}
   self.visible = false
   self.parent = nil
 end
@@ -1186,7 +1204,8 @@ function UIMenu:hide()
 end
 
 function UIMenu:present(parent, items)
-  self.items = items or {}
+  self.pageStack = {}
+  self:pushPage(items or {})
   self.parent = parent
   focusView(self)
 end
@@ -1241,9 +1260,11 @@ function UIMenu:onArrowRight()
 end
 
 function UIMenu:onArrowUp()
+  self:popPage()
 end
 
 function UIMenu:onArrowDown()
+  self:popPage()
 end
 
 function UIMenu:onEscape()
@@ -1253,6 +1274,22 @@ end
 function UIMenu:onClear()
   self.page = 0
   self:invalidate()
+end
+
+function UIMenu:pushPage(page)
+  if page then
+    table.insert(self.pageStack, page)
+    self.items = self.pageStack[#self.pageStack]
+    self:invalidate()
+  end
+end
+
+function UIMenu:popPage()
+  if #self.pageStack > 1 then
+    table.remove(self.pageStack, #self.pageStack)
+    self.items = self.pageStack[#self.pageStack]
+    self:invalidate()
+  end
 end
 
 function UIMenu:onCharIn(c)
@@ -1266,8 +1303,7 @@ function UIMenu:onCharIn(c)
       item[2]()
       focusView(self.parent)
     elseif type(item[2]) == "table" then
-      self.items = item[2]
-      self:invalidate()
+      self:pushPage(item[2])
     elseif type(item[2]) == "string" then
       input:onCharIn(item[2]) -- TODO
       focusView(input)
@@ -1324,8 +1360,7 @@ function UIMenu:draw(gc)
 end
 
 -- RPN stack view
-UIStack = class()
-
+UIStack = class(Widgets.Base)
 function UIStack:init()
   self.stack = {}
   self.frame = {x=0, y=0, width=0, height=0}
@@ -1365,6 +1400,11 @@ function UIStack:pushInfix(input)
   end
   
   local res, err = math.evalStr(infix)
+  if err then
+    Error.show(err)
+    return false
+  end
+  
   self:push({["rpn"]=stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
   return true
 end
@@ -1372,6 +1412,9 @@ end
 function UIStack:pushEval(item)
   local infix = item:infixString()
   local res, err = math.evalStr(infix)
+  if err then
+    return Error.show(err)
+  end
   self:push({["rpn"]=item.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
 end
 
@@ -1380,6 +1423,9 @@ function UIStack:push(item)
     local rpn = RPNExpression{item}
     local infix = rpn:infixString()
     local res, err = math.evalStr(infix)
+    if err then
+        return Error.show(err)
+      end
     item = {["rpn"]=rpn.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)}
   end
   if item ~= nil then
@@ -1700,13 +1746,11 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
   local fringeX = 0
   if options.showFringe == true then
     gc:setColorRGB(itemBG[((idx+1)%2)+1])
-    --gc:setPen("thin", "dashed")
     
     fringeX = x + fringeSize + 2*margin
     gc:drawLine(fringeX, y, fringeX, y + itemHeight)
     gc:setColorRGB(theme[options.theme].fringeTextColor)
     gc:drawString(#self.stack - idx + 1, x + margin, y)
-    gc:setPen()
     
     gc:clipRect("set", fringeX-1, y, w, itemHeight)
   end
@@ -1753,8 +1797,7 @@ end
 
 
 -- Text input widget
-UIInput = class()
-
+UIInput = class(Widget.Base)
 function UIInput:init(frame)
   self.frame = frame or {x=0, y=0, width=0, height=0}
   self.text = ""
@@ -2043,15 +2086,6 @@ function UIInput:onEnter()
   recordUndo(self.text)
   local c = self.text
   if self:getMode() ~= "RPN" or not dispatchFull(c) then
-    -- Since dispatchFull is not called in ALG mode,
-    -- we need this special check here.
-    if c == "@rpn" then
-      options.mode = "RPN"
-      input:setText()
-      popUndo()
-      return
-    end 
- 
     if stack:pushInfix(c) then
       input:setText("")
     else
@@ -2222,16 +2256,6 @@ function showBigView(show, idx)
   end
 end
 
---[[ === ERROR === ]]--
-function assertN(n)
-  if #stack.stack < (n or 1) then
-    print("Error!")
-    -- TODO: Display error message .. handle errors at all
-    input:selAll()
-    return false
-  end
-  return true
-end
 
 --[[ === UNDO/REDO === ]]--
 undoStack, redoStack = {}, {}
@@ -2334,8 +2358,8 @@ function dispatchOperator(op)
   local opStr, _, opArgs = queryOperatorInfo(op)
     if opStr ~= nil then
       _dispatchPushInput(op)
-      if not assertN(opArgs) then
-        return false, "Argument error"
+      if not Error.assertStackN(opArgs) then
+        return true
       end
   
       local newTop = #stack.stack - opArgs + 1
@@ -2365,8 +2389,8 @@ function dispatchImmediate(op)
   local fnStr, fnArgs = functionInfo(op, true)
   if fnStr ~= nil then
     _dispatchPushInput(op)
-    if not assertN(fnArgs) then
-      return false, "Argument error"
+    if not Error.assertStackN(fnArgs) then
+      return true
     end
     
     local newTop = #stack.stack - fnArgs + 1
@@ -2406,8 +2430,8 @@ function dispatchFull(op)
   -- Call function
   local fnStr, fnArgs = functionInfo(op, false)
   if fnStr ~= nil then
-    if not assertN(fnArgs) then
-      return false, "Argument error"
+    if not Error.assertStackN(fnArgs) then
+      return false
     end
     
     local newTop = #stack.stack - fnArgs + 1
@@ -2566,7 +2590,6 @@ input.completionFun = function(prefix)
          catmatch(unitTab, prefix)))
 end
 
-Widgets = {}
 
 -- Toast Widget
 Widgets.Toast = class()
@@ -2576,6 +2599,7 @@ function Widgets.Toast:init(options)
   self.margin = 4
   self.padding = 4
   self.text = nil
+  self.style = options.style
 end
 
 function Widgets.Toast:invalidate()
@@ -2596,20 +2620,21 @@ function Widgets.Toast:getFrame()
   end)
   
   x = x + w/2 - textW/2 - self.margin
-  y = self.padding -- Top location
+  if self.location == 'center' then
+    y = h/2 - textH/2 - self.margin -- Mid
+  else
+    y = self.padding -- Top location
+  end
+  
   w = textW + 2*self.margin
   h = textH + 2*self.margin
-  
-  if self.location == 'center' then
-    y = y + h/2 - textH/2 - self.margin
-  end
 
   return x, y, w, h
 end
 
 function Widgets.Toast:show(text)
   self:invalidate()
-  self.text = text
+  self.text = text and tostring(text) or nil
   self:invalidate()
 end
 
@@ -2618,13 +2643,14 @@ function Widgets.Toast:draw(gc)
 
   local margin = 4
   local x,y,w,h = self:getFrame()
+  local isError = self.style == 'error'
 
   gc:clipRect("set", x, y, w, h)
-  gc:setColorRGB(theme[options.theme].altRowColor)
+  gc:setColorRGB(theme[options.theme][isError and 'errorBackgroundColor' or 'altRowColor'])
   gc:fillRect(x, y, w, h)
   gc:setColorRGB(theme[options.theme].borderColor)
   gc:drawRect(x, y, w-1, h-1)
-  gc:setColorRGB(theme[options.theme].textColor)
+  gc:setColorRGB(theme[options.theme][isError and 'errorTextColor' or 'textColor'])
   gc:drawString(self.text, x + self.margin, y + self.margin)
   gc:clipRect("reset")
 end
@@ -2709,7 +2735,7 @@ end
 
 
 Toast = Widgets.Toast()
-ErrorToast = Widgets.Toast()
+ErrorToast = Widgets.Toast({location = 'center', style = 'error'})
 GlobalKbd = KeybindManager()
 
 -- After execution of any kbd command invaidate all
@@ -2734,14 +2760,37 @@ end
 
 -- Show text as error
 Error = {}
-function Error.show(str)
+function Error.show(str, pos)
   ErrorToast:show(str)
+  if not pos then
+    input:selAll()
+  else
+    input:setCursor(pos)
+  end
 end
 
 function Error.hide()
   ErrorToast:show()
 end
 
+function Error.assertStackN(n, pos)
+  if #stack.stack < (n or 1) then
+    Error.show("Too few items on stack")
+    if not pos then
+      input:selAll()
+    else
+      input:setCursor(pos)
+    end
+    return false
+  end
+  return true
+end
+
+
+-- Called for _any_ keypress
+function onAnyKey()
+  Error.hide()
+end
 
 function on.construction()
   bigview = D2Editor.newRichText() -- TODO: Refactor to custom view
@@ -2830,8 +2879,8 @@ function on.resize(w, h)
 end
 
 function on.escapeKey()
+  onAnyKey()
   GlobalKbd:resetSequence()
-  ErrorToast:show()
   
   if focus.onEscape then
     focus:onEscape()
@@ -2839,6 +2888,7 @@ function on.escapeKey()
 end
 
 function on.tabKey()
+  onAnyKey()
   if focus ~= input then
     focusView(input)
   else
@@ -2847,12 +2897,14 @@ function on.tabKey()
 end
 
 function on.backtabKey()
+  onAnyKey()
   if focus.onBackTab then
     focus:onBackTab()
   end
 end
 
 function on.returnKey()
+  onAnyKey()
   if GlobalKbd:dispatchKey('return') then
     return
   end
@@ -2870,6 +2922,7 @@ function on.returnKey()
 end
 
 function on.arrowRight()
+  onAnyKey()
   if GlobalKbd:dispatchKey('right') then
     return
   end
@@ -2879,6 +2932,7 @@ function on.arrowRight()
 end
 
 function on.arrowLeft()
+  onAnyKey()
   if GlobalKbd:dispatchKey('left') then
     return
   end
@@ -2888,6 +2942,7 @@ function on.arrowLeft()
 end
 
 function on.arrowUp()
+  onAnyKey()
   if GlobalKbd:dispatchKey('up') then
     return
   end
@@ -2897,6 +2952,7 @@ function on.arrowUp()
 end
 
 function on.arrowDown()
+  onAnyKey()
   if GlobalKbd:dispatchKey('down') then
     return
   end
@@ -2906,6 +2962,8 @@ function on.arrowDown()
 end
 
 function on.charIn(c)
+  onAnyKey()
+
   if c == "U" then undo(); return end
   if c == "R" then redo(); return end
   if c == "C" then clear(); return end
@@ -2934,24 +2992,28 @@ function on.charIn(c)
 end
 
 function on.enterKey()
+  onAnyKey()
   focus:onEnter()
   stack:invalidate() -- TODO: ?
   input:invalidate()
 end
 
 function on.backspaceKey()
+  onAnyKey()
   if focus.onBackspace then
     focus:onBackspace()
   end
 end
 
 function on.clearKey()
+  onAnyKey()
   if focus.onClear then
     focus:onClear()
   end
 end
 
 function on.contextMenu()
+  onAnyKey()
   if focus.onContextMenu then
     focus:onContextMenu()
   end
