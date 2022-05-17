@@ -94,21 +94,21 @@ theme = {
     selectionColor = 0xDFDFFF,
     fringeTextColor = 0xAAAAAA,
     textColor = 0,
-    cursorColor = 0xFF0000,
+    cursorColor = 0xEE0000,
     cursorColorAlg = 0x0000FF,
     backgroundColor = 0xFFFFFF,
     borderColor = 0,
-    errorBackgroundColor = 0xff0000,
+    errorBackgroundColor = 0xEE0000,
     errorTextColor = 0xffffff,
   },
   ["dark"] = {
     rowColor = 0x444444,
     altRowColor = 0x222222,
-    selectionColor = 0xFF0000,
+    selectionColor = 0xEE0000,
     fringeTextColor = 0xAAAAAA,
     textColor = 0xFFFFFF,
-    cursorColor = 0xFF0000,
-    cursorColorAlg = 0xFF00FF,
+    cursorColor = 0xEE0000,
+    cursorColorAlg = 0xEE00EE,
     backgroundColor = 0x111111,
     borderColor = 0x888888,
     errorBackgroundColor = 0x0000ff,
@@ -595,6 +595,72 @@ rpnFunctions = {
       m:exec()
     end
   end,
+}
+
+errorCodes = {
+  [10]  = "Function did not return a value",
+  [20]  = "Test did not resolve to true or false",
+  [40]  = "Argument error",
+  [50]  = "Argument missmatch",
+  [60]  = "Argument must be a bool or int",
+  [70]  = "Argument must be a decimal",
+  [90]  = "Argument must be a list",
+  [100] = "Argument must be a matrix",
+  [130] = "Argument must be a string",
+  [140] = "Argument must be a variable name",
+  [160] = "Argument must be an expression",
+  [180] = "Break",
+  [230] = "Dimension",
+  [235] = "Dimension error",
+  [250] = "Divide by zero",
+  [260] = "Domain error",
+  [270] = "Duplicate variable name",
+  [300] = "Expected 2 or 3-element list or matrix",
+  [310] = "Argument must be an equation with a single var",
+  [320] = "First argument must be an equation",
+  [345] = "Inconsistent units",
+  [350] = "Index out of range",
+  [360] = "Indirection string is not a valid var name",
+  [380] = "Undefined ANS",
+  [390] = "Invalid assignment",
+  [400] = "Invalid assignment value",
+  [410] = "Invalid command",
+  [430] = "Invalid for current mode settings",
+  [435] = "Invalid guess",
+  [440] = "Invalid implied mulitply",
+  [565] = "Invalid outside programm",
+  [570] = "Invalid pathname",
+  [575] = "Invalid polar complex",
+  [580] = "Invalid programm reference",
+  [600] = "Invalid table",
+  [605] = "Invalid use of units",
+  [610] = "Invalid variable name or local statement",
+  [620] = "Invalid variable or function name",
+  [630] = "Invalid variable reference",
+  [640] = "Invalid vector syntax",
+  [670] = "Low memory",
+  [672] = "Resource exhaustion",
+  [673] = "Resource exhaustion",
+  [680] = "Missing (",
+  [690] = "Missing )",
+  [700] = "Missing *",
+  [710] = "Missing [",
+  [720] = "Missing ]",
+  [750] = "Name is not a function or program",
+  [780] = "No solution found",
+  [800] = "Non-real result",
+  [830] = "Overflow",
+  [860] = "Recursion too deep",
+  [870] = "Reserved name or system variable",
+  [900] = "Argument error",
+  [910] = "Syntax error",
+  [920] = "Text ont found",
+  [930] = "Too few arguments",
+  [940] = "Too many arguments",
+  [950] = "Too many subscripts",
+  [955] = "Too many undefined variables",
+  [960] = "Variable is not defined",
+  -- TODO: ...
 }
 
 --[[ MACRO ]]--
@@ -2761,6 +2827,10 @@ end
 -- Show text as error
 Error = {}
 function Error.show(str, pos)
+  if type(str) == 'number' then
+    str = errorCodes[str] or str
+  end
+  
   ErrorToast:show(str)
   if not pos then
     input:selAll()
@@ -2775,7 +2845,7 @@ end
 
 function Error.assertStackN(n, pos)
   if #stack.stack < (n or 1) then
-    Error.show("Too few items on stack")
+    Error.show("Too few arguments on stack")
     if not pos then
       input:selAll()
     else
@@ -2818,6 +2888,28 @@ function on.construction()
     }
   })
   
+  GlobalKbd:setSequence({'I'}, function(sequence)
+    menu:present(input, {
+      {'{', '{'}, {'=:', '=:'}, {'}', '}'},
+      {'[', '['}, {'@>', '@>'}, {']', ']'},
+      {'<', '<'}, {':=', ':='}, {'>', '>'},
+    })
+  end)
+  GlobalKbd:setSequence({'U'}, function(sequence)
+    undo()
+  end)
+  GlobalKbd:setSequence({'R'}, function(sequence)
+    redo()
+  end)
+  GlobalKbd:setSequence({'C'}, function(sequence)
+    clear()
+  end)
+  GlobalKbd:setSequence({'E'}, function(sequence)
+    if #stack.stack >= 1 then
+      input:setTempMode("ALG")
+      input:setText(stack:pop().infix, "Edit")
+    end
+  end)
   GlobalKbd:setSequence({'S', 'd', '%d'}, function(sequence)
     -- Duplicate N items from top
     recordUndo()
@@ -2963,21 +3055,6 @@ end
 
 function on.charIn(c)
   onAnyKey()
-
-  if c == "U" then undo(); return end
-  if c == "R" then redo(); return end
-  if c == "C" then clear(); return end
-  if c == "L" then stack:roll(); return end
-  if c == "T" then input:onCharIn("@"); return end
-  if c == "E" then
-    if #stack.stack > 0 then
-      focusView(input)
-      input:setTempMode("ALG")
-      input:setText(stack:pop().infix, "Edit")
-      return
-    end
-  end
-  
   if GlobalKbd:dispatchKey(c) then
     return
   end
@@ -2993,6 +3070,7 @@ end
 
 function on.enterKey()
   onAnyKey()
+  GlobalKbd:resetSequence()
   focus:onEnter()
   stack:invalidate() -- TODO: ?
   input:invalidate()
@@ -3000,6 +3078,7 @@ end
 
 function on.backspaceKey()
   onAnyKey()
+  GlobalKbd:resetSequence()
   if focus.onBackspace then
     focus:onBackspace()
   end
@@ -3007,6 +3086,9 @@ end
 
 function on.clearKey()
   onAnyKey()
+  if GlobalKbd:dispatchKey('clear') then
+    return
+  end
   if focus.onClear then
     focus:onClear()
   end
@@ -3014,6 +3096,9 @@ end
 
 function on.contextMenu()
   onAnyKey()
+  if GlobalKbd:dispatchKey('ctx') then
+    return
+  end
   if focus.onContextMenu then
     focus:onContextMenu()
   end
