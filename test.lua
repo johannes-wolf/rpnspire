@@ -226,4 +226,28 @@ function test.rpn_to_infix()
   expect({2, 'x', '*', 10, '=', 'x', 2, 'solve'}, "solve(2*x=10,x)")
 end
 
+function test.keybind_manager()
+  local last = nil
+  local kbd = KeybindManager()
+
+  local function expect(seq, n)
+    kbd:resetSequence()
+    last = nil
+    for _,v in ipairs(seq) do
+      kbd:dispatchKey(v)
+    end
+    Test.assert(last == n, "Expected action "..(n or "nil").." got "..(last or "nil"))
+  end
+
+  kbd:setSequence({'a', 'b', '1'}, function() last = '1' end)
+  kbd:setSequence({'a', 'b', '2'}, function() last = '2' end)
+  kbd:setSequence({'a', 'c', '3'}, function() last = '3' end)
+  kbd:setSequence({'b'}, function() last = '4' end)
+
+  expect({}, nil)
+  expect({'c'}, nil)
+  expect({'b'}, '4')
+  expect({'a', 'b', '2'}, '2')
+end
+
 Test.run(test)
