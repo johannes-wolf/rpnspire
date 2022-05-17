@@ -633,7 +633,6 @@ macros = {
 
 -- Lexer for TI math expressions being as close to the original as possible
 Infix = {}
-
 function Infix.tokenize(input)
   local function operator(input, i)
     return Trie.find(input, operators_trie, i)
@@ -1153,7 +1152,6 @@ end
 
 -- Fullscreen 9-tile menu which is navigated using the numpad
 UIMenu = class()
-
 function UIMenu:init()
   self.frame = {width=0, height=0, x=0, y=0}
   self.items = {}
@@ -1404,8 +1402,14 @@ function UIStack:swap(idx1, idx2)
   self:invalidate()
 end
 
-function UIStack:pop(idx)
-  idx = idx or #self.stack
+-- Pop item at `idx` (or top) from the stack
+-- Index 1 is at the bottom of the stack!
+function UIStack:pop(idx, from_top)
+  if from_top then
+    idx = (#self.stack - idx + 1) or #self.stack
+  else
+    idx = idx or #self.stack
+  end
   if idx <= 0 or idx > #self.stack then return end
   local v = table.remove(self.stack, idx)
   self:invalidate()
@@ -2562,6 +2566,183 @@ input.completionFun = function(prefix)
          catmatch(unitTab, prefix)))
 end
 
+Widgets = {}
+
+-- Toast Widget
+Widgets.Toast = class()
+function Widgets.Toast:init(options)
+  options = options or {}
+  self.location = options.location or 'top'
+  self.margin = 4
+  self.padding = 4
+  self.text = nil
+end
+
+function Widgets.Toast:invalidate()
+  platform.window:invalidate(self:getFrame())
+end
+
+function Widgets.Toast:getFrame()
+  if not self.text or self.text:ulen() == 0 then
+    return 0, 0, 0, 0
+  end
+
+  local x, y, w, h = 0, 0, platform.window:width(), platform.window:height()
+  local textW, textH = 0, 0
+  
+  platform.withGC(function(gc)
+    textW = gc:getStringWidth(self.text)
+    textH = gc:getStringHeight(self.text)
+  end)
+  
+  x = x + w/2 - textW/2 - self.margin
+  y = self.padding -- Top location
+  w = textW + 2*self.margin
+  h = textH + 2*self.margin
+  
+  if self.location == 'center' then
+    y = y + h/2 - textH/2 - self.margin
+  end
+
+  return x, y, w, h
+end
+
+function Widgets.Toast:show(text)
+  self:invalidate()
+  self.text = text
+  self:invalidate()
+end
+
+function Widgets.Toast:draw(gc)
+  if not self.text then return end
+
+  local margin = 4
+  local x,y,w,h = self:getFrame()
+
+  gc:clipRect("set", x, y, w, h)
+  gc:setColorRGB(theme[options.theme].altRowColor)
+  gc:fillRect(x, y, w, h)
+  gc:setColorRGB(theme[options.theme].borderColor)
+  gc:drawRect(x, y, w-1, h-1)
+  gc:setColorRGB(theme[options.theme].textColor)
+  gc:drawString(self.text, x + self.margin, y + self.margin)
+  gc:clipRect("reset")
+end
+
+
+-- KeybindManager
+KeybindManager = class()
+function KeybindManager:init()
+  self.bindings = {}
+  
+  -- State 
+  self.currentTab = nil
+  self.currentSequence = nil
+
+  -- Callbacks
+  self.onSequenceChanged = nil -- void({sequence})
+  self.onExec = nil -- void(void)
+end
+
+function KeybindManager:resetSequence()
+  self.currentTab = nil
+  self.currentSequence = nil
+  if self.onSequenceChanged then
+    self.onSequenceChanged(self.currentSequence)
+  end
+end
+
+function KeybindManager:setSequence(sequence, fn)
+  local tab = self.bindings
+  for idx, key in ipairs(sequence) do
+    if idx == #sequence then break end
+    if not tab[key] then
+      tab[key] = {}
+    end
+    tab = tab[key]
+  end
+  
+  tab[sequence[#sequence]] = fn
+end
+
+function KeybindManager:dispatchKey(key)
+  self.currentSequence = self.currentSequence or {}
+  table.insert(self.currentSequence, key)
+  
+  self.currentTab = self.currentTab or self.bindings
+  
+  -- Special case: Binding all number keys
+  if not self.currentTab[key] then
+    if key:find('^%d+$') then
+      self.currentTab = self.currentTab['%d']
+    else
+      self.currentTab = self.currentTab[key]
+    end
+  else
+    -- Default case
+    self.currentTab = self.currentTab[key]
+  end
+
+  -- Exit if not found
+  if not self.currentTab then
+    self:resetSequence()
+    return false
+  end
+
+  -- Call binding
+  if type(self.currentTab) == 'function' then
+    self.currentTab(self.currentSequence)
+    self:resetSequence()
+    if self.onExec then
+      self.onExec()
+    end
+    return true
+  end
+
+  -- Propagate sequence change
+  if self.onSequenceChanged then
+    self.onSequenceChanged(self.currentSequence)
+  end
+
+  return true
+end
+
+
+Toast = Widgets.Toast()
+ErrorToast = Widgets.Toast()
+GlobalKbd = KeybindManager()
+
+-- After execution of any kbd command invaidate all
+GlobalKbd.onExec = function()
+  platform.window:invalidate()
+end
+
+-- Show the current state using a toast message
+GlobalKbd.onSequenceChanged = function(sequence)
+  if not sequence then
+    Toast:show()
+    return
+  end
+
+  local str = ''
+  for idx, v in ipairs(sequence) do
+    if idx > 1 then str = str..SYM_CONVERT end
+    str = str .. v
+  end
+  Toast:show(str)
+end
+
+-- Show text as error
+Error = {}
+function Error.show(str)
+  ErrorToast:show(str)
+end
+
+function Error.hide()
+  ErrorToast:show()
+end
+
+
 function on.construction()
   bigview = D2Editor.newRichText() -- TODO: Refactor to custom view
 
@@ -2587,6 +2768,45 @@ function on.construction()
       {"Toggle smart complete", function() options.smartComplete = not options.smartComplete end},
     }
   })
+  
+  GlobalKbd:setSequence({'S', 'd', '%d'}, function(sequence)
+    -- Duplicate N items from top
+    recordUndo()
+    stack:dup(tonumber(sequence[#sequence]))
+  end)
+  GlobalKbd:setSequence({'S', 'p', '%d'}, function(sequence)
+    -- Pick item at N
+    recordUndo()
+    stack:pick(tonumber(sequence[#sequence]))
+  end)
+  GlobalKbd:setSequence({'S', 'r', '%d'}, function(sequence)
+    -- Roll stack N times
+    recordUndo()
+    stack:roll(tonumber(sequence[#sequence]))
+  end)
+  GlobalKbd:setSequence({'S', 'x', '%d'}, function(sequence)
+    -- Pop item N from top
+    recordUndo()
+    stack:pop(tonumber(sequence[#sequence]), true)
+  end)
+  GlobalKbd:setSequence({'S', 'x', 'x'}, function(sequence)
+    -- Pop all items from top
+    recordUndo()
+    stack.stack = {}
+  end)
+  GlobalKbd:setSequence({'S', 'l', '%d'}, function(sequence)
+    -- Transform top N items to list
+    recordUndo()
+    stack:toList(tonumber(sequence[#sequence]))
+  end)
+  GlobalKbd:setSequence({'M', 'r'}, function(sequence)
+    -- Set mode to RPN
+    options.mode = 'RPN'
+  end)
+  GlobalKbd:setSequence({'M', 'a'}, function(sequence)
+    -- Set mode to ALG
+    options.mode = 'ALG'
+  end)
 end
 
 function on.resize(w, h)
@@ -2610,6 +2830,9 @@ function on.resize(w, h)
 end
 
 function on.escapeKey()
+  GlobalKbd:resetSequence()
+  ErrorToast:show()
+  
   if focus.onEscape then
     focus:onEscape()
   end
@@ -2630,6 +2853,10 @@ function on.backtabKey()
 end
 
 function on.returnKey()
+  if GlobalKbd:dispatchKey('return') then
+    return
+  end
+
   if focus == input then
     --menu:present(input, {
     --  {"→", "=:"}, {":=", ":="}, {"@"},
@@ -2643,24 +2870,36 @@ function on.returnKey()
 end
 
 function on.arrowRight()
+  if GlobalKbd:dispatchKey('right') then
+    return
+  end
   if focus.onArrowRight then
     focus:onArrowRight()
   end
 end
 
 function on.arrowLeft()
+  if GlobalKbd:dispatchKey('left') then
+    return
+  end
   if focus.onArrowLeft then
     focus:onArrowLeft()
   end
 end
 
 function on.arrowUp()
+  if GlobalKbd:dispatchKey('up') then
+    return
+  end
   if focus.onArrowUp then
     focus:onArrowUp()
   end
 end
 
 function on.arrowDown()
+  if GlobalKbd:dispatchKey('down') then
+    return
+  end
   if focus.onArrowDown then
     focus:onArrowDown()
   end
@@ -2679,6 +2918,10 @@ function on.charIn(c)
       input:setText(stack:pop().infix, "Edit")
       return
     end
+  end
+  
+  if GlobalKbd:dispatchKey(c) then
+    return
   end
 
   --for i=1,#c do
@@ -2754,5 +2997,7 @@ end
 function on.paint(gc)
   stack:draw(gc)
   input:draw(gc)
+  Toast:draw(gc)
+  ErrorToast:draw(gc)
   menu:draw(gc)
 end
