@@ -18,6 +18,8 @@ function class(base)
   return classdef
 end
 
+string.usub = string.sub -- FIXME: provide a better implementation
+
 math.evalStr = function(str)
   return "STUB"
 end
