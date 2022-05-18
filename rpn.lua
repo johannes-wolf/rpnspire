@@ -523,12 +523,6 @@ function functionInfo(s, builtinOnly)
     return nil
   end
   
-  local argcBegin = name:find('%d+$')
-  if argcBegin and argcBegin > 1 then
-    argc = tonumber(s:sub(argcBegin))
-    name = name:sub(1, argcBegin-1)
-  end
-
   local info = functions[name]
   if info then
     if not argc then
