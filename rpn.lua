@@ -1076,19 +1076,28 @@ function RPNExpression:fromInfix(tokens)
     popTop()
   end
 
-  self.stack = {}
-  for _,v in ipairs(result) do
-    table.insert(self.stack, v[1])
-  end
-
+  self.stack = result
   return self.stack
 end
 
-function RPNExpression:_isReverseOp(sym)
-  if self.stack[#self.stack] == sym then
-    return sym == SYM_NEGATE or sym == "(-)" or
-           sym == "not" or sym == "not "
-  end 
+function RPNExpression:_isReverseOp(value, kind)
+  if kind == 'operator' then
+    if self.stack[#self.stack][1] == value then
+      return value == SYM_NEGATE or value == "(-)" or
+             value == "not" or value == "not "
+    end 
+  end
+  return false
+end
+
+function RPNExpression:_pushFunction(value, kind)
+  if kind == 'function' then return true end
+  if kind == 'word' then
+    local name, argc = functionInfo(value, false)
+    --table.insert(self.stack, {tostring(argc), 'number'})
+    table.insert(self.stack, {name, 'function'})
+    return true
+  end
   return false
 end
 
@@ -1096,14 +1105,22 @@ function RPNExpression:pop()
   return table.remove(self.stack, #self.stack)
 end
 
-function RPNExpression:push(sym)
-  if self:_isReverseOp(sym) == true then
+function RPNExpression:push(str)
+  local tokens = Infix.tokenize(str)
+  if not tokens or #tokens < 1 then
+    Error.show("Could not parse input")
+  end
+  
+  local value, kind = unpack(tokens[1])
+  
+  if self:_isReverseOp(value, kind) then
     -- Remove double negation/not
     self:pop()
-  else
-    table.insert(self.stack, sym)
+  elseif not self:_pushFunction(value, kind) then
+    table.insert(self.stack, {value, kind})
   end
 end
+
 
 function RPNExpression:appendStack(o)
   for _, item in ipairs(o) do
@@ -1203,26 +1220,31 @@ function RPNExpression:infixString()
     table.insert(stack, {expr=str, prec=99})
   end
   
-  local function push(str)
-    if str == '}' then
+  local function push(value, kind)
+    if value == '}' then
       return pushList()
     end
 
-    local opname, opprec, opargc, oppos, opassoc, opaggrassoc = queryOperatorInfo(str)
-    if opname then
+    if kind == 'operator' then
+      local opname, opprec, opargc, oppos, opassoc, opaggrassoc = queryOperatorInfo(value)
+      assert(opname)
       return pushOperator(opname, opprec, opargc, oppos, opassoc, opaggrassoc)
     end
     
-    local fname = functionInfo(str, false)
-    if fname then
-      return pushFunction(fname)
+    if kind == 'function' then
+      local fname = functionInfo(value, false)
+      return pushFunction(fname or value)
     end
     
-    return table.insert(stack, {expr=str})
+    return table.insert(stack, {expr=value})
   end
   
   for _,v in ipairs(self.stack) do
-    push(v)
+    push(unpack(v))
+  end
+  
+  if stack and #stack >0 then
+    print("INFIX: "..stack[#stack].expr)
   end
   
   return #stack > 0 and stack[#stack].expr or nil
@@ -1444,6 +1466,16 @@ function UIStack:invalidate()
   platform.window:invalidate()
 end
 
+function UIStack:evalStr(str)
+  local res, err = math.evalStr(str)
+  -- Ignore unknown-function errors (for allowing to define functions in RPN mode)
+  if err and err ~= 750 then
+    Error.show(err)
+    return nil
+  end
+  return res, err
+end
+
 function UIStack:pushInfix(input)
   print("info: UIStack.pushInfix call with '"..input.."'")
 
@@ -1466,34 +1498,32 @@ function UIStack:pushInfix(input)
     return false
   end
   
-  local res, err = math.evalStr(infix)
-  if err then
-    Error.show(err)
-    return false
+  local res, err = self:evalStr(infix)
+  if res then
+    self:push({["rpn"]=stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
+    return true
   end
-  
-  self:push({["rpn"]=stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
-  return true
+  return false
 end
 
 function UIStack:pushEval(item)
   local infix = item:infixString()
-  local res, err = math.evalStr(infix)
-  if err then
-    return Error.show(err)
+  local res, err = self:evalStr(infix)
+  if res then
+    self:push({["rpn"]=item.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
+    return true
   end
-  self:push({["rpn"]=item.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
+  return false
 end
 
 function UIStack:push(item)
   if type(item) ~= "table" then
     local rpn = RPNExpression{item}
     local infix = rpn:infixString()
-    local res, err = math.evalStr(infix)
-    if err then
-        return Error.show(err)
-      end
-    item = {["rpn"]=rpn.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)}
+    local res, err = self:evalStr(infix)
+    if res then
+      item = {["rpn"]=rpn.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)}
+    end
   end
   if item ~= nil then
     table.insert(self.stack, item)
