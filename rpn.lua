@@ -76,12 +76,17 @@ function Trie.find(str, tab, pos)
   assert(str)
   assert(tab)
   local i, j = (pos or 1), (pos or 1) - 1
+  local match = nil
   while tab do
     j = j+1
     tab = tab[str:sub(j, j)]
-    if tab and tab['@LEAF@'] then 
-      return i, j, str:sub(i, j)
+    if tab and tab['@LEAF@'] then
+      match = {i, j, str:sub(i, j)}
     end
+  end
+
+  if match and match[1] then
+    return unpack(match)
   end
   return nil
 end
@@ -251,7 +256,7 @@ function tiGetFnArgs(nam)
   local arglist = ""
   for i=0,10 do
     res, err = math.evalStr("string("..nam.."("..arglist.."))")
-    if err == nil then
+    if err == nil or err == 210 then
       return argc
     elseif err == 930 then
       argc = argc + 1
@@ -689,7 +694,7 @@ function Macro:exec()
         input:customCompletion(items)
         coroutine.yield()
       elseif not dispatchFull(s) then
-        stack:push(s)
+        stack:pushInfix(s)
       end
     end
   end)
@@ -813,8 +818,8 @@ function Infix.tokenize(input)
   end
 
   local matcher = {
-    {fn=syntax,     kind='syntax'},
     {fn=operator,   kind='operator'},
+    {fn=syntax,     kind='syntax'},
     {fn=number,     kind='number'},
     {fn=unit,       kind='unit'},
     {fn=word,       kind='word'},
@@ -1090,33 +1095,26 @@ function RPNExpression:_isReverseOp(value, kind)
   return false
 end
 
-function RPNExpression:_pushFunction(value, kind)
-  if kind == 'function' then return true end
-  if kind == 'word' then
-    local name, argc = functionInfo(value, false)
-    --table.insert(self.stack, {tostring(argc), 'number'})
-    table.insert(self.stack, {name, 'function'})
-    return true
-  end
-  return false
-end
-
 function RPNExpression:pop()
   return table.remove(self.stack, #self.stack)
 end
 
-function RPNExpression:push(str)
-  local tokens = Infix.tokenize(str)
-  if not tokens or #tokens < 1 then
-    Error.show("Could not parse input")
+function RPNExpression:push(item)
+  local value, kind = nil, nil
+  if type(item) == 'table' then
+    value, kind = unpack(item)
+  elseif type(item) == 'string' then
+    local tokens = Infix.tokenize(item)
+    if not tokens or #tokens < 1 then
+      Error.show("Could not parse input")
+    end
+    value, kind = unpack(tokens[1])
   end
-  
-  local value, kind = unpack(tokens[1])
   
   if self:_isReverseOp(value, kind) then
     -- Remove double negation/not
     self:pop()
-  elseif not self:_pushFunction(value, kind) then
+  else
     table.insert(self.stack, {value, kind})
   end
 end
@@ -1241,10 +1239,6 @@ function RPNExpression:infixString()
   
   for _,v in ipairs(self.stack) do
     push(unpack(v))
-  end
-  
-  if stack and #stack >0 then
-    print("INFIX: "..stack[#stack].expr)
   end
   
   return #stack > 0 and stack[#stack].expr or nil
@@ -1506,7 +1500,7 @@ function UIStack:pushInfix(input)
   return false
 end
 
-function UIStack:pushEval(item)
+function UIStack:pushRPNExpression(item)
   local infix = item:infixString()
   local res, err = self:evalStr(infix)
   if res then
@@ -1517,14 +1511,7 @@ function UIStack:pushEval(item)
 end
 
 function UIStack:push(item)
-  if type(item) ~= "table" then
-    local rpn = RPNExpression{item}
-    local infix = rpn:infixString()
-    local res, err = self:evalStr(infix)
-    if res then
-      item = {["rpn"]=rpn.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)}
-    end
-  end
+  assert(item)
   if item ~= nil then
     table.insert(self.stack, item)
     self:scrollToIdx()
@@ -1615,7 +1602,7 @@ function UIStack:toList(n)
   rpn:push(tostring(n))
   rpn:push('}')
 
-  self:pushEval(rpn)
+  self:pushRPNExpression(rpn)
 end
 
 function UIStack:toPostfix()
@@ -1631,7 +1618,7 @@ function UIStack:toPostfix()
   
   local rpn = RPNExpression()
   rpn:push(str)
-  self:pushEval(rpn)
+  self:pushRPNExpression(rpn)
 end
 
 function UIStack:label(text)
@@ -2429,6 +2416,8 @@ function isBalanced(s)
 end
 
 --[[ === EVALUATION == ]]--
+-- FIXME: This is chaos and needs a rewrite!
+
 function _dispatchPushInput(op)
   if input.text:len() > 0 and input.text ~= op then
     stack:pushInfix(input.text)
@@ -2436,14 +2425,15 @@ function _dispatchPushInput(op)
   end
 end
 
+-- Handle TI operator/shortcut keys
 function _dispatchOperatorSpecial(op)
   if op == "^2" then
     _dispatchPushInput(op)
-    stack:push("2")
+    stack:pushInfix("2")
     return "^"
   elseif op == "10^" then
     _dispatchPushInput(op)
-    stack:push("10")
+    stack:pushInfix("10")
     stack:swap()
     return "^"
   end
@@ -2500,8 +2490,8 @@ function dispatchImmediate(op)
       rpn:appendStack(arg.rpn)
     end
 
-    rpn:push(tostring(fnArgs))
-    rpn:push(fnStr)
+    rpn:push({tostring(fnArgs), 'number'})
+    rpn:push({fnStr, 'function'})
       
     local infix = rpn:infixString()
     local res, err = math.evalStr(infix)
@@ -2541,8 +2531,8 @@ function dispatchFull(op)
       rpn:appendStack(arg.rpn)
     end
 
-    rpn:push(tostring(fnArgs))
-    rpn:push(fnStr)
+    rpn:push({tostring(fnArgs), 'number'})
+    rpn:push({fnStr, 'function'})
       
     local infix = rpn:infixString()
     local res, err = math.evalStr(infix)

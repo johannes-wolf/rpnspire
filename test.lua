@@ -221,9 +221,9 @@ function test.rpn_to_infix()
   expect({1, 2, '^', 3, '^'}, "(1^2)^3")
 
   -- Functions
-  expect({1, 1, 'sin'}, "sin(1)")
-  expect({1, 2, '+', 1, 'sin'}, "sin(1+2)")
-  expect({2, 'x', '*', 10, '=', 'x', 2, 'solve'}, "solve(2*x=10,x)")
+  expect({1, 1, {'sin', 'function'}}, "sin(1)")
+  expect({1, 2, '+', 1, {'sin', 'function'}}, "sin(1+2)")
+  expect({2, 'x', '*', 10, '=', 'x', 2, {'solve', 'function'}}, "solve(2*x=10,x)")
 end
 
 function test.keybind_manager()
