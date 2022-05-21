@@ -1093,6 +1093,17 @@ function RPNExpression:pop()
   return table.remove(self.stack, #self.stack)
 end
 
+function RPNExpression:pushOperator(name)
+  assert(name)
+  self:push({name, 'operator'})
+end
+
+function RPNExpression:pushFunctionCall(name, argc)
+  assert(name and argc)
+  self:push({tostring(argc), 'number'})
+  self:push({name, 'function'})
+end
+
 function RPNExpression:push(item)
   local value, kind = nil, nil
   if type(item) == 'table' then
@@ -1890,6 +1901,8 @@ function UIInput:init(frame)
   self.prefix = ""           -- Non-Editable prefix shown on the left
   -- Mode
   self.tempMode = nil
+  -- Input
+  self.inputHandler = RPNInput()
 end
 
 function UIInput:invalidate()
@@ -2072,23 +2085,7 @@ end
 
 function UIInput:onCharIn(c)
   self:cancelCompletion()
-
-  if self:getMode() == "RPN" and isBalanced(self.text:sub(1, self.cursor.pos)) then
-    if c == " " then return end
-    
-    -- Remove trailing '(' inserted by some keys
-    if c:ulen() > 1 and c:sub(-1) == '(' then
-      c = c:usub(1, -2)
-    end 
-    
-    recordUndo()
-    if not dispatchImmediate(c) then
-      popUndo()
-      self:_insertChar(c)
-    end
-  else
-    self:_insertChar(c)
-  end
+  self.inputHandler:onCharIn(c)
   self:scrollToPos()
 end
 
@@ -2162,18 +2159,7 @@ function UIInput:onEnter()
   if self.text:ulen() == 0 then return end
 
   recordUndo(self.text)
-  local c = self.text
-  if self:getMode() ~= "RPN" or not dispatchFull(c) then
-    if stack:pushInfix(c) then
-      input:setText("")
-    else
-      popUndo()
-      input:selAll()
-      return
-    end
-  else
-    input:setText("")
-  end
+  self.inputHandler:onEnter()
   
   self.tempMode = nil
   if currentMacro ~= nil then
@@ -2396,7 +2382,7 @@ end
 function isBalanced(s)
   local paren,brack,brace,dq,sq = 0,0,0,0,0
   for i = 1, #s do
-    c = s:byte(i)
+    local c = s:byte(i)
     if c==40  then paren = paren+1 end -- (
     if c==41  then paren = paren-1 end -- )
     if c==91  then brack = brack+1 end -- [
@@ -2412,12 +2398,140 @@ end
 --[[ === EVALUATION == ]]--
 -- FIXME: This is chaos and needs a rewrite!
 
-function _dispatchPushInput(op)
-  if input.text:len() > 0 and input.text ~= op then
-    stack:pushInfix(input.text)
-    input:setText("")
+RPNInput = class()
+function RPNInput:getInput()
+  return input.text
+end
+
+function RPNInput:setInput(str)
+  input:setText(str)
+end
+
+function RPNInput:popN(num)
+  local newTop = #stack.stack - num + 1
+  local rpn = RPNExpression()
+  for i=1,num do
+    rpn:appendStack(stack:pop(newTop).rpn)
+  end
+  return rpn
+end
+
+function RPNInput:dispatchInfix(str)
+  if not str or str:ulen() == 0 then
+    return nil
+  end
+  local res = stack:pushInfix(str)
+  if res then
+    self:setInput('')
+  end
+  return res
+end
+
+function RPNInput:dispatchInput()
+  local str = self:getInput()
+  if str and str:ulen() > 0 then
+    return self:dispatchInfix(str)
+  end
+  return true
+end
+
+function RPNInput:dispatchOperator(str, ignoreInput)
+  local name, _, argc = queryOperatorInfo(str)
+  if name then
+    if (not ignoreInput and not self:dispatchInput()) or
+       not Error.assertStackN(argc) then
+      return
+    end
+
+    local rpn = self:popN(argc)
+    rpn:pushOperator(name)
+    
+    stack:pushRPNExpression(rpn)
+    return true
   end
 end
+
+function RPNInput:dispatchOperatorSpecial(key)
+  local tab = {
+    ['^2'] = function()
+      self:dispatchInput()
+      stack:pushInfix('2')
+      self:dispatchOperator('^')
+    end,
+    ['10^'] = function()
+      self:dispatchInput()
+      stack:pushInfix('10')
+      stack:swap() 
+      self:dispatchOperator('^')
+    end
+  }
+  
+  tab[key]()
+end
+
+function RPNInput:dispatchFunction(str, ignoreInput)
+  local name, argc = functionInfo(str)
+  if name then
+    if (not ignoreInput and not self:dispatchInput()) or
+       not Error.assertStackN(argc) then
+      return
+    end
+
+    local rpn = self:popN(argc)
+    rpn:pushFunctionCall(name, argc)
+    
+    stack:pushRPNExpression(rpn)
+    return true
+  end
+end
+
+function RPNInput:onCharIn(key)
+  if not key then
+    return
+  end
+
+  if options.mode == "ALG" then
+    self:setInput(self:getInput() .. key)
+    return
+  end
+
+  local function isOperator(key)
+    return queryOperatorInfo(key) ~= nil
+  end
+
+  local function isOperatorSpecial(key)
+    if key == '^2' or key == '10^' then return true end
+  end
+
+  local function isFunction(key)
+    return functionInfo(key, true) ~= nil
+  end
+  
+  -- Remove trailing '(' from some TI keys
+  if key:usub(-1) == '(' then
+    key = key:sub(1, -2)
+  end
+
+  if isOperator(key) then
+    self:dispatchOperator(key)
+  elseif isOperatorSpecial(key) then
+    self:dispatchOperatorSpecial(key)
+  elseif isFunction(key) then
+    self:dispatchFunction(key)
+  else
+    self:setInput(self:getInput() .. key)
+  end
+end
+
+function RPNInput:onEnter()
+  if options.mode == "RPN" then
+    if self:dispatchFunction(self.getInput(), true) then
+      self:setInput('')
+    end
+  end
+  return self:dispatchInfix(self:getInput())
+end
+
 
 -- Handle TI operator/shortcut keys
 function _dispatchOperatorSpecial(op)
@@ -2435,109 +2549,6 @@ function _dispatchOperatorSpecial(op)
   return op
 end
 
-function dispatchOperator(op)
-  -- Special case for nspire keys that input operators with arguments
-  op = _dispatchOperatorSpecial(op)
-  
-  local opStr, _, opArgs = queryOperatorInfo(op)
-    if opStr ~= nil then
-      _dispatchPushInput(op)
-      if not Error.assertStackN(opArgs) then
-        return true
-      end
-  
-      local newTop = #stack.stack - opArgs + 1
-      local rpn = RPNExpression()
-      for i=1,opArgs do
-        local arg = stack:pop(newTop)
-        rpn:appendStack(arg.rpn)
-      end
-      
-      rpn:push(op)
-  
-      local infix = rpn:infixString()
-      local res, err = math.evalStr(infix)
-      stack:push({rpn=rpn.stack, infix=infix, result=res or ("error: "..err)})
-  
-      return true
-    end
-    
-    return false
-end
-
-function dispatchImmediate(op)
-  if input.text:sub(-1) == '@' then
-    return false
-  end
-
-  local fnStr, fnArgs = functionInfo(op, true)
-  if fnStr ~= nil then
-    _dispatchPushInput(op)
-    if not Error.assertStackN(fnArgs) then
-      return true
-    end
-    
-    local newTop = #stack.stack - fnArgs + 1
-    local rpn = RPNExpression()
-    for i=1,fnArgs do
-      local arg = stack:pop(newTop)
-      rpn:appendStack(arg.rpn)
-    end
-
-    rpn:push({tostring(fnArgs), 'number'})
-    rpn:push({fnStr, 'function'})
-      
-    local infix = rpn:infixString()
-    local res, err = math.evalStr(infix)
-    stack:push({rpn=rpn.stack, infix=infix, result=res or ("error: "..err)})
-    
-    return true
-  end
-
-  return dispatchOperator(op)
-end
-
-function dispatchFull(op)
-  -- Call internal function
-  if op:find('^@%w') then
-    local fnStr = op:sub(2)
-    local fn = rpnFunctions[fnStr]
-    if fn ~= nil then
-      fn()
-      return true
-    elseif fnStr:len() > 0 then
-      -- Display error
-      return false
-    end
-  end
-  
-  -- Call function
-  local fnStr, fnArgs = functionInfo(op, false)
-  if fnStr ~= nil then
-    if not Error.assertStackN(fnArgs) then
-      return false
-    end
-    
-    local newTop = #stack.stack - fnArgs + 1
-    local rpn = RPNExpression()
-    for i=1, fnArgs do
-      local arg = stack:pop(newTop)
-      rpn:appendStack(arg.rpn)
-    end
-
-    rpn:push({tostring(fnArgs), 'number'})
-    rpn:push({fnStr, 'function'})
-      
-    local infix = rpn:infixString()
-    local res, err = math.evalStr(infix)
-    stack:push({rpn=rpn.stack, infix=infix, result=res or ("error: "..err)})
-    
-    return true
-  end
-
-  -- Call operator
-  return dispatchOperator(op)
-end
 
 -- UI
 input = UIInput()

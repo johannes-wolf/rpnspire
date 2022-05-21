@@ -18,10 +18,33 @@ function class(base)
   return classdef
 end
 
-string.usub = string.sub -- FIXME: provide a better implementation
+function string.usub(...)
+  return string.sub(...)
+end
+
+function math.log10(x)
+  return math.log(x, 10)
+end
+
+GC = {
+  getStringWidth = function(...) return 1 end,
+  getStringHeight = function(...) return 1 end,
+  drawRect = function(...) end,
+  fillRect = function(...) end,
+  setColorRGB = function(...) end,
+}
+
+platform = {
+  withGC = function(fn) return fn(GC) end,
+  window = {
+    width = function(...) return 1 end,
+    height = function(...) return 1 end,
+    invalidate = function(...) end,
+  }
+}
 
 math.evalStr = function(str)
-  return "STUB"
+  return str
 end
 
 if not unpack then
@@ -248,6 +271,51 @@ function test.keybind_manager()
   expect({'c'}, nil)
   expect({'b'}, '4')
   expect({'a', 'b', '2'}, '2')
+end
+
+function test.rpn_input()
+  UIStack.draw = function(...) end
+  UIInput.draw = function(...) end
+
+  local rpn = RPNInput()
+
+  local function expectStack(input_str, key, stack_infix)
+    on.resize(1,1) -- TODO: Do not use real
+    stack.stack = {}
+    input:setText(input_str)
+    if type(key) == 'string' then
+      rpn:onCharIn(key)
+    else
+      for _,v in ipairs(key) do
+        if v == 'ENTER' then
+          rpn:onEnter()
+        else
+          rpn:onCharIn(v)
+        end
+      end
+    end
+    if type(stack_infix) == 'string' then
+      local stack_top = stack.stack[#stack.stack]
+      Test.assert(stack_top.infix == stack_infix,
+                  "Expected stack top to be '"..stack_infix.."' but it is '"..stack_top.infix.."'")
+    else
+      for idx,v in ipairs(stack_infix) do
+        local stack_top = stack.stack[#stack.stack - idx + 1]
+        Test.assert(stack_top.infix == v,
+                    "Expected stack top to be '"..v.."' but it is '"..stack_top.infix.."'")
+      end
+    end
+  end
+
+  expectStack('', {'1', 'ENTER'},
+              '1')
+  expectStack('', {'1', 'ENTER', '2', 'ENTER'},
+              {'2', '1'})
+  expectStack('', {'1', '2', 'ENTER'},
+              '12')
+
+  expectStack('', {'1', 'ENTER', '2', 'ENTER', '+'}, '1+2') -- TODO: Fix, deactivate old logic
+  expectStack('', {'1', 'ENTER', '2', '+'}, '1+2')
 end
 
 Test.run(test)
