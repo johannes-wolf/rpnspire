@@ -9,12 +9,12 @@ the Free Software Foundation.
 -- luacheck: ignore on
 
 -- Returns the height of string `s`
-function getStringHeight(s)
+local function getStringHeight(s)
   return platform.withGC(function(gc) return gc:getStringHeight(s or "A") end)
 end
 
 -- Dump table `o` to string
-function dump(o)
+local function dump(o)
    if type(o) == "table" then
       local s = '{ '
       for k,v in pairs(o) do
@@ -229,7 +229,7 @@ local operators = {
 local operators_trie = Trie.build(operators)
 
 -- Query operator information
-function queryOperatorInfo(s)
+local function queryOperatorInfo(s)
   local tab = operators[s]
   if tab == nil then return nil end
   
@@ -240,7 +240,7 @@ end
 -- Returns the number of arguments for the nspire function `nam`.
 -- Implementation is hacky, but there seems to be no clean way of
 -- getting this information.
-function tiGetFnArgs(nam)
+local function tiGetFnArgs(nam)
   local res, err = math.evalStr("getType("..nam..")")
   if err ~= nil or res ~= "\"FUNC\"" then
     return nil
@@ -510,7 +510,7 @@ local functions = {
 Function info table
   str, args
 --]]
-function functionInfo(s, builtinOnly)
+local function functionInfo(s, builtinOnly)
   local name, argc = s:lower(), nil
   
   if name:find('^%d') then
@@ -554,42 +554,6 @@ function functionInfo(s, builtinOnly)
   
   return nil
 end
-
-
---[[
-RPN specific functions
---]]
-rpnFunctions = {
-  ["swap"] = function() stack:swap() end,
-  ["roll"] = function() stack:roll() end,
-  ["dup"]  = function() stack:dup() end,
-  ["dup2"] = function() stack:dup(2) end,
-  ["dup3"] = function() stack:dup(3) end,
-  ["pick"] = function() stack:pick(1) end,
-  ["pick2"]= function() stack:pick(2) end,
-  ["pick3"]= function() stack:pick(3) end,
-  ["del"]  = function() stack:pop() end,
-  ["tolist"]= function() stack:toList() end,
-  ["rpn"]  = function() options.mode = "RPN" end,
-  ["alg"]  = function() options.mode = "ALG" end,
-  ["clearaz"] = function() math.evalStr("clearaz") end,
-  -- History
-  ["undo"] = function() popUndo(); undo() end, -- HACK: popUndo to remove the undo of the undo
-  -- Weird features
-  ["label"]= function() stack:label() end,
-  ["killexpr"] = function() stack:killexpr() end,
-  -- Debugging
-  ["postfix"]  = function() stack:toPostfix() end,
-  -- Macros
-  ["mcall"] = function()
-    -- TODO: this is a hack for testing out macros
-    local n = string.unquote(stack:pop().result)
-    local m = macros[n]
-    if m ~= nil then
-      m:exec()
-    end
-  end,
-}
 
 local errorCodes = {
   [10]  = "Function did not return a value",
@@ -658,7 +622,7 @@ local errorCodes = {
 }
 
 --[[ MACRO ]]--
-currentMacro = nil -- Currently or last active macro coroutine
+local currentMacro = nil -- Currently or last active macro coroutine
 
 -- A macro is a list of actions to execute with some special function available
 Macro = class()
@@ -670,30 +634,11 @@ end
 function Macro:exec()
   currentMacro = coroutine.create(function()
     for _,s in ipairs(self.steps) do
-      if type(s)=="function" then
-        s()
-      elseif s:sub(1,2) == "?>" then -- Ask for input
-        input:setText("", s:sub(3))
-        coroutine.yield()
-      elseif s:sub(1,2) == "?:" then -- Provide custom completion
-        local prefix = s:sub(3,s:find(">"))
-        local items = string.split(s:sub(s:find(">")+1),":")
-        input:setText("", prefix)
-        input:customCompletion(items)
-        coroutine.yield()
-      elseif not dispatchFull(s) then
-        stack:pushInfix(s)
-      end
+      -- TODO: Implement
     end
   end)
 end
 
--- Global macro list
-macros = {
-  ["genqf"]  = Macro{"?>a:", "x", "?>x", Sym.NEGATE, "+", "2", "^", "?>y", "@pick3", "/", "+", "*"},
-  ["seq"]    = Macro{"?>f(x)", "x", "?>start:", "?>end:", "seq"},
-  ["sumSeq"] = Macro{"?>f(x)", "x", "?>x:", "?>end:", "sumSeq"},
-}
 
 -- Lexer for TI math expressions being as close to the original as possible
 Infix = {}
@@ -1511,7 +1456,7 @@ end
 
 function UIStack:push(item)
   assert(item)
-  if item ~= nil then
+  if item then
     table.insert(self.stack, item)
     self:scrollToIdx()
     self:invalidate()
@@ -1598,7 +1543,7 @@ function UIStack:toList(n)
     end
   end
   
-  rpn:push(tostring(n))
+  rpn:push({tostring(n), 'number'})
   rpn:push('}')
 
   self:pushRPNExpression(rpn)
@@ -2608,13 +2553,6 @@ input.completionFun = function(prefix)
       table.insert(functionTab, k)
     end
   end
-  
-  local macroTab = (function ()
-    local r = {}
-    for k,_ in ipairs(macros) do
-      --table.insert(r, ""..k) -- TODO: How to call macros?
-    end
-  end)()
 
   -- TODO: Complete the unit table
   --       Maybe move units to a grouped menu
