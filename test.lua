@@ -307,15 +307,18 @@ function test.rpn_input()
     end
   end
 
-  expectStack('', {'1', 'ENTER'},
-              '1')
-  expectStack('', {'1', 'ENTER', '2', 'ENTER'},
-              {'2', '1'})
-  expectStack('', {'1', '2', 'ENTER'},
-              '12')
+  expectStack('', {'1', 'ENTER'}, '1')
+  expectStack('', {'1', 'ENTER', '2', 'ENTER'}, {'2', '1'})
+  expectStack('', {'1', '2', 'ENTER'}, '12')
 
-  expectStack('', {'1', 'ENTER', '2', 'ENTER', '+'}, '1+2') -- TODO: Fix, deactivate old logic
+  -- Operators
+  expectStack('', {'1', 'ENTER', '2', 'ENTER', '+'}, '1+2')
   expectStack('', {'1', 'ENTER', '2', '+'}, '1+2')
+
+  -- Functions
+  expectStack('', {'1', 'ENTER', 'sin', 'ENTER'}, 'sin(1)')
+  expectStack('', {'1', 'ENTER', '2', '+', 'sin', 'ENTER'}, 'sin(1+2)')
+  expectStack('', {'sin(2)', 'ENTER'}, 'sin(2)')
 end
 
 Test.run(test)

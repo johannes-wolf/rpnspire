@@ -149,7 +149,7 @@ local ParenPairs = {
   ["'"] = {"'", true},
 }
 
-local Sym = {
+Sym = {
   NEGATE  = "\226\136\146",
   STORE   = "→",
   ROOT    = "\226\136\154",
