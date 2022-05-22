@@ -135,7 +135,7 @@ local options = {
   mode = "RPN",          -- What else
   saneHexDigits = false, -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
   smartComplete = true,  -- Try to be smart when completing
-  maxUndo = 99,          -- Max num of undo steps
+  maxUndo = 20,          -- Max num of undo steps
 }
 
 local ParenPairs = {
@@ -2320,7 +2320,7 @@ end
 
 
 --[[ === UNDO/REDO === ]]--
-undoStack, redoStack = {}, {}
+local UndoStack, RedoStack = {}, {}
 
 -- Returns a new undo-state table by copying the current stack and text input
 function makeUndoState(text)
@@ -2331,15 +2331,15 @@ function makeUndoState(text)
 end
 
 function recordUndo(input)
-  table.insert(undoStack, makeUndoState(input))
-  if #undoStack > options.maxUndo then
-    table.remove(undoStack, 1)
+  table.insert(UndoStack, makeUndoState(input))
+  if #UndoStack > options.maxUndo then
+    table.remove(UndoStack, 1)
   end
-  redoStack = {}
+  RedoStack = {}
 end
 
 function popUndo()
-  table.remove(undoStack, #undoStack)
+  table.remove(UndoStack, #UndoStack)
 end
 
 function applyUndo(state)
@@ -2361,17 +2361,17 @@ function clear()
 end
 
 function undo()
-  if #undoStack > 0 then
-    local state = table.remove(undoStack, #undoStack)
-    table.insert(redoStack, makeUndoState())
+  if #UndoStack > 0 then
+    local state = table.remove(UndoStack, #UndoStack)
+    table.insert(RedoStack, makeUndoState())
     applyUndo(state)
   end
 end
 
 function redo()
-  if #redoStack > 0 then
-    local state = table.remove(redoStack, #redoStack)
-    table.insert(undoStack, makeUndoState())
+  if #RedoStack > 0 then
+    local state = table.remove(RedoStack, #RedoStack)
+    table.insert(UndoStack, makeUndoState())
     applyUndo(state)
   end
 end
@@ -3169,12 +3169,12 @@ function on.save()
     ['options'] = options,
     ['stack'] = stack.stack,
     ['input'] = input.text,
-    ['undo'] = {undoStack, redoStack}
+    ['undo'] = {UndoStack, RedoStack}
   }
 end
 
 function on.restore(state)
-  undoStack, redoStack = unpack(state.undo)
+  UndoStack, RedoStack = unpack(state.undo)
   stack.stack = state.stack
   options = state.options
   input:setText(state.input)
