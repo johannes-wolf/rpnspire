@@ -2525,7 +2525,7 @@ end
 
 function RPNInput:onEnter()
   if options.mode == "RPN" then
-    if self:dispatchFunction(self.getInput(), true) then
+    if self:dispatchFunction(self:getInput(), true) then
       self:setInput('')
     end
   end
