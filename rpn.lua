@@ -6,13 +6,15 @@ under the terms of the GNU General Public License version 3 as published by
 the Free Software Foundation.
 ]]--
 
+-- luacheck: ignore on
+
 -- Returns the height of string `s`
-function getStringHeight(s)
+local function getStringHeight(s)
   return platform.withGC(function(gc) return gc:getStringHeight(s or "A") end)
 end
 
 -- Dump table `o` to string
-function dump(o)
+local function dump(o)
    if type(o) == "table" then
       local s = '{ '
       for k,v in pairs(o) do
@@ -26,7 +28,7 @@ function dump(o)
 end
 
 -- Deep copy a table
-function clone(t)
+local function clone(t)
     if type(t) ~= "table" then return t end
     local meta = getmetatable(t)
     local target = {}
@@ -92,7 +94,7 @@ function Trie.find(str, tab, pos)
 end
 
 -- Themes
-theme = {
+local theme = {
   ["light"] = {
     rowColor = 0xFFFFFF,
     altRowColor = 0xEEEEEE,
@@ -122,7 +124,7 @@ theme = {
 }
 
 -- Global options
-options = {
+local options = {
   autoClose = true,      -- Auto close parentheses
   autoKillParen = true,  -- Auto kill righthand paren when killing left one
   showFringe = true,     -- Show fringe (stack number)
@@ -136,7 +138,7 @@ options = {
   maxUndo = 99,          -- Max num of undo steps
 }
 
-ParenPairs = {
+local ParenPairs = {
   ['('] = {')', true},
   [')'] = {'(', false},
   ['{'] = {'}', true},
@@ -147,7 +149,7 @@ ParenPairs = {
   ["'"] = {"'", true},
 }
 
-Sym = {
+local Sym = {
   NEGATE  = "\226\136\146",
   STORE   = "→",
   ROOT    = "\226\136\154",
@@ -164,7 +166,7 @@ Sym = {
   POWN1   = "\239\128\133", -- ^-1
 }
 
-operators = {
+local operators = {
   --[[                 string, lvl, #, side, assoc, aggressive-assoc ]]--
   -- Parentheses
   ["#"]             = {nil,     18, 1, -1},
@@ -224,7 +226,7 @@ operators = {
   [Sym.CONVERT]     = {nil, 1, 2, 0},
   ["@>"]            = {Sym.CONVERT, 1, 2,  0}
 }
-operators_trie = Trie.build(operators)
+local operators_trie = Trie.build(operators)
 
 -- Query operator information
 function queryOperatorInfo(s)
@@ -268,7 +270,7 @@ end
 -- n: Number of args (max)
 -- min: Min number of args
 -- conv: Conversion function (@>...)
-functions = {
+local functions = {
   ["abs"]             = {n = 1},
   ["amorttbl"]        = {n = 10, min = 4},
   ["angle"]           = {n = 1},
@@ -589,7 +591,7 @@ rpnFunctions = {
   end,
 }
 
-errorCodes = {
+local errorCodes = {
   [10]  = "Function did not return a value",
   [20]  = "Test did not resolve to true or false",
   [40]  = "Argument error",
@@ -1242,7 +1244,7 @@ function RPNExpression:infixString()
 end
 
 
-Widgets = {}
+local Widgets = {}
 
 -- Widget Base Class
 Widgets.Base = class()
@@ -2500,7 +2502,7 @@ function RPNInput:onCharIn(key)
   end
   
   -- Remove trailing '(' from some TI keys
-  if key:usub(-1) == '(' then
+  if key:ulen() > 1 and key:usub(-1) == '(' then
     key = key:sub(1, -2)
   end
 
@@ -2522,23 +2524,6 @@ function RPNInput:onEnter()
     end
   end
   return self:dispatchInfix(self:getInput())
-end
-
-
--- Handle TI operator/shortcut keys
-function _dispatchOperatorSpecial(op)
-  if op == "^2" then
-    _dispatchPushInput(op)
-    stack:pushInfix("2")
-    return "^"
-  elseif op == "10^" then
-    _dispatchPushInput(op)
-    stack:pushInfix("10")
-    stack:swap()
-    return "^"
-  end
-  
-  return op
 end
 
 
@@ -2576,9 +2561,9 @@ input.completionFun = function(prefix)
   -- Semantic autocompletion
   local semantic = nil
   if options.smartComplete then
-    local tokens, semanticValue, semanticKind = nil, nil, nil
+    local semanticValue, semanticKind = nil, nil
 
-    tokens = Infix.tokenize(input.text:usub(1, input.cursor.pos + 1 - (prefix and prefix:ulen() + 1 or 0)))
+    local tokens = Infix.tokenize(input.text:usub(1, input.cursor.pos + 1 - (prefix and prefix:ulen() + 1 or 0)))
     if tokens and #tokens > 0 then
       semanticValue, semanticKind = unpack(tokens[#tokens])
       semantic = {}
@@ -2728,7 +2713,6 @@ end
 function Widgets.Toast:draw(gc)
   if not self.text then return end
 
-  local margin = 4
   local x,y,w,h = self:getFrame()
   local isError = self.style == 'error'
 
