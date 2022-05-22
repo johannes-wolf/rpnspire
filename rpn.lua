@@ -2079,7 +2079,9 @@ end
 
 function UIInput:onCharIn(c)
   self:cancelCompletion()
-  self.inputHandler:onCharIn(c)
+  if not self.inputHandler:onCharIn(c) then
+    self:_insertChar(c)
+  end
   self:scrollToPos()
 end
 
@@ -2152,7 +2154,6 @@ end
 function UIInput:onEnter()
   if self.text:ulen() == 0 then return end
 
-  recordUndo(self.text)
   self.inputHandler:onEnter()
   
   self.tempMode = nil
@@ -2273,6 +2274,7 @@ end
 
 
 --[[ === BIG UI === ]]--
+-- TODO: Refactor
 function showBigView(show, idx)
   if show == true then
     focusView({
@@ -2284,7 +2286,9 @@ function showBigView(show, idx)
       onBackspace = function(c) 
         focusView(input)
       end,
-      onEscape = function() end,
+      onEscape = function() 
+        focusView(input)
+      end,
       onFocus = function()
         local margin = 8
         bigview:setBorder(2)
@@ -2372,11 +2376,21 @@ function redo()
   end
 end
 
--- Returns true if `s` parentheses and quotes are balanced
-function isBalanced(s)
+
+RPNInput = class()
+function RPNInput:getInput()
+  return input.text
+end
+
+function RPNInput:setInput(str)
+  input:setText(str)
+end
+
+function RPNInput:isBalanced()
+  local str = input.text
   local paren,brack,brace,dq,sq = 0,0,0,0,0
-  for i = 1, #s do
-    local c = s:byte(i)
+  for i=1,input.cursor.pos do
+    local c = str:byte(i)
     if c==40  then paren = paren+1 end -- (
     if c==41  then paren = paren-1 end -- )
     if c==91  then brack = brack+1 end -- [
@@ -2387,18 +2401,6 @@ function isBalanced(s)
     if c==39  then sq = sq + 1 end     -- '
   end
   return paren == 0 and brack == 0 and brace == 0 and dq % 2 == 0 and sq % 2 == 0
-end
-
---[[ === EVALUATION == ]]--
--- FIXME: This is chaos and needs a rewrite!
-
-RPNInput = class()
-function RPNInput:getInput()
-  return input.text
-end
-
-function RPNInput:setInput(str)
-  input:setText(str)
 end
 
 function RPNInput:popN(num)
@@ -2432,8 +2434,10 @@ end
 function RPNInput:dispatchOperator(str, ignoreInput)
   local name, _, argc = queryOperatorInfo(str)
   if name then
+    recordUndo()
     if (not ignoreInput and not self:dispatchInput()) or
        not Error.assertStackN(argc) then
+      popUndo()
       return
     end
 
@@ -2466,8 +2470,10 @@ end
 function RPNInput:dispatchFunction(str, ignoreInput)
   local name, argc = functionInfo(str)
   if name then
+    recordUndo()
     if (not ignoreInput and not self:dispatchInput()) or
        not Error.assertStackN(argc) then
+      popUndo()
       return
     end
 
@@ -2481,12 +2487,11 @@ end
 
 function RPNInput:onCharIn(key)
   if not key then
-    return
+    return false
   end
 
-  if options.mode == "ALG" or not isBalanced(self:getInput()) then
-    self:setInput(self:getInput() .. key)
-    return
+  if options.mode == "ALG" or not self:isBalanced() then
+    return false
   end
 
   local function isOperator(key)
@@ -2513,8 +2518,9 @@ function RPNInput:onCharIn(key)
   elseif isFunction(key) then
     self:dispatchFunction(key)
   else
-    self:setInput(self:getInput() .. key)
+    return false
   end
+  return true
 end
 
 function RPNInput:onEnter()
@@ -2522,6 +2528,10 @@ function RPNInput:onEnter()
     if self:dispatchFunction(self.getInput(), true) then
       self:setInput('')
     end
+  end
+  
+  if self:getInput():ulen() > 0 then
+    recordUndo()
   end
   return self:dispatchInfix(self:getInput())
 end
