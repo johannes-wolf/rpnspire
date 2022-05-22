@@ -89,11 +89,11 @@ function test:tokenize_infix()
   fail(".",     'Point is not a valid number')
 
   -- Number exponents
-  expect("3"..SYM_EE.."5",             {{'3'..SYM_EE..'5',  'n'}})
-  expect("3"..SYM_EE.."+5",            {{'3'..SYM_EE..'+5', 'n'}})
-  expect("3"..SYM_EE.."-5",            {{'3'..SYM_EE..'-5', 'n'}})
-  expect("3"..SYM_EE..SYM_NEGATE.."5", {{'3'..SYM_EE..SYM_NEGATE..'5', 'n'}})
-  fail("3"..SYM_EE.."5.1",             'Point after exponent')
+  expect("3"..Sym.EE.."5",             {{'3'..Sym.EE..'5',  'n'}})
+  expect("3"..Sym.EE.."+5",            {{'3'..Sym.EE..'+5', 'n'}})
+  expect("3"..Sym.EE.."-5",            {{'3'..Sym.EE..'-5', 'n'}})
+  expect("3"..Sym.EE..Sym.NEGATE.."5", {{'3'..Sym.EE..Sym.NEGATE..'5', 'n'}})
+  fail("3"..Sym.EE.."5.1",             'Point after exponent')
 
   -- Number bases
   expect("0b10", {{'0b10', 'n'}})
@@ -106,7 +106,7 @@ function test:tokenize_infix()
   expect("-",        {{'-', 'o'}})
   expect("*",        {{'*', 'o'}})
   expect("/",        {{'/', 'o'}})
-  expect(SYM_NEGATE, {{SYM_NEGATE, 'o'}})
+  expect(Sym.NEGATE, {{Sym.NEGATE, 'o'}})
 
   -- Units
   expect("_m", {{'_m', 'u'}})

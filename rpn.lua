@@ -136,17 +136,7 @@ options = {
   maxUndo = 99,          -- Max num of undo steps
 }
 
-
-ASCII_LPAREN = 40   -- (
-ASCII_RPAREN = 41   -- )
-ASCII_LBRACK = 91   -- [
-ASCII_RBRACK = 93   -- ]
-ASCII_LBRACE = 123  -- {
-ASCII_RBRACE = 125  -- }
-ASCII_DQUOTE = 34   -- "
-ASCII_SQUOTE = 39   -- '
-
-parenPairs = {
+ParenPairs = {
   ['('] = {')', true},
   [')'] = {'(', false},
   ['{'] = {'}', true},
@@ -157,20 +147,22 @@ parenPairs = {
   ["'"] = {"'", true},
 }
 
-SYM_NEGATE = "\226\136\146"
-SYM_STORE  = "→"
-SYM_ROOT   = "\226\136\154"
-SYM_NEQ    = "≠"
-SYM_LEQ    = "≤"
-SYM_GEQ    = "≥"
-SYM_LIMP   = "⇒"
-SYM_DLIMP  = "⇔"
-SYM_RAD    = "∠"
-SYM_TRANSP = ""
-SYM_DEGREE = "\194\176"
-SYM_CONVERT= "\226\150\182"
-SYM_EE     = "\239\128\128"
-SYM_POWN1  = "\239\128\133" -- ^-1
+Sym = {
+  NEGATE  = "\226\136\146",
+  STORE   = "→",
+  ROOT    = "\226\136\154",
+  NEQ     = "≠",
+  LEQ     = "≤",
+  GEQ     = "≥",
+  LIMP    = "⇒",
+  DLIMP   = "⇔",
+  RAD     = "∠",
+  TRANSP  = "",
+  DEGREE  = "\194\176",
+  CONVERT = "\226\150\182",
+  EE      = "\239\128\128",
+  POWN1   = "\239\128\133", -- ^-1
+}
 
 operators = {
   --[[                 string, lvl, #, side, assoc, aggressive-assoc ]]--
@@ -181,15 +173,15 @@ operators = {
   -- [" "]             = {nil, 17, 1,  1}, -- DEGREE/MIN/SEC
   ["!"]             = {nil,     17, 1,  1},
   ["%"]             = {nil,     17, 1,  1},
-  [SYM_RAD]         = {nil,     17, 1,  1},
+  [Sym.RAD]         = {nil,     17, 1,  1},
   -- [" "]             = {nil, 17, 1,  1}, -- SUBSCRIPT
-  ["@t"]            = {SYM_TRANSP, 17, 1, 1},
-  [SYM_TRANSP]      = {nil,     17, 1,  1},
+  ["@t"]            = {Sym.TRANSP, 17, 1, 1},
+  [Sym.TRANSP]      = {nil,     17, 1,  1},
   --
   ["^"]             = {nil,     16, 2,  0, 'r', true}, -- Matching V200 RPN behavior
   --
-  ["(-)"]           = {SYM_NEGATE,15,1,-1},
-  [SYM_NEGATE]      = {nil,     15, 1, -1},
+  ["(-)"]           = {Sym.NEGATE,15,1,-1},
+  [Sym.NEGATE]      = {nil,     15, 1, -1},
   --
   ["&"]             = {nil,     14, 2,  0},
   --
@@ -200,14 +192,14 @@ operators = {
   ["-"]             = {nil,     12, 2,  0, 'l'},
   --
   ["="]             = {nil,     11, 2,  0, 'r'},
-  [SYM_NEQ]         = {nil,     11, 2,  0, 'r'},
-  ["/="]            = {SYM_NEQ, 11, 2,  0, 'r'},
+  [Sym.NEQ]         = {nil,     11, 2,  0, 'r'},
+  ["/="]            = {Sym.NEQ, 11, 2,  0, 'r'},
   ["<"]             = {nil,     11, 2,  0, 'r'},
   [">"]             = {nil,     11, 2,  0, 'r'},
-  [SYM_LEQ]         = {nil,     11, 2,  0, 'r'},
-  ["<="]            = {SYM_LEQ, 11, 2,  0, 'r'},
-  [SYM_GEQ]         = {nil,     11, 2,  0, 'r'},
-  [">="]            = {SYM_GEQ, 11, 2,  0, 'r'},
+  [Sym.LEQ]         = {nil,     11, 2,  0, 'r'},
+  ["<="]            = {Sym.LEQ, 11, 2,  0, 'r'},
+  [Sym.GEQ]         = {nil,     11, 2,  0, 'r'},
+  [">="]            = {Sym.GEQ, 11, 2,  0, 'r'},
   --
   ["not"]           = {"not ",  10, 1, -1},
   ["and"]           = {" and ", 10, 2,  0},
@@ -217,20 +209,20 @@ operators = {
   ["nor"]           = {" nor ",  9, 2,  0},
   ["nand"]          = {" nand ", 9, 2,  0},
   --
-  [SYM_LIMP]        = {nil,      8, 2,  0, 'r'},
-  ["=>"]            = {SYM_LIMP, 8, 2,  0, 'r'},
+  [Sym.LIMP]        = {nil,      8, 2,  0, 'r'},
+  ["=>"]            = {Sym.LIMP, 8, 2,  0, 'r'},
   --
-  [SYM_DLIMP]       = {nil,      7, 2,  0, 'r'},
-  ["<=>"]           = {SYM_DLIMP,7, 2,  0, 'r'},
+  [Sym.DLIMP]       = {nil,      7, 2,  0, 'r'},
+  ["<=>"]           = {Sym.DLIMP,7, 2,  0, 'r'},
   --
   ["|"]             = {nil,      6, 2,  0},
   --
-  [SYM_STORE]       = {nil,      5, 2,  0, 'r'},
-  ["=:"]            = {SYM_STORE,5, 2,  0, 'r'},
+  [Sym.STORE]       = {nil,      5, 2,  0, 'r'},
+  ["=:"]            = {Sym.STORE,5, 2,  0, 'r'},
   [":="]            = {nil,      5, 2,  0, 'r'},
   
-  [SYM_CONVERT]     = {nil, 1, 2, 0},
-  ["@>"]            = {SYM_CONVERT, 1, 2,  0}
+  [Sym.CONVERT]     = {nil, 1, 2, 0},
+  ["@>"]            = {Sym.CONVERT, 1, 2,  0}
 }
 operators_trie = Trie.build(operators)
 
@@ -319,22 +311,22 @@ functions = {
   ["constructmat"]    = {n = 5},
   ["corrmat"]         = {n = 20, min = 2},
   ["cos"]             = {n = 1},
-  ["cos"..SYM_POWN1]  = {n = 1},
+  ["cos"..Sym.POWN1]  = {n = 1},
   ["cosh"]            = {n = 1},
-  ["cosh"..SYM_POWN1] = {n = 1},
+  ["cosh"..Sym.POWN1] = {n = 1},
   ["cot"]             = {n = 1},
-  ["cot"..SYM_POWN1]  = {n = 1},
+  ["cot"..Sym.POWN1]  = {n = 1},
   ["coth"]            = {n = 1},
-  ["coth"..SYM_POWN1] = {n = 1},
+  ["coth"..Sym.POWN1] = {n = 1},
   ["count"]           = {min = 1},
   ["countif"]         = {n = 2},
   ["cpolyroots"]      = {{n = 1},
                          {n = 2}},
   ["crossp"]          = {n = 2},
   ["csc"]             = {n = 1},
-  ["csc"..SYM_POWN1]  = {n = 1},
+  ["csc"..Sym.POWN1]  = {n = 1},
   ["csch"]            = {n = 1},
-  ["csch"..SYM_POWN1] = {n = 1},
+  ["csch"..Sym.POWN1] = {n = 1},
   ["csolve"]          = {{n = 2},
                          {min = 3}},
   ["cumulativesum"]   = {n = 1},
@@ -460,9 +452,9 @@ functions = {
   ["rowswap"]         = {n = 3},
   ["rref"]            = {n = 2, min = 1},
   ["sec"]             = {n = 1},
-  ["sec"..SYM_POWN1]  = {n = 1},
+  ["sec"..Sym.POWN1]  = {n = 1},
   ["sech"]            = {n = 1},
-  ["sech"..SYM_POWN1] = {n = 1},
+  ["sech"..Sym.POWN1] = {n = 1},
   ["seq"]             = {n = 5, min = 4},
   ["seqgen"]          = {n = 7, min = 4},
   ["seqn"]            = {n = 4, min = 1},
@@ -472,12 +464,12 @@ functions = {
   ["sign"]            = {n = 1},
   ["simult"]          = {n = 3, min = 2},
   ["sin"]             = {n = 1},
-  ["sin"..SYM_POWN1]  = {n = 1},
+  ["sin"..Sym.POWN1]  = {n = 1},
   ["sinh"]            = {n = 1},
-  ["sinh"..SYM_POWN1] = {n = 1},
+  ["sinh"..Sym.POWN1] = {n = 1},
   ["solve"]           = {n = 2},
-  ["sqrt"]            = {n = 1, pretty = SYM_ROOT},
-  [SYM_ROOT]          = {n = 1},
+  ["sqrt"]            = {n = 1, pretty = Sym.ROOT},
+  [Sym.ROOT]          = {n = 1},
   ["stdefpop"]        = {n = 2, min = 1},
   ["stdefsamp"]       = {n = 2, min = 1},
   ["string"]          = {n = 1},
@@ -487,10 +479,10 @@ functions = {
   ["sumseq"]          = {n = 5, min = 4}, -- FIXME: Check n
   ["system"]          = {min = 1},
   ["tan"]             = {n = 1},
-  ["tan"..SYM_POWN1]  = {n = 1},
+  ["tan"..Sym.POWN1]  = {n = 1},
   ["tangentline"]     = {n = 3, min = 2},
   ["tanh"]            = {n = 1},
-  ["tanh"..SYM_POWN1] = {n = 1},
+  ["tanh"..Sym.POWN1] = {n = 1},
   ["taylor"]          = {n = 4, min = 3},
   ["tcdf"]            = {n = 3},
   ["tcollect"]        = {n = 1},
@@ -696,7 +688,7 @@ end
 
 -- Global macro list
 macros = {
-  ["genqf"]  = Macro{"?>a:", "x", "?>x", SYM_NEGATE, "+", "2", "^", "?>y", "@pick3", "/", "+", "*"},
+  ["genqf"]  = Macro{"?>a:", "x", "?>x", Sym.NEGATE, "+", "2", "^", "?>y", "@pick3", "/", "+", "*"},
   ["seq"]    = Macro{"?>f(x)", "x", "?>start:", "?>end:", "seq"},
   ["sumSeq"] = Macro{"?>f(x)", "x", "?>x:", "?>end:", "sumSeq"},
 }
@@ -757,10 +749,10 @@ function Infix.tokenize(input)
       
       -- SCI notation exponent
       if i then
-        local ei, ej, etoken = input:find('^('..SYM_EE..'[%-%+]?%d+)', j+1)
+        local ei, ej, etoken = input:find('^('..Sym.EE..'[%-%+]?%d+)', j+1)
         if not ei then
-          -- SYM_NEGATE is a multibyte char, so we can not put it into the char-class above
-          ei, ej, etoken = input:find('^('..SYM_EE..SYM_NEGATE..'%d+)', j+1)
+          -- Sym.NEGATE is a multibyte char, so we can not put it into the char-class above
+          ei, ej, etoken = input:find('^('..Sym.EE..Sym.NEGATE..'%d+)', j+1)
         end
         if ei then
           j, token = ej, token..etoken
@@ -1082,7 +1074,7 @@ end
 function RPNExpression:_isReverseOp(value, kind)
   if kind == 'operator' then
     if self.stack[#self.stack][1] == value then
-      return value == SYM_NEGATE or value == "(-)" or
+      return value == Sym.NEGATE or value == "(-)" or
              value == "not" or value == "not "
     end 
   end
@@ -2096,7 +2088,7 @@ function UIInput:_insertChar(c)
   local expanded = c
   if options.autoClose == true then
     -- Add closing paren
-    local matchingParen, isOpening = unpack(parenPairs[c:usub(-1)] or {})
+    local matchingParen, isOpening = unpack(ParenPairs[c:usub(-1)] or {})
     if matchingParen and isOpening then
       expanded = c..matchingParen
     end
@@ -2120,7 +2112,7 @@ function UIInput:_insertChar(c)
 
     -- Kill the matching character right to the selection
     if options.autoKillParen == true and mid:ulen() == 1 then
-      local matchingParen, isOpening = unpack(parenPairs[mid] or {})
+      local matchingParen, isOpening = unpack(ParenPairs[mid] or {})
       if matchingParen and isOpening and right:usub(1, 1) == matchingParen then
         right = right:usub(2)
       end
@@ -2490,7 +2482,7 @@ function RPNInput:onCharIn(key)
     return
   end
 
-  if options.mode == "ALG" then
+  if options.mode == "ALG" or not isBalanced(self:getInput()) then
     self:setInput(self:getInput() .. key)
     return
   end
@@ -2592,11 +2584,11 @@ input.completionFun = function(prefix)
       semantic = {}
     end
 
-    if semanticValue == '@>' or semanticValue == SYM_CONVERT or semanticKind == 'number' then
+    if semanticValue == '@>' or semanticValue == Sym.CONVERT or semanticKind == 'number' then
       semantic['unit'] = true
     end 
     
-    if semanticValue == '@>' or semanticValue == SYM_CONVERT then
+    if semanticValue == '@>' or semanticValue == Sym.CONVERT then
       semantic['conversion_fn'] = true
     end
     
@@ -2604,7 +2596,7 @@ input.completionFun = function(prefix)
       semantic['conversion_op'] = true
     end
     
-    if semanticValue ~= '@>' and semanticValue ~= SYM_CONVERT and semanticKind == 'operator'  then
+    if semanticValue ~= '@>' and semanticValue ~= Sym.CONVERT and semanticKind == 'operator'  then
       semantic['function'] = true
       semantic['variable'] = true
     end
@@ -2847,7 +2839,7 @@ GlobalKbd.onSequenceChanged = function(sequence)
 
   local str = ''
   for idx, v in ipairs(sequence) do
-    if idx > 1 then str = str..SYM_CONVERT end
+    if idx > 1 then str = str..Sym.CONVERT end
     str = str .. v
   end
   Toast:show(str)
@@ -2902,7 +2894,7 @@ function on.construction()
       {"ROLL 3", function() stack:roll(3) end},
       {"DEL",    function() stack:pop() end},
       {"UNDO",   function() undo() end},
-      {SYM_CONVERT.."List", function() stack:toList() end},
+      {Sym.CONVERT.."List", function() stack:toList() end},
     },
     {"Clear",
       {"Clear A-Z", function() math.evalStr("ClearAZ") end},
