@@ -284,13 +284,13 @@ function test.rpn_input()
     stack.stack = {}
     input:setText(input_str)
     if type(key) == 'string' then
-      rpn:onCharIn(key)
+      input:onCharIn(key)
     else
       for _,v in ipairs(key) do
         if v == 'ENTER' then
-          rpn:onEnter()
+          input:onEnter()
         else
-          rpn:onCharIn(v)
+          input:onCharIn(v)
         end
       end
     end
