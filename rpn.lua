@@ -9,12 +9,12 @@ the Free Software Foundation.
 -- luacheck: ignore on
 
 -- Returns the height of string `s`
-local function getStringHeight(s)
+function getStringHeight(s)
   return platform.withGC(function(gc) return gc:getStringHeight(s or "A") end)
 end
 
 -- Dump table `o` to string
-local function dump(o)
+function dump(o)
    if type(o) == "table" then
       local s = '{ '
       for k,v in pairs(o) do
@@ -1244,7 +1244,7 @@ function RPNExpression:infixString()
 end
 
 
-local Widgets = {}
+Widgets = {}
 
 -- Widget Base Class
 Widgets.Base = class()
