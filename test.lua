@@ -299,9 +299,6 @@ function test.rpn_input()
   rpn.getInput = function(self)
     return text
   end
-  rpn.isBalanced = function(self)
-    return true
-  end
 
   local function expectStack(input_str, key, stack_infix)
     stack.stack = {}
@@ -329,6 +326,8 @@ function test.rpn_input()
     end
   end
 
+  rpn.isBalanced = function() return true end
+
   expectStack('', {'1', 'ENTER'}, '1')
   expectStack('', {'1', 'ENTER', '2', 'ENTER'}, {'2', '1'})
   expectStack('', {'1', '2', 'ENTER'}, '12')
@@ -341,6 +340,47 @@ function test.rpn_input()
   expectStack('', {'1', 'ENTER', 'sin', 'ENTER'}, 'sin(1)')
   expectStack('', {'1', 'ENTER', '2', '+', 'sin', 'ENTER'}, 'sin(1+2)')
   expectStack('', {'sin(2)', 'ENTER'}, 'sin(2)')
+
+  -- Lists
+  expectStack('', {'{', '1', ',', '2', '}', 'ENTER'}, '{1,2}')
+
+  -- Unbalanced (ALG) input
+  rpn.isBalanced = function() return false end
+  expectStack('', {'1', '+', '2', 'x', 'ENTER'}, '1+2*x')
+  expectStack('', {'{', '1', '+', '2', ',', '3', '}', 'ENTER'}, '{1+2,3}')
+end
+
+function test.stack_to_list()
+  local function expect(infix_list, n, stack_result)
+    stack.stack = {}
+    for _,v in ipairs(infix_list) do
+      stack:pushInfix(v)
+    end
+    stack:toList(n)
+
+    local stack_top = stack.stack[#stack.stack]
+    Test.assert(stack_top.infix == stack_result,
+                "Expected stack top to be '"..stack_result.."' but it is '"..stack_top.infix.."'")
+  end
+
+  -- List of numbers
+  expect({'1'}, 10, '{1}')
+  expect({'1'}, 0, '{}')
+  expect({'1'}, 1, '{1}')
+  expect({'1', '2'}, 1, '{2}')
+  expect({'1', '2', '3'}, 1, '{3}')
+  expect({'1', '2', '3'}, 2, '{2,3}')
+  expect({'1', '2', '3'}, 3, '{1,2,3}')
+
+  -- List with functions
+  expect({'abs(1)', 'root(2,3)', '3'}, 3, '{abs(1),root(2,3),3}')
+
+  -- Join lists
+  expect({'{1}', '2'}, 2, '{1,2}')
+  expect({'{1,2,3}', '4'}, 2, '{1,2,3,4}')
+  expect({'{1,2,3}', '{4}'}, 2, '{1,2,3,4}')
+  expect({'{x,y,z}', '{1,2,3}', '4'}, 3, '{x,y,z,1,2,3,4}')
+  expect({'{x,y,z}', '1', '{2,3,4}'}, 3, '{x,y,z,1,2,3,4}')
 end
 
 Test.run(test)

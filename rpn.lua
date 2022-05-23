@@ -1783,21 +1783,47 @@ function UIStack:toList(n)
   assert(type(n)=="number")
   assert(n >= 0)
 
+  local newList = {
+    rpn = RPNExpression(),
+    n = 0
+  }
+
+  function newList:join(rpn)
+    if rpn and rpn[#rpn][1] == '}' then
+      table.remove(rpn, #rpn)
+
+      local size = tonumber(table.remove(rpn, #rpn)[1])
+      assert(size)
+
+      self.rpn:appendStack(rpn)
+      self.n = self.n + size
+      return true
+    end
+  end
+
+  function newList:add(rpn)
+    if not self:join(rpn) then
+      self.rpn:appendStack(rpn)
+      self.n = self.n + 1
+    end
+  end
+
+  function newList:finalize()
+    self.rpn:push({tostring(self.n), 'number'})
+    self.rpn:push('}')
+  end
+
   local newTop = math.max(#stack.stack - n + 1, 1)
-  local rpn = RPNExpression()
   for i=1,n do
     local arg = self:pop(newTop)
     if arg then
-      rpn:appendStack(arg.rpn)
-    else
-      n = n - 1
+      newList:add(arg.rpn)
     end
   end
   
-  rpn:push({tostring(n), 'number'})
-  rpn:push('}')
+  newList:finalize()
 
-  self:pushRPNExpression(rpn)
+  self:pushRPNExpression(newList.rpn)
 end
 
 function UIStack:toPostfix()
