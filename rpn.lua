@@ -893,6 +893,7 @@ function RPNExpression:fromInfix(tokens)
 
   beginFunction = function(name)
     local argc = nil
+    local parenLevel = 0
     for token in next do
       local value, kind = token[1], token[2]
       if value == ',' then
@@ -905,7 +906,7 @@ function RPNExpression:fromInfix(tokens)
           print("error: RPNExpression.fromInfix missing '('")
           return
         end
-      elseif value == ')' then
+      elseif value == ')' and parenLevel == 1 then
         if popUntil('(') then
           table.remove(stack, #stack)
           table.insert(result, {tostring(argc or 0), 'number'})
@@ -919,6 +920,11 @@ function RPNExpression:fromInfix(tokens)
         -- Begin argument count at first non '(' token
         if value ~= '(' and not argc then
           argc = 1
+        end
+        if value == '(' then
+          parenLevel = parenLevel + 1
+        elseif value == ')' then
+          parenLevel = parenLevel - 1
         end
         handleDefault(value, kind)
       end
@@ -2268,14 +2274,14 @@ end
 local UndoStack, RedoStack = {}, {}
 
 -- Returns a new undo-state table by copying the current stack and text input
-function makeUndoState(text)
+local function makeUndoState(text)
   return {
     stack=clone(stack.stack),
     input=text or input.text
   }
 end
 
-function recordUndo(input)
+local function recordUndo(input)
   table.insert(UndoStack, makeUndoState(input))
   if #UndoStack > options.maxUndo then
     table.remove(UndoStack, 1)
@@ -2283,11 +2289,11 @@ function recordUndo(input)
   RedoStack = {}
 end
 
-function popUndo()
+local function popUndo()
   table.remove(UndoStack, #UndoStack)
 end
 
-function applyUndo(state)
+local function applyUndo(state)
   stack.stack = state.stack
   if state.input ~= nil then
     input:setText(state.input)

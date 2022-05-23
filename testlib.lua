@@ -5,12 +5,12 @@ local Test = {
 
 function Test.fail(message)
   Test.failed = message
-  Test.thisfunctiondoesnotexist()
+  return false
 end
 
 function Test.assert(pred, message)
   if not pred then
-    Test.fail(message)
+    return Test.fail(message)
   end
   return true
 end

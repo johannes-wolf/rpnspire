@@ -166,7 +166,12 @@ function test.infix_to_rpn_to_infix()
     local rpn = RPNExpression()
     rpn:fromInfix(Infix.tokenize(str))
     local new = rpn:infixString()
-    Test.assert(new == other, "Expected "..other.." got "..(new or "nil"))
+    if not Test.assert(new == other, "Expected "..other.." got "..(new or "nil")) then
+      print("RPN Stack:")
+      for idx,v in ipairs(rpn.stack) do
+        print(string.format('%0.2d| %10s (%s)', idx, v[1], v[2]))
+      end
+    end
   end
 
   expect("1+2")
@@ -183,6 +188,7 @@ function test.infix_to_rpn_to_infix()
   expect("2^(3^4)")
   expect("x^(y-1)=0")
   expect("solve(x^(y-1)=0,x)") -- bug#16
+  expect("solve((((x*2)))=(((1))),((((((x)))))))", "solve(x*2=1,x)")
 
   -- Left assoc
   for _,v in ipairs({'-', '/'}) do
@@ -215,6 +221,7 @@ function test.infix_to_rpn_to_infix()
   expect("{1,2}")
   expect("{1,2,3}")
   expect("{(1+a)*2,2+b,3+c}")
+  expect("{(1+a)*2,2+b,root((1+x)*2,2*y)}")
 
   -- Matrix (NOT YET IMPLEMENTED)
   --expect("[1]", "[[1]]")
