@@ -103,6 +103,7 @@ local theme = {
     textColor = 0,
     cursorColor = 0xEE0000,
     cursorColorAlg = 0x0000FF,
+    cursorColorAlt = 0x999999,
     backgroundColor = 0xFFFFFF,
     borderColor = 0,
     errorBackgroundColor = 0xEE0000,
@@ -116,6 +117,7 @@ local theme = {
     textColor = 0xFFFFFF,
     cursorColor = 0xEE0000,
     cursorColorAlg = 0xEE00EE,
+    cursorColorAlt = 0x999999,
     backgroundColor = 0x111111,
     borderColor = 0x888888,
     errorBackgroundColor = 0x0000ff,
@@ -1194,11 +1196,155 @@ function RPNExpression:infixString()
   return #stack > 0 and stack[#stack].expr or nil
 end
 
+--------------------------------------------------
+--                     UI                       --
+--------------------------------------------------
 
 Widgets = {}
 
 -- Widget Base Class
 Widgets.Base = class()
+
+-- Toast Widget
+Widgets.Toast = class(Widgets.Base)
+function Widgets.Toast:init(options)
+  options = options or {}
+  self.location = options.location or 'top'
+  self.margin = 4
+  self.padding = 4
+  self.text = nil
+  self.style = options.style
+end
+
+function Widgets.Toast:invalidate()
+  platform.window:invalidate(self:getFrame())
+end
+
+function Widgets.Toast:getFrame()
+  if not self.text or self.text:ulen() == 0 then
+    return 0, 0, 0, 0
+  end
+
+  local x, y, w, h = 0, 0, platform.window:width(), platform.window:height()
+  local textW, textH = 0, 0
+  
+  platform.withGC(function(gc)
+    textW = gc:getStringWidth(self.text)
+    textH = gc:getStringHeight(self.text)
+  end)
+  
+  x = x + w/2 - textW/2 - self.margin
+  if self.location == 'center' then
+    y = h/2 - textH/2 - self.margin -- Mid
+  else
+    y = self.padding -- Top location
+  end
+  
+  w = textW + 2*self.margin
+  h = textH + 2*self.margin
+
+  return x, y, w, h
+end
+
+function Widgets.Toast:show(text)
+  self:invalidate()
+  self.text = text and tostring(text) or nil
+  self:invalidate()
+end
+
+function Widgets.Toast:draw(gc)
+  if not self.text then return end
+
+  local x,y,w,h = self:getFrame()
+  local isError = self.style == 'error'
+
+  gc:clipRect("set", x, y, w, h)
+  gc:setColorRGB(theme[options.theme][isError and 'errorBackgroundColor' or 'altRowColor'])
+  gc:fillRect(x, y, w, h)
+  gc:setColorRGB(theme[options.theme].borderColor)
+  gc:drawRect(x, y, w-1, h-1)
+  gc:setColorRGB(theme[options.theme][isError and 'errorTextColor' or 'textColor'])
+  gc:drawString(self.text, x + self.margin, y + self.margin)
+  gc:clipRect("reset")
+end
+
+
+-- KeybindManager
+KeybindManager = class()
+function KeybindManager:init()
+  self.bindings = {}
+  
+  -- State 
+  self.currentTab = nil
+  self.currentSequence = nil
+
+  -- Callbacks
+  self.onSequenceChanged = nil -- void({sequence})
+  self.onExec = nil -- void(void)
+end
+
+function KeybindManager:resetSequence()
+  self.currentTab = nil
+  self.currentSequence = nil
+  if self.onSequenceChanged then
+    self.onSequenceChanged(self.currentSequence)
+  end
+end
+
+function KeybindManager:setSequence(sequence, fn)
+  local tab = self.bindings
+  for idx, key in ipairs(sequence) do
+    if idx == #sequence then break end
+    if not tab[key] then
+      tab[key] = {}
+    end
+    tab = tab[key]
+  end
+  
+  tab[sequence[#sequence]] = fn
+end
+
+function KeybindManager:dispatchKey(key)
+  self.currentSequence = self.currentSequence or {}
+  table.insert(self.currentSequence, key)
+  
+  self.currentTab = self.currentTab or self.bindings
+  
+  -- Special case: Binding all number keys
+  if not self.currentTab[key] then
+    if key:find('^%d+$') then
+      self.currentTab = self.currentTab['%d']
+    else
+      self.currentTab = self.currentTab[key]
+    end
+  else
+    -- Default case
+    self.currentTab = self.currentTab[key]
+  end
+
+  -- Exit if not found
+  if not self.currentTab then
+    self:resetSequence()
+    return false
+  end
+
+  -- Call binding
+  if type(self.currentTab) == 'function' then
+    self.currentTab(self.currentSequence)
+    self:resetSequence()
+    if self.onExec then
+      self.onExec()
+    end
+    return true
+  end
+
+  -- Propagate sequence change
+  if self.onSequenceChanged then
+    self.onSequenceChanged(self.currentSequence)
+  end
+
+  return true
+end
 
 -- Fullscreen 9-tile menu which is navigated using the numpad
 UIMenu = class(Widgets.Base)
@@ -1396,10 +1542,76 @@ end
 UIStack = class(Widgets.Base)
 function UIStack:init()
   self.stack = {}
+  -- View
   self.frame = {x=0, y=0, width=0, height=0}
   self.scrolly = 0
+  -- Selection
   self.sel = 0
-  return o
+  -- Bindings
+  self.kbd = KeybindManager()
+  self:initBindings()
+end
+
+function UIStack:initBindings()
+  self.kbd.onExec = function()
+    self:invalidate()
+  end
+  self.kbd:setSequence({"x"}, function()
+    recordUndo()
+    self:pop(self.sel, false)
+  end)
+  self.kbd:setSequence({"backspace"}, function()
+    recordUndo()
+    self:pop(self.sel, false)
+    if #self.stack == 0 then
+      focusView(input)
+    end
+  end)
+  self.kbd:setSequence({"clear"}, function()
+    recordUndo()
+    self.stack = {}
+    self:selectIdx()
+    focusView(input)
+  end)
+  self.kbd:setSequence({"enter"}, function()
+    recordUndo()
+    self:push(clone(self.stack[self.sel]))
+    self:selectIdx()
+  end)
+  self.kbd:setSequence({"="}, function()
+    recordUndo()
+    self:pushRPNExpression(self.stack[self.sel].rpn)
+    self:selectIdx()
+  end)
+  self.kbd:setSequence({"left"}, function()
+    self:roll(-1)
+  end)
+  self.kbd:setSequence({"right"}, function()
+    self:roll(1)
+  end)
+  self.kbd:setSequence({"c", "left"}, function()
+    input:setText(self.stack[self.sel].infix)
+    focusView(input)
+  end)
+  self.kbd:setSequence({"c", "right"}, function()
+    input:setText(self.stack[self.sel].result)
+    focusView(input)
+  end)
+  self.kbd:setSequence({"i", "left"}, function()
+    input:insertText(self.stack[self.sel].infix)
+  end)
+  self.kbd:setSequence({"i", "right"}, function()
+    input:insertText(self.stack[self.sel].result)
+  end)
+  self.kbd:setSequence({"5"}, function()
+    showBigView(true, self.sel)
+  end)
+  self.kbd:setSequence({"7"}, function()
+    self:selectIdx(1)
+  end)
+  self.kbd:setSequence({"3"}, function()
+    self:selectIdx(#self.stack)
+  end)
 end
 
 function UIStack:getFrame()
@@ -1628,14 +1840,6 @@ function UIStack:scrollToIdx(idx)
 end
 
 --[[ Events ]]--
-function UIStack:onArrowLeft()
-  self:roll(-1)
-end
-
-function UIStack:onArrowRight()
-  self:roll(1)
-end
-
 function UIStack:onArrowDown()
   if self.sel < #self.stack then
     self:selectIdx(self.sel + 1)
@@ -1652,69 +1856,13 @@ function UIStack:onArrowUp()
 end
 
 function UIStack:onLooseFocus()
+  self.kbd:resetSequence()
   self:invalidate()
 end
 
 function UIStack:onFocus()
+  self.kbd:resetSequence()
   self:selectIdx()
-end
-
-function UIStack:onEnter()
-  if self.sel > 0 then
-    self:onCharIn("d")
-    self.sel = #self.stack
-  end
-end
-
-function UIStack:onBackspace()
-  self:onCharIn("x")
-end
-
-function UIStack:onClear()
-  recordUndo()
-  self.stack = {}
-  self:selectIdx()
-  focusView(input)
-end
-
-function UIStack:onCharIn(c)
-  if c == "x" then
-    recordUndo()
-    table.remove(self.stack, self.sel)
-    if #self.stack == 0 then
-      focusView(input)
-    end
-  elseif c == "d" then
-    recordUndo()
-    self:push(clone(self.stack[self.sel]))
-  elseif c == "r" then
-    recordUndo()
-    self:push(self.stack[self.sel].result)
-  elseif c == "=" then
-    recordUndo()
-    local rpn = RPNExpression(self.stack[self.sel].rpn)
-    local infix = rpn:infixString()
-    local res, err = math.evalStr(infix)
-    self:push({rpn=rpn, infix=infix, result=res or ("error: "..err)})
-  elseif c == "c" then
-    input:setText(self.stack[self.sel].result)
-  elseif c == "s" then
-    if self.sel > 1 then
-      self:swap(self.sel, self.sel - 1)
-    end
-  elseif c == "7" then
-    self:selectIdx(1)
-  elseif c == "3" then
-    self:selectIdx(#self.stack)
-  elseif c == "5" then
-    showBigView(true, self.sel)
-  end
-  
-  -- Fix selection if out of bounds
-  if self.sel > #self.stack then
-    self.sel = #self.stack
-  end
-  self:invalidate()
 end
 
 function UIStack:itemHeight(gc, idx)
@@ -2153,6 +2301,13 @@ function UIInput:setText(s, prefix)
   self:invalidate()
 end
 
+function UIInput:insertText(s)
+  if s then
+    self:cancelCompletion()
+    self:_insertChar(s)
+  end
+end
+
 function UIInput:selAll()
   self:cancelCompletion()
   self.cursor.pos = 0
@@ -2212,8 +2367,10 @@ function UIInput:drawText(gc)
     gc:setColorRGB(self:getMode() == "RPN" and 
         theme[options.theme].cursorColor or
         theme[options.theme].cursorColorAlg)
-    gc:fillRect(cursorx+1, y+2, options.cursorWidth, h-3)
+  else
+      gc:setColorRGB(theme[options.theme].cursorColorAlt)
   end
+  gc:fillRect(cursorx+1, y+2, options.cursorWidth, h-3)
   
   gc:clipRect("reset")
 end
@@ -2617,148 +2774,6 @@ input.completionFun = function(prefix)
 end
 
 
--- Toast Widget
-Widgets.Toast = class(Widgets.Base)
-function Widgets.Toast:init(options)
-  options = options or {}
-  self.location = options.location or 'top'
-  self.margin = 4
-  self.padding = 4
-  self.text = nil
-  self.style = options.style
-end
-
-function Widgets.Toast:invalidate()
-  platform.window:invalidate(self:getFrame())
-end
-
-function Widgets.Toast:getFrame()
-  if not self.text or self.text:ulen() == 0 then
-    return 0, 0, 0, 0
-  end
-
-  local x, y, w, h = 0, 0, platform.window:width(), platform.window:height()
-  local textW, textH = 0, 0
-  
-  platform.withGC(function(gc)
-    textW = gc:getStringWidth(self.text)
-    textH = gc:getStringHeight(self.text)
-  end)
-  
-  x = x + w/2 - textW/2 - self.margin
-  if self.location == 'center' then
-    y = h/2 - textH/2 - self.margin -- Mid
-  else
-    y = self.padding -- Top location
-  end
-  
-  w = textW + 2*self.margin
-  h = textH + 2*self.margin
-
-  return x, y, w, h
-end
-
-function Widgets.Toast:show(text)
-  self:invalidate()
-  self.text = text and tostring(text) or nil
-  self:invalidate()
-end
-
-function Widgets.Toast:draw(gc)
-  if not self.text then return end
-
-  local x,y,w,h = self:getFrame()
-  local isError = self.style == 'error'
-
-  gc:clipRect("set", x, y, w, h)
-  gc:setColorRGB(theme[options.theme][isError and 'errorBackgroundColor' or 'altRowColor'])
-  gc:fillRect(x, y, w, h)
-  gc:setColorRGB(theme[options.theme].borderColor)
-  gc:drawRect(x, y, w-1, h-1)
-  gc:setColorRGB(theme[options.theme][isError and 'errorTextColor' or 'textColor'])
-  gc:drawString(self.text, x + self.margin, y + self.margin)
-  gc:clipRect("reset")
-end
-
-
--- KeybindManager
-KeybindManager = class()
-function KeybindManager:init()
-  self.bindings = {}
-  
-  -- State 
-  self.currentTab = nil
-  self.currentSequence = nil
-
-  -- Callbacks
-  self.onSequenceChanged = nil -- void({sequence})
-  self.onExec = nil -- void(void)
-end
-
-function KeybindManager:resetSequence()
-  self.currentTab = nil
-  self.currentSequence = nil
-  if self.onSequenceChanged then
-    self.onSequenceChanged(self.currentSequence)
-  end
-end
-
-function KeybindManager:setSequence(sequence, fn)
-  local tab = self.bindings
-  for idx, key in ipairs(sequence) do
-    if idx == #sequence then break end
-    if not tab[key] then
-      tab[key] = {}
-    end
-    tab = tab[key]
-  end
-  
-  tab[sequence[#sequence]] = fn
-end
-
-function KeybindManager:dispatchKey(key)
-  self.currentSequence = self.currentSequence or {}
-  table.insert(self.currentSequence, key)
-  
-  self.currentTab = self.currentTab or self.bindings
-  
-  -- Special case: Binding all number keys
-  if not self.currentTab[key] then
-    if key:find('^%d+$') then
-      self.currentTab = self.currentTab['%d']
-    else
-      self.currentTab = self.currentTab[key]
-    end
-  else
-    -- Default case
-    self.currentTab = self.currentTab[key]
-  end
-
-  -- Exit if not found
-  if not self.currentTab then
-    self:resetSequence()
-    return false
-  end
-
-  -- Call binding
-  if type(self.currentTab) == 'function' then
-    self.currentTab(self.currentSequence)
-    self:resetSequence()
-    if self.onExec then
-      self.onExec()
-    end
-    return true
-  end
-
-  -- Propagate sequence change
-  if self.onSequenceChanged then
-    self.onSequenceChanged(self.currentSequence)
-  end
-
-  return true
-end
-
-
 Toast = Widgets.Toast()
 ErrorToast = Widgets.Toast({location = 'center', style = 'error'})
 GlobalKbd = KeybindManager()
@@ -2782,6 +2797,8 @@ GlobalKbd.onSequenceChanged = function(sequence)
   end
   Toast:show(str)
 end
+
+stack.kbd.onSequenceChanged = GlobalKbd.onSequenceChanged
 
 -- Show text as error
 Error = {}
@@ -2932,7 +2949,9 @@ end
 function on.escapeKey()
   onAnyKey()
   GlobalKbd:resetSequence()
-  
+  if focus.kbd then
+    focus.kbd:resetSequence()
+  end
   if focus.onEscape then
     focus:onEscape()
   end
@@ -2959,6 +2978,9 @@ function on.returnKey()
   if GlobalKbd:dispatchKey('return') then
     return
   end
+  if focus.kbd and focus.kbd:dispatchKey('return') then
+    return
+  end
 
   if focus == input then
     --menu:present(input, {
@@ -2977,6 +2999,9 @@ function on.arrowRight()
   if GlobalKbd:dispatchKey('right') then
     return
   end
+  if focus.kbd and focus.kbd:dispatchKey('right') then
+    return
+  end
   if focus.onArrowRight then
     focus:onArrowRight()
   end
@@ -2985,6 +3010,9 @@ end
 function on.arrowLeft()
   onAnyKey()
   if GlobalKbd:dispatchKey('left') then
+    return
+  end
+  if focus.kbd and focus.kbd:dispatchKey('left') then
     return
   end
   if focus.onArrowLeft then
@@ -2997,6 +3025,9 @@ function on.arrowUp()
   if GlobalKbd:dispatchKey('up') then
     return
   end
+  if focus.kbd and focus.kbd:dispatchKey('up') then
+    return
+  end
   if focus.onArrowUp then
     focus:onArrowUp()
   end
@@ -3007,6 +3038,9 @@ function on.arrowDown()
   if GlobalKbd:dispatchKey('down') then
     return
   end
+  if focus.kbd and focus.kbd:dispatchKey('down') then
+    return
+  end
   if focus.onArrowDown then
     focus:onArrowDown()
   end
@@ -3015,6 +3049,9 @@ end
 function on.charIn(c)
   onAnyKey()
   if GlobalKbd:dispatchKey(c) then
+    return
+  end
+  if focus.kbd and focus.kbd:dispatchKey(c) then
     return
   end
 
@@ -3030,14 +3067,23 @@ end
 function on.enterKey()
   onAnyKey()
   GlobalKbd:resetSequence()
-  focus:onEnter()
-  stack:invalidate() -- TODO: ?
-  input:invalidate()
+  if focus.kbd and focus.kbd:dispatchKey('enter') then
+    return
+  end
+  if focus.onEnter then
+    focus:onEnter()
+  end
+  if focus.invalidate then
+    focus:invalidate()
+  end
 end
 
 function on.backspaceKey()
   onAnyKey()
   GlobalKbd:resetSequence()
+  if focus.kbd and focus.kbd:dispatchKey('backspace') then
+    return
+  end
   if focus.onBackspace then
     focus:onBackspace()
   end
@@ -3048,6 +3094,9 @@ function on.clearKey()
   if GlobalKbd:dispatchKey('clear') then
     return
   end
+  if focus.kbd and focus.kbd:dispatchKey('clear') then
+    return
+  end
   if focus.onClear then
     focus:onClear()
   end
@@ -3056,6 +3105,9 @@ end
 function on.contextMenu()
   onAnyKey()
   if GlobalKbd:dispatchKey('ctx') then
+    return
+  end
+  if focus.kbd and focus.kbd:dispatchKey('ctx') then
     return
   end
   if focus.onContextMenu then
