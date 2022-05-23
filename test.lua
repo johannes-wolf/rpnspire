@@ -181,6 +181,8 @@ function test.infix_to_rpn_to_infix()
   expect("(2^3)^4")
   expect("2^3^4", "2^(3^4)")
   expect("2^(3^4)")
+  expect("x^(y-1)=0")
+  expect("solve(x^(y-1)=0,x)") -- bug#16
 
   -- Left assoc
   for _,v in ipairs({'-', '/'}) do
