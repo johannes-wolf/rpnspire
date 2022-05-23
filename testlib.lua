@@ -1,4 +1,4 @@
-Test = {
+local Test = {
   last = nil,
   failed = nil
 }
@@ -49,3 +49,5 @@ function Test.run(tests)
     os.exit(1)
   end
 end
+
+return Test

@@ -58,9 +58,7 @@ on = {}
 
 -- luacheck: ignore Infix RPNExpression
 require 'rpn'
-
--- luacheck: ignore Test
-require 'testlib'
+local Test = require 'testlib'
 
 local test = {}
 
