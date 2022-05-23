@@ -1,3 +1,4 @@
+-- luacheck: ignore class
 function class(base)
   local classdef = {}
 
@@ -26,20 +27,21 @@ function math.log10(x)
   return math.log(x, 10)
 end
 
-GC = {
-  getStringWidth = function(...) return 1 end,
-  getStringHeight = function(...) return 1 end,
-  drawRect = function(...) end,
-  fillRect = function(...) end,
-  setColorRGB = function(...) end,
+local GC = {
+  getStringWidth = function() return 1 end,
+  getStringHeight = function() return 1 end,
+  drawRect = function() end,
+  fillRect = function() end,
+  setColorRGB = function() end,
 }
 
+-- luacheck: ignore platform
 platform = {
   withGC = function(fn) return fn(GC) end,
   window = {
-    width = function(...) return 1 end,
-    height = function(...) return 1 end,
-    invalidate = function(...) end,
+    width = function() return 1 end,
+    height = function() return 1 end,
+    invalidate = function() end,
   }
 }
 
@@ -51,14 +53,18 @@ if not unpack then
   _G.unpack = table.unpack
 end
 
+-- luacheck: ignore on
 on = {}
 
+-- luacheck: ignore Infix RPNExpression
 require 'rpn'
+
+-- luacheck: ignore Test
 require 'testlib'
 
-test = {}
+local test = {}
 
-function test:tokenize_infix()
+function test.tokenize_infix()
   local function fail(str, reason)
     local res = Infix.tokenize(str)
     Test.assert((not res), reason)
@@ -155,8 +161,8 @@ function test:tokenize_infix()
   })
 end
 
-function test:infix_to_rpn_to_infix()
-  function expect(str, other)
+function test.infix_to_rpn_to_infix()
+  local function expect(str, other)
     other = other or str
 
     local rpn = RPNExpression()
@@ -219,8 +225,8 @@ function test:infix_to_rpn_to_infix()
   expect("(((2^2)))", "2^2")
 end
 
-function test:rpn_to_infix()
-  function expect(stack, str)
+function test.rpn_to_infix()
+  local function expect(stack, str)
     local rpn = RPNExpression()
     for _,v in ipairs(stack) do
       if type(v) == 'number' then v = tostring(v) end
@@ -249,7 +255,7 @@ function test:rpn_to_infix()
   expect({2, 'x', '*', 10, '=', 'x', 2, {'solve', 'function'}}, "solve(2*x=10,x)")
 end
 
-function test:keybind_manager()
+function test.keybind_manager()
   local last = nil
   local kbd = KeybindManager()
 
@@ -273,7 +279,7 @@ function test:keybind_manager()
   expect({'a', 'b', '2'}, '2')
 end
 
-function test:rpn_input()
+function test.rpn_input()
   UIStack.draw = function(...) end
   UIInput.draw = function(...) end
 
