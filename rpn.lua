@@ -109,6 +109,20 @@ local theme = {
     errorBackgroundColor = 0xEE0000,
     errorTextColor = 0xffffff,
   },
+  ["nordlike"] = {
+    rowColor = 0x2e3440,
+    altRowColor = 0x323844,
+    selectionColor = 0x636c7e,
+    fringeTextColor = 0x4c566a,
+    textColor = 0xd8dee9,
+    cursorColor = 0xd8dee9,
+    cursorColorAlg = 0x0000FF,
+    cursorColorAlt = 0x777777,
+    backgroundColor = 0x2e3440,
+    borderColor = 0x1b2232,
+    errorBackgroundColor = 0xbf616a,
+    errorTextColor = 0xd8dee9,
+  },
   ["dark"] = {
     rowColor = 0x444444,
     altRowColor = 0x222222,
@@ -1514,17 +1528,33 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
     return
   end
 
+  local itemText = item[1]
+  local itemState = item.state
+
   local tw, th = gc:getStringWidth(item[1]), gc:getStringHeight(item[1])
   local tx, ty = x + w/2 - tw/2, y + h/2 - th/2
   
   gc:setColorRGB(theme[options.theme].textColor)
   gc:drawString(item[1], tx, ty)
+  
+  if itemState ~= nil then 
+    local iw, ih = w * 0.66, 4
+    local ix, iy = x + w/2 - iw/2, y + h - ih - margin
+
+    if itemState == true then
+      gc:setColorRGB(theme[options.theme].selectionColor)
+      gc:fillRect(ix,iy,iw,ih)
+    end
+    gc:setColorRGB(theme[options.theme].borderColor)
+    gc:drawRect(ix, iy, iw, ih)
+  end
 end
 
 function UIMenu:draw(gc)
   if not self.visible then return end
 
   gc:clipRect("set", self:getFrame())
+  local ffamily, fstyle, fsize = gc:setFont('sansserif', 'r', 9)
   
   local pageOffset = self.page * 9
   
@@ -1536,6 +1566,7 @@ function UIMenu:draw(gc)
     end
   end
   
+  gc:setFont(ffamily, fstyle, fsize)
   gc:clipRect("reset")
 end
 
@@ -3187,18 +3218,25 @@ function on.contextMenu()
 
   -- FIXME: this is just a test
   if focus == stack then
+    local function makeThemeMenu()
+      local items = {}
+      for name,_ in pairs(theme) do
+        table.insert(items, {
+          name, function() options.theme = name end, state=(options.theme==name)
+        })
+      end
+      return items
+    end
+  
     menu:present(stack, {
       {"Options", {
-        {"Fringe", function() options.showFringe = not options.showFringe end},
-        {"Calc", function() options.showExpr = not options.showExpr end},
-        {"Complete", {
-          {"Smart", function() options.smartComplete = true end},
-          {"Prefix", function() options.smartComplete = false end},
+        {"Show Fringe", function() options.showFringe = not options.showFringe end, state=(options.showFringe==true)},
+        {"Show Infix", function() options.showExpr = not options.showExpr end, state=(options.showExpr==true)},
+        {"Completion", {
+          {"Closing Paren", function() options.autoClose = not options.autoClose end, state=options.autoClose==true},
+          {"Smart", function() options.smartComplete = not options.smartComplete end, state=options.smartComplete==true},
         }},
-        {"Theme", {
-          {"light", function() options.theme="light" end},
-          {"dark",  function() options.theme="dark" end},
-        }}
+        {"Theme", makeThemeMenu()}
       }},
       {"Clear A-Z", function() math.evalStr("ClearAZ") end},
     })
