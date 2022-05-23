@@ -137,6 +137,7 @@ local options = {
   mode = "RPN",          -- What else
   saneHexDigits = false, -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
   smartComplete = true,  -- Try to be smart when completing
+  spaceAsEnter = false,  -- Space acts as enter in RPN mode
   maxUndo = 20,          -- Max num of undo steps
 }
 
@@ -1673,11 +1674,12 @@ function UIStack:pushRPNExpression(item)
 end
 
 function UIStack:push(item)
-  assert(item)
   if item then
     table.insert(self.stack, item)
     self:scrollToIdx()
     self:invalidate()
+  else
+    print("UIStack:push item is nil")
   end
 end
 
@@ -2017,7 +2019,7 @@ function UIInput:initBindings()
       if direction == 'left' then
         if newPos >= pos and newPos < byteOrigin then
           pos = newPos + 1
-        else
+        else 
           return pos - 1
         end
       else
@@ -2025,7 +2027,7 @@ function UIInput:initBindings()
       end
     end
   end
-
+  
   self.kbd:setSequence({'G', '('}, function()
     local byteCursor = self.text:usub(1, self.cursor.pos):len()
     local left = findNearestChr('[%(%[%{,]', byteCursor, 'left')
@@ -2160,7 +2162,7 @@ end
 function UIInput:setCursor(pos, scroll)
   local oldPos, oldSize = unpack(self.cursor)
   
-  self.cursor.pos = math.min(math.max(0, pos), self.text:ulen())
+  self.cursor.pos = math.min(math.max(0, pos or self.text:ulen()), self.text:ulen())
   self.cursor.size = 0
   
   scroll = scroll or true
@@ -2225,20 +2227,30 @@ function UIInput:onArrowUp()
   focusView(stack)
 end
 
+function UIInput:onEscape()
+  self:cancelCompletion()
+  self:setCursor()
+  self:invalidate()
+end
+
 function UIInput:onLooseFocus()
   self:cancelCompletion()
   self:invalidate()
 end
 
 function UIInput:onFocus()
-  self:setCursor(#self.text)
+  --self:setCursor(#self.text)
   self:invalidate()
 end
 
 function UIInput:onCharIn(c)
   self:cancelCompletion()
   if not self.inputHandler:onCharIn(c) then
-    self:_insertChar(c)
+    if c == ' ' and self:getMode() == 'RPN' and options.spaceAsEnter then
+      self:onEnter()
+    else
+      self:_insertChar(c)
+    end
   end
   self:scrollToPos()
 end
