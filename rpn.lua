@@ -1499,7 +1499,7 @@ function UIMenu:onCharIn(c)
     elseif type(item[2]) == "table" then
       self:pushPage(item[2])
     elseif type(item[2]) == "string" then
-      input:onCharIn(item[2]) -- TODO
+      Input:insertText(item[2]) -- TODO
       focusView(input)
     end
   end
@@ -1786,7 +1786,7 @@ function UIStack:toList(n)
   local newTop = math.max(#stack.stack - n + 1, 1)
   local rpn = RPNExpression()
   for i=1,n do
-    local arg = stack:pop(newTop)
+    local arg = self:pop(newTop)
     if arg then
       rpn:appendStack(arg.rpn)
     else

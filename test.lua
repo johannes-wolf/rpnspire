@@ -4,7 +4,7 @@ function class(base)
 
   setmetatable(classdef, {
     __index = base,
-    __call = function(...)
+    __call = function(_, ...)
       local inst = {
         class = classdef,
         super = base or nil
@@ -304,7 +304,6 @@ function test.rpn_input()
   end
 
   local function expectStack(input_str, key, stack_infix)
-    on.resize(1,1) -- TODO: Do not use real
     stack.stack = {}
     text = ''
     for _,v in ipairs(key) do
@@ -340,7 +339,7 @@ function test.rpn_input()
 
   -- Functions
   expectStack('', {'1', 'ENTER', 'sin', 'ENTER'}, 'sin(1)')
-  --expectStack('', {'1', 'ENTER', '2', '+', 'sin', 'ENTER'}, 'sin(1+2)') -- FIXME: WTF, this one fucks everything up!
+  expectStack('', {'1', 'ENTER', '2', '+', 'sin', 'ENTER'}, 'sin(1+2)')
   expectStack('', {'sin(2)', 'ENTER'}, 'sin(2)')
 end
 
