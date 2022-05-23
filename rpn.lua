@@ -1855,6 +1855,11 @@ function UIStack:onArrowUp()
   end
 end
 
+function UIStack:onEscape()
+  self.kbd:resetSequence()
+  focusView(input)
+end
+
 function UIStack:onLooseFocus()
   self.kbd:resetSequence()
   self:invalidate()
