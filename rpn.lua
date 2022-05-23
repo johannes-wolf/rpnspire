@@ -2281,7 +2281,7 @@ local function makeUndoState(text)
   }
 end
 
-local function recordUndo(input)
+function recordUndo(input)
   table.insert(UndoStack, makeUndoState(input))
   if #UndoStack > options.maxUndo then
     table.remove(UndoStack, 1)
@@ -2289,7 +2289,7 @@ local function recordUndo(input)
   RedoStack = {}
 end
 
-local function popUndo()
+function popUndo()
   table.remove(UndoStack, #UndoStack)
 end
 
