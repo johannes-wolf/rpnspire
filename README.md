@@ -40,6 +40,7 @@ Uppercase letters are used as global shortcuts, even if the input view is focuse
 | <kbd>G</kbd><kbd>(</kbd>       | Go to previous parenthese or comma or beginning                         |
 | <kbd>G</kbd><kbd>)</kbd>       | Go to next parenthese or comma                                          |
 | <kbd>G</kbd><kbd>.</kbd>       | Select text between parentheses and or commas (select current argument) |
+| <kbd>I</kbd>                   | Insert special                                                          |
 
 ### Stack
 | Key                               | Function                                                        |

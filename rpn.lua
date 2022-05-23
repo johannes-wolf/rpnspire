@@ -2114,6 +2114,13 @@ function UIInput:initBindings()
   self.kbd:setSequence({'G', 'right'}, function()
     self:setCursor(self.text:ulen())
   end)
+  self.kbd:setSequence({'I'}, function(sequence)
+    menu:present(input, {
+      {'{', '{'}, {'=:', '=:'}, {'}', '}'},
+      {'[', '['}, {'@>', '@>'}, {']', ']'},
+      {'|', '|'}, {':=', ':='}, {'@', '@'},
+    })
+  end)
 end
 
 function UIInput:invalidate()
@@ -2929,6 +2936,7 @@ GlobalKbd.onSequenceChanged = function(sequence)
 end
 
 stack.kbd.onSequenceChanged = GlobalKbd.onSequenceChanged
+input.kbd.onSequenceChanged = GlobalKbd.onSequenceChanged
 
 -- Show text as error
 Error = {}
@@ -2994,13 +3002,6 @@ function on.construction()
     }
   })
   
-  GlobalKbd:setSequence({'I'}, function(sequence)
-    menu:present(input, {
-      {'{', '{'}, {'=:', '=:'}, {'}', '}'},
-      {'[', '['}, {'@>', '@>'}, {']', ']'},
-      {'<', '<'}, {':=', ':='}, {'>', '>'},
-    })
-  end)
   GlobalKbd:setSequence({'U'}, function(sequence)
     undo()
   end)
@@ -3054,6 +3055,8 @@ function on.construction()
     -- Set mode to ALG
     options.mode = 'ALG'
   end)
+
+  focusView(input)
 end
 
 function on.resize(w, h)
