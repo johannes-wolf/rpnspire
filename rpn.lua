@@ -2001,6 +2001,60 @@ function UIInput:init(frame)
   self.tempMode = nil
   -- Input
   self.inputHandler = RPNInput()
+  self.kbd = KeybindManager()
+  self:initBindings()
+end
+
+function UIInput:initBindings()
+  local function findNearestChr(chr, origin, direction)
+    local byteOrigin = self.text:sub(1, origin):len()
+    local pos = direction == 'left' and 1 or byteOrigin+1
+    for i=1,self.text:len() do
+      local newPos = self.text:find(chr, pos)
+      if not newPos then
+        return direction == 'left' and pos - 1 or nil
+      end
+      if direction == 'left' then
+        if newPos >= pos and newPos < byteOrigin then
+          pos = newPos + 1
+        else
+          return pos - 1
+        end
+      else
+        return newPos - 1
+      end
+    end
+  end
+
+  self.kbd:setSequence({'G', '('}, function()
+    local byteCursor = self.text:usub(1, self.cursor.pos):len()
+    local left = findNearestChr('[%(%[%{,]', byteCursor, 'left')
+    if left then
+      self:setCursor(self.text:sub(1, left):ulen())
+    end
+  end)
+  self.kbd:setSequence({'G', ')'}, function()
+    local byteCursor = self.text:usub(1, self.cursor.pos + 1):len()
+    local right = findNearestChr('[%)%]%},]', byteCursor, 'right')
+    if right then
+      self:setCursor(self.text:sub(1, right):ulen())
+    end
+  end)
+  self.kbd:setSequence({'G', '.'}, function()
+    local byteCursor = self.text:usub(1, self.cursor.pos + 1):len()
+    local left = findNearestChr('[%(%[%{,]', byteCursor, 'left')
+    local right = findNearestChr('[%)%]%},]', byteCursor, 'right')
+    if left and right then
+      self:setCursor(self.text:sub(1, left):ulen())
+      self.cursor.size = self.text:sub(1, right):ulen() - self.cursor.pos
+    end
+  end)
+  self.kbd:setSequence({'G', 'left'}, function()
+    self:setCursor(0)
+  end)
+  self.kbd:setSequence({'G', 'right'}, function()
+    self:setCursor(self.text:ulen())
+  end)
 end
 
 function UIInput:invalidate()

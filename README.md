@@ -26,15 +26,20 @@ Uppercase letters are used as global shortcuts, even if the input view is focuse
 | <kbd>S</kbd><kbd>l</kbd><kbd>[0-9]</kbd> | Create list from last #n items |
 
 ### Input
-| Key                            | Function                           |
-|--------------------------------|------------------------------------|
-| <kbd>left</kbd>                | Move cursor left                   |
-| <kbd>right</kbd>               | Move cursor right                  |
-| <kbd>up</kbd>                  | Focus stack                        |
-| <kbd>down</kbd>                | Swap stack 1 & 2                   |
-| <kbd>ctrl</kbd><kbd>menu</kbd> | Show context menu (WIP)            |
-| <kbd>return</kbd>              | Insert special character/operator  |
-| <kbd>tab</kbd>                 | Start completion for current input |
+| Key                            | Function                                                                |
+|--------------------------------|-------------------------------------------------------------------------|
+| <kbd>left</kbd>                | Move cursor left                                                        |
+| <kbd>right</kbd>               | Move cursor right                                                       |
+| <kbd>up</kbd>                  | Focus stack                                                             |
+| <kbd>down</kbd>                | Swap stack 1 & 2                                                        |
+| <kbd>ctrl</kbd><kbd>menu</kbd> | Show context menu (WIP)                                                 |
+| <kbd>return</kbd>              | Insert special character/operator                                       |
+| <kbd>tab</kbd>                 | Start completion for current input                                      |
+| <kbd>G</kbd><kbd>left</kbd>    | Go to beginning                                                         |
+| <kbd>G</kbd><kbd>right</kbd>   | Go to end                                                               |
+| <kbd>G</kbd><kbd>(</kbd>       | Go to previous parenthese or comma or beginning                         |
+| <kbd>G</kbd><kbd>)</kbd>       | Go to next parenthese or comma                                          |
+| <kbd>G</kbd><kbd>.</kbd>       | Select text between parentheses and or commas (select current argument) |
 
 ### Stack
 | Key                               | Function                                                        |
