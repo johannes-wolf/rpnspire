@@ -2677,8 +2677,8 @@ function RPNInput:dispatchOperatorSpecial(key)
   tab[key]()
 end
 
-function RPNInput:dispatchFunction(str, ignoreInput)
-  local name, argc = functionInfo(str)
+function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
+  local name, argc = functionInfo(str, builtinOnly)
   if name then
     recordUndo()
     if (not ignoreInput and not self:dispatchInput()) or
@@ -2735,7 +2735,9 @@ end
 
 function RPNInput:onEnter()
   if options.mode == "RPN" then
-    if self:dispatchFunction(self:getInput(), true) then
+    if self:dispatchFunction(self:getInput(), true, false) then
+      self:setInput('')
+    elseif self:dispatchOperator(self:getInput(), true) then
       self:setInput('')
     end
   end
