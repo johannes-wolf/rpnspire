@@ -37,60 +37,39 @@ Uppercase letters are used as global shortcuts, even if the input view is focuse
 | <kbd>tab</kbd>                 | Start completion for current input |
 
 ### Stack
-| Key                            | Function                                                        |
-|--------------------------------|-----------------------------------------------------------------|
-| <kbd>left</kbd>                | Roll stack up                                                   |
-| <kbd>right</kbd>               | Roll stack down                                                 |
-| <kbd>up</kbd>                  | Move selection up                                               |
-| <kbd>down</kbd>                | Move selection down, focus input if out of bounds               |
-| <kbd>backspace</kbd>           | Delete item                                                     |
-| <kbd>enter</kbd>               | Duplicate item                                                  |
-| <kbd>=</kbd>                   | Duplicate and reevaluate                                        |
-| <kbd>r</kbd>                   | Duplicate result                                                |
-| <kbd>c</kbd>                   | Copy result to input                                            |
-| <kbd>s</kbd>                   | Swap selection with previous                                    |
-| <kbd>3</kbd>                   | Select bottom (oldest)                                          |
-| <kbd>7</kbd>                   | Select top (newest)                                             |
-| <kbd>5</kbd>                   | Show expression and result fullsreen (exit with <kbd>tab</kbd>) |
-| <kbd>ctrl</kbd><kbd>menu</kbd> | Show context menu (WIP)                                         |
-| <kbd>tab</kbd>                 | Focus input                                                     |
-
-### Special functions
-| Name      | Function                               |
-|-----------|----------------------------------------|
-| @swap     | Swap 1 & 2                             |
-| @roll     | Roll                                   |
-| @dup      | Duplicate 1                            |
-| @dup2     | Duplicate 1 & 2                        |
-| @dup3     | Duplicate 1, 2 & 3                     |
-| @pick     | Pick 1                                 |
-| @pick2    | Pick 2                                 |
-| @pick3    | Pick 3                                 |
-| @del      | Pop 1                                  |
-| *History* |                                        |
-| @undo     | Undo                                   |
-| *Misc*    |                                        |
-| @label    | Set last expression text to @1         |
-| @postfix  | Push last expression as postfix string |
-| *Macro*   |                                        |
-| @mcall    | Call macro @1                          |
-
+| Key                               | Function                                                        |
+|-----------------------------------|-----------------------------------------------------------------|
+| <kbd>left</kbd>                   | Roll stack up (1)                                               |
+| <kbd>right</kbd>                  | Roll stack down (1)                                             |
+| <kbd>up</kbd>                     | Move selection up                                               |
+| <kbd>down</kbd>                   | Move selection down, focus input if out of bounds               |
+| <kbd>clear</kbd>                  | Clear the stack                                                 |
+| <kbd>backspace</kbd>/<kbd>x</kbd> | Delete selected item                                            |
+| <kbd>enter</kbd>                  | Duplicate selected item                                         |
+| <kbd>=</kbd>                      | Duplicate selected item and reevaluate                          |
+| <kbd>c</kbd><kbd>left</kbd>       | Copy selected expression to input                               |
+| <kbd>c</kbd><kbd>right</kbd>      | Copy selected result to input                                   |
+| <kbd>i</kbd><kbd>left</kbd>       | Insert selected expression into input                           |
+| <kbd>i</kbd><kbd>right</kbd>      | Insert selected result into input                               |
+| <kbd>3</kbd>                      | Select bottom (oldest)                                          |
+| <kbd>7</kbd>                      | Select top (newest)                                             |
+| <kbd>5</kbd>                      | Show expression and result fullsreen (exit with <kbd>tab</kbd>) |
+| <kbd>tab</kbd>/<kbd>escape</kbd>  | Focus input                                                     |
 
 ## Features
 * [x] RPN interface supporting (nearly) all of the nspires operators
-* [x] Stack manipulation functions (`@pick, @roll, @dup, @swap, @del`)
-* [x] Unlimmited* undo and redo (`U` - undo, `R` - redo)
+* [x] Stack manipulation functions (See global keybindings)
+* [x] Undo and redo (<kbd>U/R</kbd>)
 * [x] Autocompletion for functions, variables and units
 * [x] A fast numblock driven menu system
 * [x] Nested keyboard shortcuts
-* [x] Support for lists
 * [x] Writing glue for all of the nspires functions
-* [x] Theming support 🔥 
 * [x] Correct handling of unicode charactes in the input entry
+* [x] Error handling
+* [x] Theming support 🔥 
 
 ## Not implemented yet
-* [-] Error handling
-* [ ] Support for matrixes (parser)
+* [ ] Support for matrices (parser)
 * [ ] Touchpad support (scrolling etc.)
 
 ## What is not working
