@@ -664,6 +664,10 @@ function Infix.tokenize(input)
     return Trie.find(input, operators_trie, i)
   end
   
+  local function ans(input, i)
+    return input:find('^(@[0-9]+)', i)
+  end
+  
   local function syntax(input, i)
     return input:find('^([(){}[%],])', i)
   end
@@ -770,6 +774,7 @@ function Infix.tokenize(input)
   local matcher = {
     {fn=operator,   kind='operator'},
     {fn=syntax,     kind='syntax'},
+    {fn=ans,        kind='ans'},
     {fn=number,     kind='number'},
     {fn=unit,       kind='unit'},
     {fn=word,       kind='word'},
@@ -872,6 +877,20 @@ function RPNExpression:fromInfix(tokens)
     end
     table.insert(stack, {sym, 'operator'})
   end
+  
+  local function handleAns(sym)
+    local n = tonumber(sym:sub(2))
+    if n then
+      if not Error.assertStackN(n) then
+        return
+      end
+      
+      local rpn = _G.stack.stack[#_G.stack.stack - n + 1].rpn
+      for _,v in ipairs(rpn) do
+        table.insert(result, v)
+      end
+    end
+  end
 
   local function handleDefault(value, kind)
     assert(value)
@@ -901,6 +920,8 @@ function RPNExpression:fromInfix(tokens)
       matrixLevel = matrixLevel - 1
     elseif kind == 'operator' then
       handleOperator(value)
+    elseif kind == 'ans' then
+      handleAns(value)
     else
       return false
     end
@@ -1517,7 +1538,7 @@ function UIMenu:onCharIn(c)
     elseif type(item[2]) == "table" then
       self:pushPage(item[2])
     elseif type(item[2]) == "string" then
-      Input:insertText(item[2]) -- TODO
+      input:insertText(item[2]) -- TODO
       focusView(input)
     end
   else
@@ -2161,6 +2182,12 @@ function UIInput:initBindings()
       {'[', '['}, {'@>', '@>'}, {']', ']'},
       {'|', '|'}, {':=', ':='}, {'@', '@'},
     })
+  end)
+  self.kbd:setSequence({'A', '%d'}, function(sequence)
+    local n = tonumber(sequence[#sequence])
+    if Error.assertStackN(n) then
+      self:insertText('@'..sequence[#sequence])
+    end
   end)
 end
 
