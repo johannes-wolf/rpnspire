@@ -2971,6 +2971,43 @@ function Error.assertStackN(n, pos)
 end
 
 
+-- Menus
+local function make_options_menu()
+  local function make_bool_item(title, key)
+    return {title, function() options[key] = not options[key] end, state=options[key] == true}
+  end
+
+  local function make_choice_item(title, key, choices)
+    local choice_items = {}
+    for k,v in pairs(choices) do
+      table.insert(choice_items, {
+        k, function() options[key] = v end, state=options[key] == v
+      })
+    end
+    return {title, choice_items}
+  end
+
+  local function make_theme_menu()
+    local items = {}
+    for name,_ in pairs(theme) do
+      table.insert(items, {
+        name, function() options.theme = name end, state=options.theme == name
+      })
+    end
+    return {'Theme', items}
+  end
+
+  return {
+    make_bool_item('Show Fringe', 'showFringe'),
+    make_bool_item('Show Infix', 'showExpr'),
+    make_bool_item('Smart Parens', 'autoClose'),
+    make_bool_item('Smart Kill', 'autoKillParen'),
+    make_bool_item('Smart Complete', 'smartComplete'),
+    make_bool_item('Auto Pop', 'autoPop'),
+    make_theme_menu()}
+end
+
+
 -- Called for _any_ keypress
 function onAnyKey()
   Error.hide()
@@ -2992,13 +3029,8 @@ function on.construction()
     {"Clear",
       {"Clear A-Z", function() math.evalStr("ClearAZ") end},
     },
-    {"Settings",
-      {"Light theme", function() options.theme = "light" end},
-      {"Dark theme",  function() options.theme = "dark" end},
-      {"Toggle fringe", function() options.showFringe = not options.showFringe end},
-      {"Toggle calculation", function() options.showExpr = not options.showExpr end},
-      {"Toggle smart parens", function() options.autoClose = not options.autoClose; options.autoKillParen = options.autoClose end},
-      {"Toggle smart complete", function() options.smartComplete = not options.smartComplete end},
+    {"Options",
+      {"Show...", function() menu:present(focus, make_options_menu()) end}
     }
   })
   
@@ -3116,11 +3148,6 @@ function on.returnKey()
   end
 
   if focus == input then
-    --menu:present(input, {
-    --  {"→", "=:"}, {":=", ":="}, {"@"},
-    --  {"{", "{"},  {"}", "}"}, {"\""},
-    --  {"[", "["},  {"]", "]"}, {"'", "'"}
-    --})
     input:customCompletion({
       "=:", ":=", "{}", "[]", "@>"
     })
@@ -3245,50 +3272,6 @@ function on.contextMenu()
   end
   if focus.onContextMenu then
     focus:onContextMenu()
-  end
-
-  -- FIXME: this is just a test
-  if focus == stack then
-    local function makeThemeMenu()
-      local items = {}
-      for name,_ in pairs(theme) do
-        table.insert(items, {
-          name, function() options.theme = name end, state=(options.theme==name)
-        })
-      end
-      return items
-    end
-  
-    menu:present(stack, {
-      {"Options", {
-        {"Show Fringe", function() options.showFringe = not options.showFringe end, state=(options.showFringe==true)},
-        {"Show Infix", function() options.showExpr = not options.showExpr end, state=(options.showExpr==true)},
-        {"Completion", {
-          {"Closing Paren", function() options.autoClose = not options.autoClose end, state=options.autoClose==true},
-          {"Smart", function() options.smartComplete = not options.smartComplete end, state=options.smartComplete==true},
-        }},
-        {"Theme", makeThemeMenu()}
-      }},
-      {"Clear A-Z", function() math.evalStr("ClearAZ") end},
-    })
-  elseif focus == input then
-    menu:present(input, {
-      {"Const", {
-        {"g", "_g"}, {"c", "_c"},
-      }},
-      {"Units", {
-        {"Length", {
-          {"m", "_m"}
-        }},
-        {"Mass", {
-          {"kg", "_kg"}
-        }}
-      }},
-      {"CAS", {
-        {"solve", "solve"}, {"zeros", "zeros"}
-      }}, 
-      {options.mode == "RPN" and "ALG" or "RPN", function() options.mode = options.mode == "RPN" and "ALG" or "RPN" end},
-    })
   end
 end
 

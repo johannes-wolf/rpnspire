@@ -4,7 +4,7 @@ local Test = {
 }
 
 function Test.fail(message)
-  Test.failed = message
+  Test.failed = message or "fail"
   return false
 end
 
