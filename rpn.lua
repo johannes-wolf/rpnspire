@@ -1882,7 +1882,7 @@ function UIStack:toList(n)
   for i=1,n do
     local arg = self:pop(newTop)
     if arg then
-      newList:add(arg.rpn)
+      newList:add(RPNExpression():fromInfix(Infix.tokenize(arg.result)))
     end
   end
   
