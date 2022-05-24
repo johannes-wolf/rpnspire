@@ -9,8 +9,65 @@
 https://raw.githubusercontent.com/johannes-wolf/rpnspire/main/doc/demo.mp4?raw=true
 
 ## Usage
+
+The input field of rpnspire support autocompletion for functions, variables and units. To trigger completion,
+press <kbd>tab</kbd>. Completion respects characters left to the cursor as compeltions prefix. Typing `so<tab>` will
+present a list of completions starting with `so`. By pressing <kbd>tab</kbd> multiple times you can loop through that list.
+To accept a completion press a cursor key (left or right) or press <kbd>enter</kbd> to directly evaluate.
+
+### RPN-Mode
+
+RPN-mode is the default mode of rpnspire. In RPN-mode, pressing an operator or function key submits the current input
+and directly evaluates the operator or function pressed. You can enter ALG mode by hitting <kbd>M</kbd><kbd>r</kbd>.
+
+Calling functions from RPN-mode is done by just typing the functions name, without parentheses.
+
+Example:
+``` text
+Stack:
+1 | x^2-1
+2 | x
+
+Input:
+zeros
+
+Result:
+1 | zeros(x^2-1,x) ...
+```
+
+### ALG-Mode
+
+ALG-mode is the infix mode of rpnspire. Hitting operator keys in ALG-mode will not evaluate them, but add them at the cursor
+position. You can enter ALG mode by hitting <kbd>M</kbd><kbd>a</kbd>.
+The input mode is (temporarily) set to ALG-mode as soon as the left side of the cursor is an un-balanced expression,
+e.G if it is missing a closing paren or quote.
+
+Example:
+``` text
+Unbalanced:
+(4+x|)
+    ^cursor
+
+Balanced:
+(4+x)|
+     ^cursor
+```
+
+To use stack items in ALG expressions, hit <kbd>A</kbd><kbd>[0-9]</kbd> to enter a reference to the stack `@n`, where
+n is the stack level. The stack reference will be replaced with the corresponding expression on push.
+
+## Options
+
+You can access rpnsprires option dialog by pressing <kbd>menu</kbd> and select `Options>Show...`.
+The option menu is navigated using the number keys.
+
+## Bindings
+
+rpnspire uses key-sequences for its bindings. <kbd>A</kbd><kbd>r</kbd> means: Press `A` and then press `r`.
+
 ### Global
-Uppercase letters are used as global shortcuts, even if the input view is focused!
+
+The global shortcuts work from everywhere, regardless of the currently focused view.
 
 | Key                                      | Function                       |
 |------------------------------------------|--------------------------------|
@@ -41,6 +98,7 @@ Uppercase letters are used as global shortcuts, even if the input view is focuse
 | <kbd>G</kbd><kbd>)</kbd>       | Go to next parenthese or comma                                          |
 | <kbd>G</kbd><kbd>.</kbd>       | Select text between parentheses and or commas (select current argument) |
 | <kbd>I</kbd>                   | Insert special                                                          |
+| <kbd>A</kbd><kbd>[0-9]</kbd>   | Insert stack reference (Ans)                                            |
 
 ### Stack
 | Key                               | Function                                                        |
