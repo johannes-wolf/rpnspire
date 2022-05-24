@@ -100,6 +100,7 @@ local theme = {
     altRowColor = 0xEEEEEE,
     selectionColor = 0xDFDFFF,
     fringeTextColor = 0xAAAAAA,
+    menuActiveColor = 0x88FF98,
     textColor = 0,
     cursorColor = 0xEE0000,
     cursorColorAlg = 0x0000FF,
@@ -113,6 +114,7 @@ local theme = {
     rowColor = 0x2e3440,
     altRowColor = 0x323844,
     selectionColor = 0x636c7e,
+    menuActiveColor = 0x636c7e,
     fringeTextColor = 0x4c566a,
     textColor = 0xd8dee9,
     cursorColor = 0xd8dee9,
@@ -127,6 +129,7 @@ local theme = {
     rowColor = 0x444444,
     altRowColor = 0x222222,
     selectionColor = 0xEE0000,
+    menuActiveColor = 0x00EE00,
     fringeTextColor = 0xAAAAAA,
     textColor = 0xFFFFFF,
     cursorColor = 0xEE0000,
@@ -1604,7 +1607,7 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
     local ix, iy = x + w/2 - iw/2, y + h - ih - margin
 
     if itemState == true then
-      gc:setColorRGB(theme[options.theme].selectionColor)
+      gc:setColorRGB(theme[options.theme].menuActiveColor)
       gc:fillRect(ix,iy,iw,ih)
     end
     gc:setColorRGB(theme[options.theme].borderColor)
