@@ -1368,6 +1368,7 @@ function UIMenu:init()
   self.page = 0
   self.pageStack = {}
   self.items = {}
+  self.filterString = nil
   self.visible = false
   self.parent = nil
 end
@@ -1399,6 +1400,7 @@ end
 
 function UIMenu:present(parent, items)
   self.pageStack = {}
+  self.filterString = nil
   self:pushPage(items or {})
   self.parent = parent
   focusView(self)
@@ -1462,11 +1464,23 @@ function UIMenu:onArrowDown()
 end
 
 function UIMenu:onEscape()
+  if #self.items ~= #self.origItems then
+    self:onBackspace()
+    return
+  end
   self:hide()
 end
 
 function UIMenu:onClear()
   self.page = 0
+  self.filterString = ''
+  self.items = self.origItems
+  self:invalidate()
+end
+
+function UIMenu:onBackspace()
+  self.filterString = ''
+  self.items = self.origItems
   self:invalidate()
 end
 
@@ -1474,6 +1488,8 @@ function UIMenu:pushPage(page)
   if page then
     table.insert(self.pageStack, page)
     self.items = self.pageStack[#self.pageStack]
+    self.origItems = self.items
+    self.filterString = ''
     self:invalidate()
   end
 end
@@ -1482,6 +1498,8 @@ function UIMenu:popPage()
   if #self.pageStack > 1 then
     table.remove(self.pageStack, #self.pageStack)
     self.items = self.pageStack[#self.pageStack]
+    self.origItems = self.items
+    self.filterString = ''
     self:invalidate()
   end
 end
@@ -1502,6 +1520,29 @@ function UIMenu:onCharIn(c)
       Input:insertText(item[2]) -- TODO
       focusView(input)
     end
+  else
+    self.filterString = self.filterString or ''
+    if c == ' ' then
+      self.filterString = self.filterString..'.*'
+    elseif c:byte(1) >= 97 and c:byte(1) <= 122 then
+      self.filterString = self.filterString..c:lower()
+    end
+    
+    local function matchFn(title)
+      if title:lower():find(self.filterString) then
+        return true
+      end
+    end
+    
+    local filteredItems = {}
+    for _,v in ipairs(self.origItems) do
+      if matchFn(v[1]) then
+        table.insert(filteredItems, v)
+      end
+    end
+    
+    self.items = filteredItems
+    self:invalidate()
   end
 end
 
