@@ -15,6 +15,10 @@ press <kbd>tab</kbd>. Completion respects characters left to the cursor as compe
 present a list of completions starting with `so`. By pressing <kbd>tab</kbd> multiple times you can loop through that list.
 To accept a completion press a cursor key (left or right) or press <kbd>enter</kbd> to directly evaluate.
 
+<p align="center">
+<img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-completion.gif" width="300px"></img>
+</p>
+
 ### RPN-Mode
 
 RPN-mode is the default mode of rpnspire. In RPN-mode, pressing an operator or function key submits the current input
@@ -22,18 +26,9 @@ and directly evaluates the operator or function pressed. You can enter ALG mode 
 
 Calling functions from RPN-mode is done by just typing the functions name, without parentheses.
 
-Example:
-``` text
-Stack:
-1 | x^2-1
-2 | x
-
-Input:
-zeros
-
-Result:
-1 | zeros(x^2-1,x) ...
-```
+<p align="center">
+<img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-zeros.gif" width="300px"></img>
+</p>
 
 ### ALG-Mode
 
@@ -55,6 +50,10 @@ Balanced:
 
 To use stack items in ALG expressions, hit <kbd>A</kbd><kbd>[0-9]</kbd> to enter a reference to the stack `@n`, where
 n is the stack level. The stack reference will be replaced with the corresponding expression on push.
+
+<p align="center">
+<img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-ans.gif" width="300px"></img>
+</p>
 
 ## Options
 
