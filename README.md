@@ -66,7 +66,7 @@ The option menu is navigated using the number keys.
 
 rpnspire uses key-sequences for its bindings. <kbd>A</kbd><kbd>r</kbd> means: Press `A` and then press `r`.
 The current sequence of keys pressed (that are part of a binding) is displayed by a dialog at the
-top of the screen.
+top of the screen. Bindings with an asterisk can be repeated by pressing the last key of the sequence again.
 
 ### Global
 
@@ -83,7 +83,9 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>S</kbd><kbd>x</kbd><kbd>[0-9]</kbd> | Drop stack item #n             |
 | <kbd>S</kbd><kbd>x</kbd><kbd>x</kbd>     | Clear stack                    |
 | <kbd>S</kbd><kbd>r</kbd><kbd>[0-9]</kbd> | Roll stack #n times            |
+| <kbd>S</kbd><kbd>r</kbd><kbd>r*</kbd>    | Roll stack                     |
 | <kbd>S</kbd><kbd>l</kbd><kbd>[0-9]</kbd> | Create list from last #n items |
+| <kbd>S</kbd><kbd>l</kbd><kbd>l*</kbd>    | Join two top items             |
 | <kbd>V</kbd><kbd>backspace</kbd>         | Delete variable(s) interactive |
 | <kbd>V</kbd><kbd>clear</kbd>             | Delete variables a-z           |
 | <kbd>V</kbd><kbd>=</kbd>                 | Set variable interactive       |
@@ -142,7 +144,6 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 * [x] Theming support 🔥 
 
 ## Not implemented yet
-* [ ] Subscript support
 * [ ] Touchpad support (scrolling etc.)
 
 ## What is not working

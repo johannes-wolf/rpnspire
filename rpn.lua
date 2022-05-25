@@ -1517,17 +1517,19 @@ function KeybindManager:dispatchKey(key)
   table.insert(self.currentSequence, key)
   
   self.currentTab = self.currentTab or self.bindings
-  
-  -- Special case: Binding all number keys
-  if not self.currentTab[key] then
-    if key:find('^%d+$') then
-      self.currentTab = self.currentTab['%d']
+
+  if type(self.currentTab) == 'table' then
+    -- Special case: Binding all number keys
+    if not self.currentTab[key] then
+      if key:find('^%d+$') then
+        self.currentTab = self.currentTab['%d']
+      else
+        self.currentTab = self.currentTab[key]
+      end
     else
+      -- Default case
       self.currentTab = self.currentTab[key]
     end
-  else
-    -- Default case
-    self.currentTab = self.currentTab[key]
   end
 
   -- Exit if not found
@@ -1538,8 +1540,11 @@ function KeybindManager:dispatchKey(key)
 
   -- Call binding
   if type(self.currentTab) == 'function' then
-    self.currentTab(self.currentSequence)
-    self:resetSequence()
+    if self.currentTab(self.currentSequence) == 'repeat' then
+      self.currentTab = {[key] = self.currentTab}
+    else
+      self:resetSequence()
+    end
     if self.onExec then
       self.onExec()
     end
@@ -3385,6 +3390,12 @@ function on.construction()
     recordUndo()
     stack:roll(tonumber(sequence[#sequence]))
   end)
+  GlobalKbd:setSequence({'S', 'r', 'r'}, function(sequence)
+    -- Roll down 1
+    recordUndo()
+    stack:roll(1)
+    return 'repeat'
+  end)
   GlobalKbd:setSequence({'S', 'x', '%d'}, function(sequence)
     -- Pop item N from top
     recordUndo()
@@ -3399,6 +3410,12 @@ function on.construction()
     -- Transform top N items to list
     recordUndo()
     stack:toList(tonumber(sequence[#sequence]))
+  end)
+  GlobalKbd:setSequence({'S', 'l', 'l'}, function(sequence)
+    -- Transform top 2 items to list (repeatable)
+    recordUndo()
+    stack:toList(2)
+    return 'repeat'
   end)
 
   -- Variables
