@@ -677,22 +677,130 @@ local errorCodes = {
   -- TODO: ...
 }
 
---[[ MACRO ]]--
-local currentMacro = nil -- Currently or last active macro coroutine
 
--- A macro is a list of actions to execute with some special function available
+-- Macro
+currentMacro = nil
+
 Macro = class()
-
-function Macro:init(s)
-  self.steps = s or {}
+function Macro:init(steps)
+  self.steps = steps or {}
 end
 
-function Macro:exec()
-  currentMacro = coroutine.create(function()
-    for _,s in ipairs(self.steps) do
-      -- TODO: Implement
+function Macro:execute()
+  recordUndo()
+  
+  local stackTop = stack:size()
+  
+  local function clrbot(n)
+    n = tonumber(n)
+    for i=stack:size() -n,stackTop+1,-1 do
+      stack:pop(i)
     end
+  end
+    
+  local function exec_step(step)
+    if step:find('^@%a+') then
+      step = step:usub(2)
+      local tokens = step:split(':')
+      local cmd = tokens[1]
+      
+      local function numarg(n, def)
+        n = n + 1
+        return tokens >= n and tonumber(tokens[n]) or def
+      end
+      
+      if cmd == 'clrbot' then
+        -- Clear all but top n args
+        clrbot(tokens[2] or 1)
+      elseif cmd == 'dup' then
+        stack:dup(numarg(1, 1))
+      elseif cmd == 'simp' then
+        stack:pushInfix(stack:pop().result)
+      elseif cmd == 'label' then
+        if stack:size() > 0 then
+          stack:top().label = tokens[2]
+        end
+      elseif cmd == 'input' then
+        local prefix = tokens[2] or ''
+        
+        input_ask_value(input, function(value)
+          stack:pushInfix(value)
+          if currentMacro then
+            coroutine.resume(currentMacro)
+          end
+        end, function()
+          undo()
+          currentMacro = nil
+        end, function(widget)
+          widget:setText('', prefix)
+        end)
+        coroutine.yield(currentMacro)
+      end
+    else
+      stack:pushInfix(step)
+    end
+    
+    return true
+  end
+  
+  if currentMacro and coroutine.status(currentMacro) ~= 'dead' then
+    print('Macro:execute: another macro is active!')
+    return
+  end
+  
+  currentMacro = coroutine.create(function()
+    for _,v in ipairs(self.steps) do
+      if not exec_step(v) then
+        undo()
+        break
+      end
+    end
+    platform.window:invalidate()
   end)
+  coroutine.resume(currentMacro)
+end
+
+
+-- Formula (WIP)
+-- Idea: Provide a catalog of formulas that interactively ask for their input
+--       values. Suggest using variables of the right name by default.
+--       Bonus: Automatic chaining of formulas
+Formula = class()
+function Formula:init(infix, variables)
+  self.infix = infix
+  self.variables = variables
+end
+
+function Formula:solve_symbolic(forVar)
+  local withExpr = ''
+  for key,_ in pairs(self.variables) do
+    if key ~= forVar then
+      if withExpr:len() > 0 then withExpr = withExpr..' and ' end
+      withExpr = withExpr..key..'="'..key..'"' -- Trick to get a symbolic output
+    end
+  end
+
+  local solveExpr = string.format('solve(%s,%s)|%s', self.infix, forVar, withExpr)
+  print('Formula:solve_symbolic: '..solveExpr)
+
+  local res, err = math.evalStr(solveExpr)
+  if res then
+    print('> '..res:gsub('"', ''))
+  end
+end
+
+function Formula:solve_interactive()
+end
+
+local formulas = {
+  ['Triangle'] = {
+    
+  }
+}
+
+FormulaMerger = class()
+function FormulaMerger:build_tree_for(tab, want, have)
+
 end
 
 
