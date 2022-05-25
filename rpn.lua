@@ -2169,7 +2169,7 @@ function UIInput:init(frame)
   -- Input
   self.inputHandler = RPNInput()
   self.kbd = KeybindManager()
-  self:initBindings()
+  self:init_bindings()
 end
 
 function UIInput:save_state()
@@ -2183,7 +2183,8 @@ function UIInput:restore_state(state)
   self:invalidate()
 end
 
-function UIInput:initBindings()
+
+function UIInput:init_bindings()
   local function findNearestChr(chr, origin, direction)
     local byteOrigin = self.text:sub(1, origin):len()
     local pos = direction == 'left' and 1 or byteOrigin+1
@@ -2233,6 +2234,8 @@ function UIInput:initBindings()
   self.kbd:setSequence({'G', 'right'}, function()
     self:setCursor(self.text:ulen())
   end)
+  
+  -- Special chars
   self.kbd:setSequence({'I'}, function(sequence)
     menu:present(input, {
       {'{', '{'}, {'=:', '=:'}, {'}', '}'},
@@ -2240,6 +2243,8 @@ function UIInput:initBindings()
       {'|', '|'}, {':=', ':='}, {'@', '@'},
     })
   end)
+  
+  -- Ans/Stack reference
   self.kbd:setSequence({'A', '%d'}, function(sequence)
     local n = tonumber(sequence[#sequence])
     if Error.assertStackN(n) then
@@ -3172,6 +3177,7 @@ local function make_options_menu()
     make_bool_item('Smart Kill', 'autoKillParen'),
     make_bool_item('Smart Complete', 'smartComplete'),
     make_bool_item('Auto Pop', 'autoPop'),
+    make_bool_item('Auto ANS', 'autoAns'),
     make_theme_menu()}
 end
 
@@ -3211,12 +3217,24 @@ function on.construction()
   GlobalKbd:setSequence({'C'}, function(sequence)
     clear()
   end)
+
+  -- Edit
   GlobalKbd:setSequence({'E'}, function(sequence)
-    if #stack.stack >= 1 then
-      input:setTempMode("ALG")
-      input:setText(stack:pop().infix, "Edit")
+    if stack:size() > 0 then
+      local idx = stack.sel or stack:size()
+      focusView(input)
+      input_ask_value(input, function(expr)
+        recordUndo()
+        stack:pushInfix(expr)
+        stack:swap(idx, #stack.stack)
+        stack:pop()
+      end, nil, function(widget)
+        widget:setText(stack.stack[idx].infix, 'Edit #'..(#stack.stack - idx + 1))
+      end)
     end
   end)
+
+  -- Stack
   GlobalKbd:setSequence({'S', 'd', '%d'}, function(sequence)
     -- Duplicate N items from top
     recordUndo()
@@ -3247,6 +3265,44 @@ function on.construction()
     recordUndo()
     stack:toList(tonumber(sequence[#sequence]))
   end)
+
+  -- Variables
+  GlobalKbd:setSequence({'V', 'clear'}, function()
+      math.evalStr('DelVar a-z')
+  end)
+  GlobalKbd:setSequence({'V', 'backspace'}, function()
+    input_ask_value(self, function(varname)
+      local res, err = math.evalStr('DelVar '..varname)
+      if err then
+        Error.show(err)
+      end
+    end, nil, function(widget)
+      widget:setText('', 'Delete Var:')
+      widget.completionFun = completion_fn_variables
+    end)
+  end)
+  GlobalKbd:setSequence({'V', '='}, function()
+    input_ask_value(self, function(varname)
+      input_ask_value(self, function(value)
+        local res, err = math.evalStr(varname..':=('..value..')')
+        if err then
+          Error.show(err)
+        end
+      end, nil, function(widget)
+        local text = ''
+        if #stack.stack > 0 then
+          text = stack.stack[#stack.stack].result
+        end
+        widget:setText(text, varname..':=')
+        widget:selAll()
+      end)
+    end, nil, function(widget)
+      widget:setText('', 'Set Var:')
+      widget.completionFun = completion_fn_variables
+    end)
+  end)
+
+  -- Mode
   GlobalKbd:setSequence({'M', 'r'}, function(sequence)
     -- Set mode to RPN
     options.mode = 'RPN'
@@ -3254,6 +3310,10 @@ function on.construction()
   GlobalKbd:setSequence({'M', 'a'}, function(sequence)
     -- Set mode to ALG
     options.mode = 'ALG'
+  end)
+  GlobalKbd:setSequence({'M', 'm'}, function(sequence)
+    -- Toggle mode
+    options.mode = options.mode == 'RPN' and 'ALG' or 'RPN'
   end)
 
   focusView(input)

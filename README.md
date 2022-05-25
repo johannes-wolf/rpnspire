@@ -77,31 +77,37 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>U</kbd>                             | Undo                           |
 | <kbd>R</kbd>                             | Redo                           |
 | <kbd>C</kbd>                             | Clear stack & input            |
-| <kbd>E</kbd>                             | Edit last item                 |
+| <kbd>E</kbd>                             | Edit selection or top          |
 | <kbd>S</kbd><kbd>d</kbd><kbd>[0-9]</kbd> | Duplicate #n stack items       |
 | <kbd>S</kbd><kbd>p</kbd><kbd>[0-9]</kbd> | Pick stack item #n             |
 | <kbd>S</kbd><kbd>x</kbd><kbd>[0-9]</kbd> | Drop stack item #n             |
 | <kbd>S</kbd><kbd>x</kbd><kbd>x</kbd>     | Clear stack                    |
 | <kbd>S</kbd><kbd>r</kbd><kbd>[0-9]</kbd> | Roll stack #n times            |
 | <kbd>S</kbd><kbd>l</kbd><kbd>[0-9]</kbd> | Create list from last #n items |
+| <kbd>V</kbd><kbd>backspace</kbd>         | Delete variable(s) interactive |
+| <kbd>V</kbd><kbd>clear</kbd>             | Delete variables a-z           |
+| <kbd>V</kbd><kbd>=</kbd>                 | Set variable interactive       |
+| <kbd>M</kbd><kbd>a</kbd>                 | Set mode to ALG                |
+| <kbd>M</kbd><kbd>r</kbd>                 | Set mode to RPN                |
+| <kbd>M</kbd><kbd>m</kbd>                 | Toggle mode                    |
 
 ### Input
-| Key                            | Function                                                                |
-|--------------------------------|-------------------------------------------------------------------------|
-| <kbd>left</kbd>                | Move cursor left                                                        |
-| <kbd>right</kbd>               | Move cursor right                                                       |
-| <kbd>up</kbd>                  | Focus stack                                                             |
-| <kbd>down</kbd>                | Swap stack 1 & 2                                                        |
-| <kbd>ctrl</kbd><kbd>menu</kbd> | Show context menu (WIP)                                                 |
-| <kbd>return</kbd>              | Insert special character/operator                                       |
-| <kbd>tab</kbd>                 | Start completion for current input                                      |
-| <kbd>G</kbd><kbd>left</kbd>    | Go to beginning                                                         |
-| <kbd>G</kbd><kbd>right</kbd>   | Go to end                                                               |
-| <kbd>G</kbd><kbd>(</kbd>       | Go to previous parenthese or comma or beginning                         |
-| <kbd>G</kbd><kbd>)</kbd>       | Go to next parenthese or comma                                          |
-| <kbd>G</kbd><kbd>.</kbd>       | Select text between parentheses and or commas (select current argument) |
-| <kbd>I</kbd>                   | Insert special                                                          |
-| <kbd>A</kbd><kbd>[0-9]</kbd>   | Insert stack reference (Ans)                                            |
+| Key                              | Function                                                                |
+|----------------------------------|-------------------------------------------------------------------------|
+| <kbd>left</kbd>                  | Move cursor left                                                        |
+| <kbd>right</kbd>                 | Move cursor right                                                       |
+| <kbd>up</kbd>                    | Focus stack                                                             |
+| <kbd>down</kbd>                  | Swap stack 1 & 2                                                        |
+| <kbd>ctrl</kbd><kbd>menu</kbd>   | Show context menu (WIP)                                                 |
+| <kbd>return</kbd>                | Insert special character/operator                                       |
+| <kbd>tab</kbd>                   | Start completion for current input                                      |
+| <kbd>G</kbd><kbd>left</kbd>      | Go to beginning                                                         |
+| <kbd>G</kbd><kbd>right</kbd>     | Go to end                                                               |
+| <kbd>G</kbd><kbd>(</kbd>         | Go to previous parenthese or comma or beginning                         |
+| <kbd>G</kbd><kbd>)</kbd>         | Go to next parenthese or comma                                          |
+| <kbd>G</kbd><kbd>.</kbd>         | Select text between parentheses and or commas (select current argument) |
+| <kbd>I</kbd>                     | Insert special                                                          |
+| <kbd>A</kbd><kbd>[0-9]</kbd>     | Insert stack reference (Ans)                                            |
 
 ### Stack
 | Key                               | Function                                                        |
