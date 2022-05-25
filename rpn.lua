@@ -8,6 +8,10 @@ the Free Software Foundation.
 
 -- luacheck: ignore on
 
+-- Forward declarations
+local temp_mode = {} -- Temporary mode override
+
+
 -- Returns the height of string `s`
 local function getStringHeight(s)
   return platform.withGC(function(gc) return gc:getStringHeight(s or "A") end)
@@ -170,6 +174,22 @@ local options = {
   spaceAsEnter = false,  -- Space acts as enter in RPN mode
   maxUndo = 20,          -- Max num of undo steps
 }
+
+-- Get the current mode
+local function get_mode()
+  return (temp_mode and temp_mode[#temp_mode]) or options.mode
+end
+
+-- Oveeride the current mode
+local function push_temp_mode(mode)
+  temp_mode = temp_mode or {}
+  table.insert(temp_mode, mode)
+end
+
+local function pop_temp_mode()
+  table.remove(temp_mode, #temp_mode)
+end
+
 
 local ParenPairs = {
   ['('] = {')', true},
@@ -2134,8 +2154,6 @@ function UIInput:init(frame)
   self.completionList = nil  -- Current completion candidates
   -- Prefix
   self.prefix = ""           -- Non-Editable prefix shown on the left
-  -- Mode
-  self.tempMode = nil
   -- Input
   self.inputHandler = RPNInput()
   self.kbd = KeybindManager()
@@ -2503,15 +2521,6 @@ function UIInput:clear()
   self:invalidate()
 end
 
-function UIInput:setTempMode(mode)
-  self.tempMode = mode or options.mode
-  self:invalidate()
-end
-
-function UIInput:getMode()
-  return self.tempMode or options.mode
-end
-
 function UIInput:setText(s, prefix)
   self.text = s or ""
   self.prefix = prefix or ""
@@ -2583,7 +2592,7 @@ function UIInput:drawText(gc)
   gc:drawString(self.text, x + margin + scrollx, y)
   
   if focus == self then
-    gc:setColorRGB(self:getMode() == "RPN" and 
+    gc:setColorRGB(get_mode() == "RPN" and 
         theme[options.theme].cursorColor or
         theme[options.theme].cursorColorAlg)
   else
@@ -2682,7 +2691,6 @@ function clear()
   stack.stack = {}
   stack:invalidate()
   input:setText("", "")
-  input:setTempMode()
   input:invalidate()
   currentMacro = nil
 end
@@ -2817,7 +2825,7 @@ function RPNInput:onCharIn(key)
     return false
   end
 
-  if options.mode == "ALG" or not self:isBalanced() then
+  if get_mode() == "ALG" or not self:isBalanced() then
     return false
   end
 
@@ -2851,7 +2859,7 @@ function RPNInput:onCharIn(key)
 end
 
 function RPNInput:onEnter()
-  if options.mode == "RPN" then
+  if get_mode() == "RPN" then
     if self:dispatchFunction(self:getInput(), true, false) then
       self:setInput('')
     elseif self:dispatchOperator(self:getInput(), true) then
