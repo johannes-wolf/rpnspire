@@ -3,28 +3,30 @@
 ![rpnspire logo](https://github.com/johannes-wolf/rpnspire/blob/main/doc/logo.png?raw=true)
 
 <p align="center">
-    An RPN interface for the TI Nspire CX
+An RPN interface for the TI Nspire CX
 </p>
 
 https://raw.githubusercontent.com/johannes-wolf/rpnspire/main/doc/demo.mp4?raw=true
 
 ## Usage
 
-The input field of rpnspire support autocompletion for functions, variables and units. To trigger completion,
-press <kbd>tab</kbd>. Completion respects characters left to the cursor as compeltions prefix. Typing `so<tab>` will
-present a list of completions starting with `so`. By pressing <kbd>tab</kbd> multiple times you can loop through that list.
-To accept a completion press a cursor key (left or right) or press <kbd>enter</kbd> to directly evaluate.
+The input field of rpnspire supports autocompletion for functions, variables and units. To trigger completion,
+press <kbd>tab</kbd>. Completion uses characters left to the cursor as compeltions prefix. Typing `so<tab>` will
+present you the first entry of a list of completion candidates starting with `so`. Pressing <kbd>tab</kbd> multiple times loops through all candidates. To accept a completion press a cursor key (<kbd>left</kbd> or <kbd>right</kbd>) or hit <kbd>enter</kbd> to directly evaluate.
 
 <p align="center">
 <img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-completion.gif" width="300px"></img>
 </p>
 
+Special cursor movement functions are available using bindings starting with <kbd>G</kbd> (e.G. <kbd>G</kbd><kbd>)</kbd> moves up to the next comma or parenthese).
+
 ### RPN-Mode
 
 RPN-mode is the default mode of rpnspire. In RPN-mode, pressing an operator or function key submits the current input
-and directly evaluates the operator or function pressed. You can enter ALG mode by hitting <kbd>M</kbd><kbd>r</kbd>.
+and directly evaluates the operator or function pressed. You can enter RPN mode by hitting <kbd>M</kbd><kbd>r</kbd>.
 
-Calling functions from RPN-mode is done by just typing the functions name, without parentheses.
+Calling functions from RPN-mode is done by just entering the function name without parentheses.
+To set the argument for variable argument functions, use infix syntax (see ALG mode).
 
 <p align="center">
 <img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-zeros.gif" width="300px"></img>
@@ -32,7 +34,7 @@ Calling functions from RPN-mode is done by just typing the functions name, witho
 
 ### ALG-Mode
 
-ALG-mode is the infix mode of rpnspire. Hitting operator keys in ALG-mode will not evaluate them, but add them at the cursor
+ALG-mode is the infix mode of rpnspire. Hitting operator keys in ALG-mode will not evaluate them, but add them at the cursors
 position. You can enter ALG mode by hitting <kbd>M</kbd><kbd>a</kbd>.
 The input mode is (temporarily) set to ALG-mode as soon as the left side of the cursor is an un-balanced expression,
 e.G if it is missing a closing paren or quote.
@@ -63,6 +65,8 @@ The option menu is navigated using the number keys.
 ## Bindings
 
 rpnspire uses key-sequences for its bindings. <kbd>A</kbd><kbd>r</kbd> means: Press `A` and then press `r`.
+The current sequence of keys pressed (that are part of a binding) is displayed by a dialog at the
+top of the screen.
 
 ### Global
 
