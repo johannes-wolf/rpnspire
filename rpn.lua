@@ -1737,7 +1737,7 @@ function UIStack:initBindings()
     input:insertText(self.stack[self.sel].result)
   end)
   self.kbd:setSequence({"5"}, function()
-    showBigView(true, self.sel)
+    bigv:displayStackItem(self.sel)
   end)
   self.kbd:setSequence({"7"}, function()
     self:selectIdx(1)
@@ -2647,47 +2647,40 @@ end
 
 --[[ === BIG UI === ]]--
 -- TODO: Refactor
-function showBigView(show, idx)
-  if show == true then
-    focusView({
-      onArrowRight = function() end,
-      onArrowLeft = function() end,
-      onArrowUp = function() end,
-      onArrowDown = function() end,
-      onCharIn = function(c) end,
-      onBackspace = function(c) 
-        focusView(input)
-      end,
-      onEscape = function() 
-        focusView(input)
-      end,
-      onFocus = function()
-        local margin = 8
-        bigview:setBorder(2)
-        bigview:setBorderColor(theme[options.theme].borderColor)
-        bigview:move(margin, margin)
-        bigview:resize(platform.window:width() - 2*margin, platform.window:height() - 2*margin)
-        bigview:setVisible(show == true)
-        bigview:setReadOnly(true)
-      end,
-      onLooseFocus = function()
-        bigview:setVisible(false)
-      end,
-      onEnter = function()
-        focusView(input)
-      end,
-      onClear = function()
-      end
-    })
-    local item = stack.stack[idx or #stack.stack]
-    if item ~= nil then
-      bigview:createMathBox():setExpression("\\0el {"..item.infix.." = "..item.result.."}")
-    else
-      bigview:setExpression(":-(")
-    end
-  else
-    focusView(stack)
+RichText = class(Widgets.Base)
+function RichText:init()
+  self.view = D2Editor.newRichText()
+  self.view:setReadOnly(true)
+  self.view:setBorder(0)
+end
+
+function RichText:onFocus()
+  self.view:move(stack.frame.x, stack.frame.y)
+    :resize(stack.frame.width, stack.frame.height)
+    :setVisible(true)
+end
+
+function RichText:onLooseFocus()
+  self.view:setVisible(false)
+end
+
+function RichText:onEscape()
+  focusView(stack)
+end
+
+function RichText:displayStackItem(idx)
+  local item = stack.stack[idx or stack:size()]
+  if item ~= nil then
+    self.view:createMathBox()
+      :setExpression("\\0el {"..item.infix.."}\n=\n" ..
+                     "\\0el {"..item.result.."}")
   end
+  focusView(self)
+end
+
+function RichText:displayText(text)
+  self.view:setExpression(text)
+  focusView(self)
 end
 
 
@@ -2914,6 +2907,7 @@ end
 input = UIInput()
 stack = UIStack()
 menu  = UIMenu()
+bigv  = RichText()
 focus = input
 
 function focusView(v)
@@ -3188,8 +3182,6 @@ function onAnyKey()
 end
 
 function on.construction()
-  bigview = D2Editor.newRichText() -- TODO: Refactor to custom view
-
   toolpalette.register({
     {"Stack",
       {"DUP 2",  function() stack:dup(2) end},
@@ -3271,7 +3263,7 @@ function on.construction()
       math.evalStr('DelVar a-z')
   end)
   GlobalKbd:setSequence({'V', 'backspace'}, function()
-    input_ask_value(self, function(varname)
+    input_ask_value(input, function(varname)
       local res, err = math.evalStr('DelVar '..varname)
       if err then
         Error.show(err)
@@ -3282,8 +3274,8 @@ function on.construction()
     end)
   end)
   GlobalKbd:setSequence({'V', '='}, function()
-    input_ask_value(self, function(varname)
-      input_ask_value(self, function(value)
+    input_ask_value(input, function(varname)
+      input_ask_value(input, function(value)
         local res, err = math.evalStr(varname..':=('..value..')')
         if err then
           Error.show(err)
@@ -3468,7 +3460,9 @@ end
 
 function on.backspaceKey()
   onAnyKey()
-  GlobalKbd:resetSequence()
+  if GlobalKbd:dispatchKey('backspace') then
+    return
+  end
   if focus.kbd and focus.kbd:dispatchKey('backspace') then
     return
   end
@@ -3500,6 +3494,16 @@ function on.contextMenu()
   end
   if focus.onContextMenu then
     focus:onContextMenu()
+  end
+end
+
+function on.help()
+  onAnyKey()
+  if GlobalKbd:dispatchKey('help') then
+    return
+  end
+  if focus.kbd and focus.kbd:dispatchKey('help') then
+    return
   end
 end
 
