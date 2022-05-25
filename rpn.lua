@@ -9,6 +9,7 @@ the Free Software Foundation.
 -- luacheck: ignore on
 
 -- Forward declarations
+local input_ask_value = nil
 local completion_fn_variables = nil
 local temp_mode = {} -- Temporary mode override
 
@@ -2171,6 +2172,17 @@ function UIInput:init(frame)
   self:initBindings()
 end
 
+function UIInput:save_state()
+  return table_copy_fields(self, {
+    'text', 'prefix', 'cursor', 'scrollx', 'completionFun', 'completionIdx', 'completionList'})
+end
+
+function UIInput:restore_state(state)
+  table_copy_fields(state, {
+    'text', 'prefix', 'cursor', 'scrollx', 'completionFun', 'completionIdx', 'completionList'}, self)
+  self:invalidate()
+end
+
 function UIInput:initBindings()
   local function findNearestChr(chr, origin, direction)
     local byteOrigin = self.text:sub(1, origin):len()
@@ -3084,6 +3096,46 @@ function Error.assertStackN(n, pos)
     return false
   end
   return true
+end
+
+-- Ask for a value submitteds with [enter], canceled with [esc]
+-- Parameters:
+--   widget  The UIInput instance
+--   callbackEnter   Called if the user pressed enter
+--   callbackEscape  Called if the user pressed escape
+--   callbackSetup   Called first with `widget` passed as parameter
+input_ask_value = function(widget, callbackEnter, callbackEscape, callbackSetup)
+  local state = widget:save_state()
+  local onEnter = widget.onEnter
+  local onEscape = widget.onEscape
+  
+  local function restore_state()
+    pop_temp_mode()
+    widget:restore_state(state)
+    widget.onEnter = onEnter
+    widget.onEscape = onEscape
+  end
+  
+  push_temp_mode('ALG')
+  widget:setText('', '')
+  if callbackSetup then
+    callbackSetup(widget)
+  end
+  
+  widget.onEnter = function()
+    local text = widget.text
+    restore_state()
+    if callbackEnter then
+      enterRes = callbackEnter(text)
+    end
+  end
+  
+  widget.onEscape = function()
+    if callbackEscape then 
+      callbackEscape()
+    end
+    restore_state()
+  end
 end
 
 
