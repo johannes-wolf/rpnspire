@@ -172,6 +172,7 @@ local options = {
   saneHexDigits = false, -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
   smartComplete = true,  -- Try to be smart when completing
   spaceAsEnter = false,  -- Space acts as enter in RPN mode
+  autoAns = true,        -- Auto insert @1 in ALG mode
   maxUndo = 20,          -- Max num of undo steps
 }
 
@@ -1676,7 +1677,7 @@ function UIStack:init()
   self.frame = {x=0, y=0, width=0, height=0}
   self.scrolly = 0
   -- Selection
-  self.sel = 0
+  self.sel = nil
   -- Bindings
   self.kbd = KeybindManager()
   self:initBindings()
@@ -1760,6 +1761,14 @@ function UIStack:evalStr(str)
     return nil
   end
   return res, err
+end
+
+function UIStack:size()
+  return #self.stack
+end
+
+function UIStack:top()
+  return #self.stack > 0 and self.stack[#self.stack] or nil
 end
 
 function UIStack:pushInfix(input)
@@ -2019,6 +2028,7 @@ end
 
 function UIStack:onLooseFocus()
   self.kbd:resetSequence()
+  self.sel = nil
   self:invalidate()
 end
 
@@ -2412,7 +2422,15 @@ end
 function UIInput:onCharIn(c)
   self:cancelCompletion()
   if not self.inputHandler:onCharIn(c) then
-    if c == ' ' and self:getMode() == 'RPN' and options.spaceAsEnter then
+    -- Inserting an operator into an empty input in ALG mode should insert '@1'
+    if get_mode() == 'ALG' and options.autoAns and self.text:len() == 0 and stack:size() > 0 then
+      local name, _, args, side = queryOperatorInfo(c)
+      if name and (args > 1 or (args == 1 and side == 1)) then
+        c = '@1'..c
+      end 
+    end
+    
+    if c == ' ' and get_mode() == 'RPN' and options.spaceAsEnter then
       self:onEnter()
     else
       self:_insertChar(c)
