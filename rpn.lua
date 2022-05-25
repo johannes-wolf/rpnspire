@@ -9,6 +9,7 @@ the Free Software Foundation.
 -- luacheck: ignore on
 
 -- Forward declarations
+local completion_fn_variables = nil
 local temp_mode = {} -- Temporary mode override
 
 
@@ -2585,7 +2586,7 @@ function UIInput:drawText(gc)
   gc:clipRect("set", x, y, w, h)
   
   -- Draw prefix text
-  if self.prefix:len() > 0 then
+  if self.prefix and self.prefix:len() > 0 then
     local prefixWidth = gc:getStringWidth(self.prefix) + 2*margin
 
     --gc:setColorRGB(theme[options.theme].altRowColor)
@@ -2906,23 +2907,28 @@ function focusView(v)
   end
 end
 
-input.completionFun = function(prefix)
-  local catmatch = function(tab, prefix, res)
-    res = res or {}
-    local plen = prefix and #prefix or 0
-    for _,v in ipairs(tab or {}) do
-      if plen == 0 or v:lower():sub(1, plen) == prefix then
-        local m = v:sub(plen + 1)
-        if #m > 0 then
-          table.insert(res, m)
-        end
+-- Completion functions
+local function completion_catmatch(candidates, prefix, res)
+  res = res or {}
+  local plen = prefix and #prefix or 0
+  for _,v in ipairs(candidates or {}) do
+    if plen == 0 or v:lower():sub(1, plen) == prefix then
+      local m = v:sub(plen + 1)
+      if #m > 0 then
+        table.insert(res, m)
       end
     end
-    
-    table.sort(res)
-    return res
   end
+  
+  table.sort(res)
+  return res
+end
 
+completion_fn_variables = function(prefix)
+  return completion_catmatch(var:list(), prefix)
+end
+
+input.completionFun = function(prefix)
   -- Semantic autocompletion
   local semantic = nil
   if options.smartComplete then
@@ -2985,13 +2991,13 @@ input.completionFun = function(prefix)
   if semantic then 
     local candidates = {}
     if semantic['unit'] then
-      candidates = catmatch(unitTab, prefix, candidates)
+      candidates = completion_catmatch(unitTab, prefix, candidates)
     end
     if semantic['conversion_op'] then
-      candidates = catmatch({'@>'}, prefix, candidates) -- TODO: Use unicode when input is ready
+      candidates = completion_catmatch({'@>'}, prefix, candidates) -- TODO: Use unicode when input is ready
     end
     if semantic['conversion_fn'] then
-      candidates = catmatch({
+      candidates = completion_catmatch({
         'approxFraction()',
         'Base2', 'Base10', 'Base16',
         'Decimal',
@@ -2999,25 +3005,25 @@ input.completionFun = function(prefix)
       }, prefix, candidates)
     end
     if semantic['function'] then
-      candidates = catmatch(functionTab, prefix, candidates)
+      candidates = completion_catmatch(functionTab, prefix, candidates)
     end
     if semantic['variable'] then
-      candidates = catmatch(var.list(), prefix, candidates)
+      candidates = completion_catmatchtch(var.list(), prefix, candidates)
     end
     if semantic['common'] then
-      candidates = catmatch(commonTab, prefix, candidates) -- TODO: Add common tab
-      candidates = catmatch(var.list(), prefix,
-                   catmatch(functionTab, prefix,
-                   catmatch(unitTab, prefix, candidates)))
+      candidates = completion_catmatch(commonTab, prefix, candidates) -- TODO: Add common tab
+      candidates = completion_catmatch(var.list(), prefix,
+                   completion_catmatch(functionTab, prefix,
+                   completion_catmatch(unitTab, prefix, candidates)))
     end
 
     return candidates
   end
 
   -- Provide all
-  return catmatch(var.list(), prefix,
-         catmatch(functionTab, prefix,
-         catmatch(unitTab, prefix)))
+  return completion_catmatch(var.list(), prefix,
+         completion_catmatch(functionTab, prefix,
+         completion_catmatch(unitTab, prefix)))
 end
 
 
