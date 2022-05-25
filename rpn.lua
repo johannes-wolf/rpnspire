@@ -1053,16 +1053,27 @@ function RPNExpression:fromInfix(tokens)
       return
     end
 
-    local rows, cols = 0, 0
+    local rows, cols = 0, 1
+    local curCol = 0
     for token in next do
       local value, kind = token[1], token[2]
       if value == ',' then
-        cols = cols + 1
+        if rows <= 1 then
+          cols = cols + 1
+        else
+          curCol = curCol + 1
+          if curCol > cols then
+            print("error: RPNExpression.fromInfix different column count")
+            return
+          end
+        end
+        
         if not popUntil('[') then
           print("error: RPNExpression.fromInfix missing '['")
           return
         end
       elseif value == '[' then
+        curCol = 1
         rows = rows + 1
         if not popUntil('[') then
           print("error: RPNExpression.fromInfix missing '['")
@@ -1070,15 +1081,20 @@ function RPNExpression:fromInfix(tokens)
         end
         --handleDefault(value, kind)
       elseif value == ']' then
+        if rows == 0 then rows = 1 end
         if popUntil('[') then
-          table.remove(stack, #stack)
-          --table.insert(result, {tostring(argc), 'number'})
-          --table.insert(result, {']', 'syntax'})
-          return
+          if curCol == 0 then
+            table.remove(stack, #stack)
+            table.insert(result, {tostring(cols), 'number'})
+            table.insert(result, {tostring(rows), 'number'})
+            table.insert(result, {']', 'syntax'})
+            return
+          end
         else
           print("error: RPNExpression.fromInfix missing '['")
           return
         end
+        curCol = 0
       else
         handleDefault(value, kind)
       end
@@ -1229,25 +1245,29 @@ function RPNExpression:infixString()
     local cols = tonumber(table.remove(stack, #stack).expr)
     assert(rows and rows >= 1)
     assert(cols and cols >= 1)
-
+    
     local str = ""
-    while rows > 0 do
-      str = str .. "["
-      for col=cols,0,-1 do
-        str = table.remove(stack, #stack).expr .. str
-        if col > 1 then str = "," .. str end
-        rows = rows - 1
+    for row=rows,1,-1 do
+      local colStr = ''
+      for col=cols,1,-1 do
+        colStr = table.remove(stack, #stack).expr .. colStr
+        if col > 1 then colStr = "," .. colStr end
       end
-      str = str .. "]"
+      str = '['.. colStr .. ']'..str
     end
-    str = "[" .. str .. "]"
-
+    
+    if rows > 1 then
+      str = "[" .. str .. "]"
+    end
+ 
     table.insert(stack, {expr=str, prec=99})
   end
   
   local function push(value, kind)
     if value == '}' then
       return pushList()
+    elseif value == ']' then
+      return pushMatrix()
     end
 
     if kind == 'operator' then

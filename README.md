@@ -142,7 +142,7 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 * [x] Theming support 🔥 
 
 ## Not implemented yet
-* [ ] Support for matrices (parser)
+* [ ] Subscript support
 * [ ] Touchpad support (scrolling etc.)
 
 ## What is not working

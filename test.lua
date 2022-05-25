@@ -27,6 +27,18 @@ function math.log10(x)
   return math.log(x, 10)
 end
 
+local RichTextStub = class()
+function RichTextStub:setReadOnly()
+  return self
+end
+function RichTextStub:setBorder()
+  return self
+end
+
+D2Editor = {
+  newRichText = function() return RichTextStub() end
+}
+
 local GC = {
   getStringWidth = function() return 1 end,
   getStringHeight = function() return 1 end,
@@ -59,6 +71,7 @@ on = {}
 -- luacheck: ignore Infix RPNExpression
 require 'rpn'
 local Test = require 'testlib'
+
 
 local test = {}
 
@@ -223,9 +236,12 @@ function test.infix_to_rpn_to_infix()
   expect("{(1+a)*2,2+b,3+c}")
   expect("{(1+a)*2,2+b,root((1+x)*2,2*y)}")
 
-  -- Matrix (NOT YET IMPLEMENTED)
-  --expect("[1]", "[[1]]")
-  --expect("[[1,2,3],[4,5,6]]")
+  -- Matrix
+  expect("[1]", "[1]")
+  expect("[1,2]", "[1,2]")
+  expect("[[1,2,3][4,5,6]]")
+  expect("[[1,2,3][4,5,6][7,8,9]]")
+  expect("[[1+1,x,y^(2+z)][abs(x),{1,2,3},\"!\"][7,8,9]]")
 
   -- Remove parens
   expect("(2^2)", "2^2")
