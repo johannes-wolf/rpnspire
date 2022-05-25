@@ -1396,7 +1396,12 @@ function RPNExpression:infixString()
     push(unpack(v))
   end
   
-  return #stack > 0 and stack[#stack].expr or nil
+  local infix = nil
+  for _,v in ipairs(stack) do
+    infix = (infix or '') .. v.expr
+  end 
+  
+  return infix
 end
 
 --------------------------------------------------
