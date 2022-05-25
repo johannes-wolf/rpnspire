@@ -2070,7 +2070,9 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
                   theme[options.theme].selectionColor}
   local minDistance, margin = 12, 2
   
-  local leftSize = {w = gc:getStringWidth(item.infix or ""), h = gc:getStringHeight(item.infix or "")}
+  local leftStr = item.label or item.infix or ''
+  
+  local leftSize = {w = gc:getStringWidth(leftStr or ""), h = gc:getStringHeight(leftStr or "")}
   local rightSize = {w = gc:getStringWidth(item.result or ""), h = gc:getStringHeight(item.result or "")}
   
   local fringeSize = gc:getStringWidth("0")*math.floor(math.log10(#self.stack)+1)
@@ -2081,10 +2083,8 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
   local rightPos = {x = x + w - margin - rightSize.w,
                     y = y}
   
-  if options.showExpr then
-    if rightPos.x < leftPos.x + leftSize.w + minDistance then
-      rightPos.y = leftPos.y + margin*2 + leftSize.h
-    end
+  if rightPos.x < leftPos.x + leftSize.w + minDistance then
+    rightPos.y = leftPos.y + margin*2 + leftSize.h
   end
   
   local itemHeight = rightPos.y - leftPos.y + rightSize.h + margin
@@ -2113,11 +2113,19 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
   
   -- Render expression and result
   gc:setColorRGB(theme[options.theme].textColor)
-  if options.showExpr == true then
-    gc:drawString(item.infix or "", leftPos.x, leftPos.y)
-    gc:drawString(item.result or "", rightPos.x, rightPos.y)
+  if not item.label then
+    if options.showExpr == true then
+      gc:drawString(item.infix or "", leftPos.x, leftPos.y)
+      gc:drawString(item.result or "", rightPos.x, rightPos.y)
+    else
+      gc:drawString(item.result or "", leftPos.x, leftPos.y)
+    end
   else
-    gc:drawString(item.result or "", leftPos.x, leftPos.y)
+    local ffamily, fstyle, fsize = gc:setFont('serif', 'i', 11)
+    gc:drawString(item.label, leftPos.x, leftPos.y)
+    gc:setFont(ffamily, fstyle, fsize)
+    
+    gc:drawString(item.result or "", rightPos.x, rightPos.y)
   end
   
   -- Render overflow indicator
@@ -3135,6 +3143,8 @@ input_ask_value = function(widget, callbackEnter, callbackEscape, callbackSetup)
     end
     restore_state()
   end
+  
+  widget:invalidate()
 end
 
 
