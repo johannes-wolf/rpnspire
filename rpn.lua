@@ -28,19 +28,32 @@ local function dump(o)
 end
 
 -- Deep copy a table
-local function clone(t)
-    if type(t) ~= "table" then return t end
+local function table_clone(t)
+    if type(t) ~= 'table' then return t end
     local meta = getmetatable(t)
     local target = {}
     for k, v in pairs(t) do
-        if type(v) == "table" then
-            target[k] = clone(v)
+        if type(v) == 'table' then
+            target[k] = table_clone(v)
         else
             target[k] = v
         end
     end
     setmetatable(target, meta)
     return target
+end
+
+-- Copy certain table fields
+local function table_copy_fields(source, fields, target)
+  target = target or {}
+  for _,v in ipairs(fields) do
+    if type(source[v]) == 'table' then
+      target[v] = table_clone(source[v])
+    else
+      target[v] = source[v]
+    end
+  end
+  return target
 end
 
 -- Remove quotes from `str`
@@ -1672,7 +1685,7 @@ function UIStack:initBindings()
   end)
   self.kbd:setSequence({"enter"}, function()
     recordUndo()
-    self:push(clone(self.stack[self.sel]))
+    self:push(table_clone(self.stack[self.sel]))
     self:selectIdx()
   end)
   self.kbd:setSequence({"="}, function()
@@ -1785,7 +1798,7 @@ function UIStack:swap(idx1, idx2)
   idx1 = idx1 or (#self.stack - 1)
   idx2 = idx2 or #self.stack
   if idx1 <= #self.stack and idx2 <= #self.stack then
-    local tmp = clone(self.stack[idx1])
+    local tmp = table_clone(self.stack[idx1])
     self.stack[idx1] = self.stack[idx2]
     self.stack[idx2] = tmp
   end
@@ -1828,14 +1841,14 @@ function UIStack:dup(n)
   n = n or 1
   local idx = #self.stack - (n - 1)
   for i=1,n do
-    table.insert(self.stack, clone(self.stack[idx + i - 1]))
+    table.insert(self.stack, table_clone(self.stack[idx + i - 1]))
   end
 end
 
 function UIStack:pick(n)
   n = n or 1
   local idx = #self.stack - (n - 1)
-  table.insert(self.stack, clone(self.stack[idx]))
+  table.insert(self.stack, table_clone(self.stack[idx]))
 end
 
 function UIStack:toList(n)
@@ -2639,7 +2652,7 @@ local UndoStack, RedoStack = {}, {}
 -- Returns a new undo-state table by copying the current stack and text input
 local function makeUndoState(text)
   return {
-    stack=clone(stack.stack),
+    stack=table_clone(stack.stack),
     input=text or input.text
   }
 end
