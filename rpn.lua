@@ -2743,7 +2743,7 @@ function UIInput:drawText(gc)
   local margin = self.margin
   local x,y,w,h = self:getFrame()
   local scrollx = self.scrollx
-  local cursorx = gc:getStringWidth(string.usub(self.text, 1, self.cursor.pos))
+  local cursorx = math.max(gc:getStringWidth(string.usub(self.text, 1, self.cursor.pos)) or 0, 0)
   cursorx = cursorx + x + scrollx
   
   gc:clipRect("set", x, y, w, h)
@@ -2778,7 +2778,7 @@ function UIInput:drawText(gc)
         theme[options.theme].cursorColor or
         theme[options.theme].cursorColorAlg)
   else
-      gc:setColorRGB(theme[options.theme].cursorColorAlt)
+    gc:setColorRGB(theme[options.theme].cursorColorAlt)
   end
   gc:fillRect(cursorx+1, y+2, options.cursorWidth, h-3)
   
@@ -2804,10 +2804,12 @@ function RichText:onFocus()
   self.view:move(stack.frame.x, stack.frame.y)
     :resize(stack.frame.width, stack.frame.height)
     :setVisible(true)
+    :setFocus(true)
 end
 
 function RichText:onLooseFocus()
   self.view:setVisible(false)
+    :setFocus(false)
 end
 
 function RichText:onEscape()
