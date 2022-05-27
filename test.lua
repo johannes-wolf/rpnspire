@@ -403,8 +403,8 @@ function test.rect()
   local a = {x = 10, y = 10, width = 10, height = 10}
 
   Test.assert(not Rect.is_point_in_rect(a, 0, 0))
-  Test.assert(not Rect.is_point_in_rect(a, 30, 30}))
-  Test.assert(Rect.is_point_in_rect(a, 15, 15}))
+  Test.assert(not Rect.is_point_in_rect(a, 30, 30))
+  Test.assert(Rect.is_point_in_rect(a, 15, 15))
 
   Test.assert(not Rect.intersection(a, 0, 0, 5, 5))
   Test.assert(Rect.intersection(a, a.x, a.y, a.width, a.height))
