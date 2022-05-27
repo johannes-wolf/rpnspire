@@ -3997,11 +3997,7 @@ function on.contextMenu()
 end
 
 function on.help()
-
-
-  build_formula_solve_queue(formulas['Resistive Circuits'], 'r', {{'u','12'}, {'i', '2'}})
-  
-  --[[
+  --[[ -- TEST CODE
   Macro({'@input:f1(x)', 'f1(x):=@1',
          'f1(0)', 'derivative(f1(x),x)|x=0', '@simp', '(f1(x)-@2-@1)|x=1', '@simp',
          'string(@1)&"((x+"&string((@2/@1)/2)&")^2+"&string((@3/@1)-(((@2/@1)/2)^2))&")"', '@label:f1(x)', '@clrbot:1',
