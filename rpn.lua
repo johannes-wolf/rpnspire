@@ -75,6 +75,37 @@ function string.ulen(str)
   return select(2, str:gsub('[^\128-\193]', ''))
 end
 
+
+-- Rectangle utility functions
+Rect = {}
+function Rect.is_point_in_rect(rect, x, y)
+  return x >= rect.x and x <= rect.x + rect.width and
+         y >= rect.y and x <= rect.y + rect.height
+end
+
+function Rect.intersection(r, x, y, width, height)
+  local top_left = {
+      x = math.max(r.x, x),
+      y = math.max(r.y, y)
+  }
+  local bottom_right = {
+      x = math.min(r.x + r.width, x + width),
+      y = math.min(r.y + r.height, y + height)
+  }
+
+  if bottom_right.x > top_left.x and
+     bottom_right.y > top_left.y then
+    return {
+      x = top_left.x,
+      y = top_left.y,
+      width = bottom_right.x - top_left.x,
+      height = bottom_right.y - top_left.y
+    }
+  end
+  return nil
+end
+
+
 -- Prefix
 Trie = {}
 
@@ -1412,6 +1443,11 @@ Widgets = {}
 
 -- Widget Base Class
 Widgets.Base = class()
+function Widgets.Base:invalidate()
+end
+
+function Widgets.Base:draw(gc)
+end
 
 -- Toast Widget
 Widgets.Toast = class(Widgets.Base)
@@ -1487,7 +1523,7 @@ function KeybindManager:init()
   self.currentSequence = nil
 
   -- Callbacks
-  self.onSequenceChanged = nil -- void({sequence})
+  self.onSequenceChanged = nil -- string({sequence})
   self.onExec = nil -- void(void)
 end
 
@@ -1626,12 +1662,10 @@ end
 
 function UIMenu:onFocus()
   self.visible = true
-  self:invalidate()
 end
 
 function UIMenu:onLooseFocus()
   self.visible = false
-  self:invalidate()
 end
 
 function UIMenu:onTab()
@@ -2169,7 +2203,6 @@ end
 function UIStack:onLooseFocus()
   self.kbd:resetSequence()
   self.sel = nil
-  self:invalidate()
 end
 
 function UIStack:onFocus()
@@ -2575,12 +2608,10 @@ end
 
 function UIInput:onLooseFocus()
   self:cancelCompletion()
-  self:invalidate()
 end
 
 function UIInput:onFocus()
   --self:setCursor(#self.text)
-  self:invalidate()
 end
 
 function UIInput:onCharIn(c)
@@ -3060,9 +3091,15 @@ focus = input
 
 function focusView(v)
   if v ~= nil and v ~= focus then
-    focus:onLooseFocus()
+    if focus.onLooseFocus then
+      focus:onLooseFocus()
+    end
+    focus:invalidate()
     focus = v
-    focus:onFocus()
+    if focus.onFocus then
+      focus:onFocus()
+    end
+    focus:invalidate()
   end
 end
 
@@ -3327,9 +3364,18 @@ end
 
 
 -- Called for _any_ keypress
-function onAnyKey()
+function on_any_key()
   Error.hide()
 end
+
+-- View list
+local views = {
+  stack,
+  input,
+  Toast,
+  ErrorToast,
+  menu
+}
 
 function on.construction()
   toolpalette.register({
@@ -3494,7 +3540,7 @@ function on.resize(w, h)
 end
 
 function on.escapeKey()
-  onAnyKey()
+  on_any_key()
   GlobalKbd:resetSequence()
   if focus.kbd then
     focus.kbd:resetSequence()
@@ -3505,7 +3551,7 @@ function on.escapeKey()
 end
 
 function on.tabKey()
-  onAnyKey()
+  on_any_key()
   if focus ~= input then
     focusView(input)
   else
@@ -3514,14 +3560,14 @@ function on.tabKey()
 end
 
 function on.backtabKey()
-  onAnyKey()
+  on_any_key()
   if focus.onBackTab then
     focus:onBackTab()
   end
 end
 
 function on.returnKey()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('return') then
     return
   end
@@ -3537,7 +3583,7 @@ function on.returnKey()
 end
 
 function on.arrowRight()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('right') then
     return
   end
@@ -3550,7 +3596,7 @@ function on.arrowRight()
 end
 
 function on.arrowLeft()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('left') then
     return
   end
@@ -3563,7 +3609,7 @@ function on.arrowLeft()
 end
 
 function on.arrowUp()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('up') then
     return
   end
@@ -3576,7 +3622,7 @@ function on.arrowUp()
 end
 
 function on.arrowDown()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('down') then
     return
   end
@@ -3589,7 +3635,7 @@ function on.arrowDown()
 end
 
 function on.charIn(c)
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey(c) then
     return
   end
@@ -3607,7 +3653,7 @@ function on.charIn(c)
 end
 
 function on.enterKey()
-  onAnyKey()
+  on_any_key()
   GlobalKbd:resetSequence()
   if focus.kbd and focus.kbd:dispatchKey('enter') then
     return
@@ -3621,7 +3667,7 @@ function on.enterKey()
 end
 
 function on.backspaceKey()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('backspace') then
     return
   end
@@ -3634,7 +3680,7 @@ function on.backspaceKey()
 end
 
 function on.clearKey()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('clear') then
     return
   end
@@ -3647,7 +3693,7 @@ function on.clearKey()
 end
 
 function on.contextMenu()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('ctx') then
     return
   end
@@ -3660,7 +3706,7 @@ function on.contextMenu()
 end
 
 function on.help()
-  onAnyKey()
+  on_any_key()
   if GlobalKbd:dispatchKey('help') then
     return
   end
@@ -3669,12 +3715,14 @@ function on.help()
   end
 end
 
-function on.paint(gc)
-  stack:draw(gc)
-  input:draw(gc)
-  Toast:draw(gc)
-  ErrorToast:draw(gc)
-  menu:draw(gc)
+function on.paint(gc, x, y, w, h)
+  local frame = {x = x, y = y, width = w, height = h}
+
+  for _,view in ipairs(views) do
+    if Rect.intersection(frame, view:getFrame()) then
+      view:draw(gc, frame)
+    end
+  end
 end
 
 function on.save()

@@ -399,4 +399,17 @@ function test.stack_to_list()
   expect({'{x,y,z}', '1', '{2,3,4}'}, 3, '{x,y,z,1,2,3,4}')
 end
 
+function test.rect()
+  local a = {x = 10, y = 10, width = 10, height = 10}
+
+  Test.assert(not Rect.is_point_in_rect(a, 0, 0))
+  Test.assert(not Rect.is_point_in_rect(a, 30, 30}))
+  Test.assert(Rect.is_point_in_rect(a, 15, 15}))
+
+  Test.assert(not Rect.intersection(a, 0, 0, 5, 5))
+  Test.assert(Rect.intersection(a, a.x, a.y, a.width, a.height))
+  Test.assert(Rect.intersection(a, 0, 0, 15, 15))
+  Test.assert(Rect.intersection(a, 15, 15, 5, 5))
+end
+
 Test.run(test)
