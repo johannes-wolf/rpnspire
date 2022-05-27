@@ -1859,7 +1859,7 @@ function UIMenu:center(w, h)
   w = w or platform.window:width()
   h = h or platform.window:height()
   
-  local margin = 8
+  local margin = 4
   self.frame.x = margin
   self.frame.y = margin
   self.frame.width = w - 2*margin
@@ -2037,14 +2037,13 @@ function UIMenu:onCharIn(c)
 end
 
 function UIMenu:drawCell(gc, item, x, y, w ,h)
-  local margin = 4
+  local margin = 1
   x = x + margin
   y = y + margin
   w = w - 2*margin
   h = h - 2*margin
 
   if w < 0 or h < 0 then return end
-  gc:clipRect("set", x-1, y-1, w+2, h+2)
 
   if item then
     gc:setColorRGB(theme[options.theme].altRowColor)
@@ -2058,6 +2057,8 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
     gc:drawRect(x,y,w,h)
     return
   end
+
+  gc:clipRect("set", x, y, w+1, h+1)
 
   local itemText = item[1] or ''
   local itemState = item.state
@@ -2079,6 +2080,8 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
     gc:setColorRGB(theme[options.theme].borderColor)
     gc:drawRect(ix, iy, iw, ih)
   end
+  
+  gc:clipRect("reset")
 end
 
 function UIMenu:draw(gc)
