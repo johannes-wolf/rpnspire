@@ -92,6 +92,7 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>M</kbd><kbd>a</kbd>                 | Set mode to ALG                |
 | <kbd>M</kbd><kbd>r</kbd>                 | Set mode to RPN                |
 | <kbd>M</kbd><kbd>m</kbd>                 | Toggle mode                    |
+| <kbd>F</kbd>                             | Open then formula-solver       |
 
 ### Input
 | Key                              | Function                                                                |
