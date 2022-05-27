@@ -709,9 +709,58 @@ local errorCodes = {
 }
 
 
--- Macro
-currentMacro = nil
+--[[
+  Interactive Session
 
+  Capsules an coroutine for representing an interactive function.
+  Only one interactive function can be active at the same time.
+]]--
+local currentInteractive = nil
+local function interactive_start(fn)
+  if currentInteractive and coroutine.status(currentInteractive) ~= 'dead' then
+    Error.show('Another interactive session is running!')
+    return nil
+  end
+
+  currentInteractive = coroutine.create(fn)
+  coroutine.resume(currentInteractive)
+  return currentInteractive
+end
+
+local function interactive_resume()
+  if currentInteractive then
+    coroutine.resume(currentInteractive)
+  end
+end
+
+local function interactive_yield()
+  if currentInteractive then
+    coroutine.yield(currentInteractive)
+  end
+end
+
+local function interactive_kill()
+  currentInteractive = nil
+end
+
+--[[
+  Helper function for using `input_ask_value` in an interactive session.
+--]]--
+local function interactive_input_ask_value(widget, onEnter, onCancel, onSetup)
+  input_ask_value(widget, function(value)
+    if onEnter then onEnter(value) end
+    interactive_resume()
+  end, function()
+    if onCancel then onCancel() end
+    interactive_kill()
+  end, function(widget)
+    if onSetup then onSetup(widget) end
+  end)
+  interactive_yield()
+end
+
+
+-- Macro
 Macro = class()
 function Macro:init(steps)
   self.steps = steps or {}
@@ -754,18 +803,14 @@ function Macro:execute()
       elseif cmd == 'input' then
         local prefix = tokens[2] or ''
         
-        input_ask_value(input, function(value)
+        interactive_input_ask_value(input, function(value)
           stack:pushInfix(value)
-          if currentMacro then
-            coroutine.resume(currentMacro)
-          end
+          interactive_resume()
         end, function()
           undo()
-          currentMacro = nil
         end, function(widget)
           widget:setText('', prefix)
         end)
-        coroutine.yield(currentMacro)
       end
     else
       stack:pushInfix(step)
@@ -774,12 +819,7 @@ function Macro:execute()
     return true
   end
   
-  if currentMacro and coroutine.status(currentMacro) ~= 'dead' then
-    print('Macro:execute: another macro is active!')
-    return
-  end
-  
-  currentMacro = coroutine.create(function()
+  return interactive_start(function()
     for _,v in ipairs(self.steps) do
       if not exec_step(v) then
         undo()
@@ -788,50 +828,255 @@ function Macro:execute()
     end
     platform.window:invalidate()
   end)
-  coroutine.resume(currentMacro)
 end
 
 
--- Formula (WIP)
--- Idea: Provide a catalog of formulas that interactively ask for their input
---       values. Suggest using variables of the right name by default.
---       Bonus: Automatic chaining of formulas
+--[[
+
+]]--
 Formula = class()
 function Formula:init(infix, variables)
+  self.title = infix -- TODO: Provide helpful names
   self.infix = infix
   self.variables = variables
 end
 
-function Formula:solve_symbolic(forVar)
-  local withExpr = ''
-  for key,_ in pairs(self.variables) do
-    if key ~= forVar then
+function Formula:variables()
+  local res = {}
+  for k,_ in pairs(self.variables) do
+    table.insert(res, k)
+  end
+
+  return res
+end
+
+function Formula:solve_symbolic(for_var)
+  local dummy_prefix = 'dummysolvesym_'
+  local withExpr = nil
+  for _,key in ipairs(self.variables) do
+    if key ~= for_var then
+      withExpr = withExpr or ''
       if withExpr:len() > 0 then withExpr = withExpr..' and ' end
-      withExpr = withExpr..key..'="'..key..'"' -- Trick to get a symbolic output
+      withExpr = withExpr..key..'=' .. dummy_prefix .. key -- Trick to get a symbolic output
     end
   end
 
-  local solveExpr = string.format('solve(%s,%s)|%s', self.infix, forVar, withExpr)
-  print('Formula:solve_symbolic: '..solveExpr)
-
+  local solveExpr = string.format('solve(%s,%s)%s', self.infix, for_var, withExpr and '|' .. withExpr or '')
+  print('info: Formula:solve_symbolic: ' .. solveExpr)
   local res, err = math.evalStr(solveExpr)
   if res then
-    print('> '..res:gsub('"', ''))
+     return res:gsub(dummy_prefix, '')
+  else
+    print(err)
   end
 end
 
-function Formula:solve_interactive()
+local formulas = (function()
+  local function v(name, unit)
+    return {name, unit = unit}
+  end
+
+  local categories = {}
+  categories["Resistive Circuits"] = {
+    variables = {
+      ['p'] = v('Power P', 'W'),
+      ['r'] = v('Resistance R', 'Ohm'),
+      ['u'] = v('Voltage U', 'V'),
+      ['i'] = v('Current I', 'A'),
+      ['t'] = v('Time t', 's'),
+      ['g'] = v('Conductance G', 'siemens'),
+      ['w'] = v('Work W', 'J')
+    },
+    formulas = {
+      Formula('u=r*i',     {'u', 'r', 'i'}),
+      Formula('p=u*i',     {'p', 'u', 'i'}),
+      Formula('p=(u*u)/r', {'p', 'u', 'r'}),
+      Formula('p=u*u*g',   {'p', 'u', 'g'}),
+      Formula('p=w/t',     {'w', 'p', 't'}),
+      Formula('g=1/r',     {'r', 'g'}),
+      Formula('w=u*i*t',   {'w', 'u', 'i', 't'})
+    }
+  }
+  -- TODO: Add formulas
+
+  return categories
+end)()
+
+-- Returns a list of {var, formula} to solve in order to solve for `want_var`.
+-- Parameters
+--   category   Formula category table
+--   want_var   Variable name
+--   have_vars  List of {var, value} pairs
+function build_formula_solve_queue(category, want_var, have_vars)
+  local formulas, variables = category.formulas, category.variables
+  local var_to_formula = {}
+
+  -- Insert all given arguments as pseudo formulas
+  for _,v in ipairs(have_vars) do
+    local name, value = unpack(v)
+    var_to_formula[name:lower()] = Formula(name .. '=' .. value, {})
+  end
+
+  -- Returns a variable name the formula is solvable for
+  -- with the current set of known variables
+  local function get_solvable_for(formula)
+    local missing = nil
+    for _,v in ipairs(formula.variables) do
+      if not var_to_formula[v:lower()] then
+        if missing then
+          return nil
+        end
+        missing = v:lower()
+      end
+    end
+    return missing
+  end
+  
+  for i=1,50 do -- Artificial search limit
+    local found = false
+    for _,v in ipairs(formulas) do
+      local var = get_solvable_for(v)
+      if var then
+        var_to_formula[var] = v
+        found = true
+      end
+    end
+    if not found then
+      break
+    end
+  end
+
+  -- Build list of formulas that need to be solved
+  local solve_queue = {}
+
+  local function add_formula_to_queue(formula, solve_for)
+    if not formula then return end 
+
+    -- Remove prev element
+    for i,v in ipairs(solve_queue) do
+      if v[1] == solve_for and v[2] == formula then
+        table.remove(solve_queue, i)
+        break
+      end
+    end
+
+    -- Insert at top
+    table.insert(solve_queue, 1, {solve_for, formula})
+    
+    for _,v in ipairs(formula.variables) do
+      if v ~= solve_for then
+        add_formula_to_queue(var_to_formula[v], v)
+      end
+    end
+  end
+
+  add_formula_to_queue(var_to_formula[want_var], want_var)
+
+  print('info: formula solve queue:')
+  for idx,v in ipairs(solve_queue) do
+    local solve_for, formula = unpack(v)
+    print(string.format('%02d %s', idx, solve_for ..  ' = ' .. formula:solve_symbolic(solve_for)))
+  end
+
+  return solve_queue
 end
 
-local formulas = {
-  ['Triangle'] = {
+local function solve_formula_interactive(category)
+  interactive_start(function()
+    local var_in_use = {}
+    local solve_for, solve_with = nil, {}
     
-  }
-}
+    local function interactive_ask_variable(prefix)
+      prefix = prefix or ''
+      local ret = nil
+    
+      local var_menu = {}
+      for name,info in pairs(category.variables) do
+        if not var_in_use[name] then
+          table.insert(var_menu, {
+            prefix .. info[1], function()
+              ret = name
+              interactive_resume()
+            end
+          })
+        end
+      end
+      table.insert(var_menu, {
+        'Solve [esc]', function()
+          ret = nil
+          interactive_resume()
+        end
+      })
+      
+      menu:present(focus, var_menu, nil, function()
+        interactive_resume()
+      end)
+      
+      interactive_yield()
+      return ret
+    end
+    
+    solve_for = interactive_ask_variable()
+    if not solve_for then
+      return
+    end
+    
+    -- Mark as in use
+    var_in_use[solve_for] = true
 
-FormulaMerger = class()
-function FormulaMerger:build_tree_for(tab, want, have)
+    while not empty_input do
+      local set_var = interactive_ask_variable('Set ')
+      if not set_var then
+        break
+      end
 
+      local var_info = category.variables[set_var]
+      interactive_input_ask_value(input, function(value)
+        table.insert(solve_with, {set_var, value})
+      end, function()
+        canceled = true
+      end, function(widget)
+        -- Auto append the matching base unit for convenience
+        local template = ''
+        if var_info.unit then
+          template = '*_' .. var_info.unit
+        end
+        widget:setText(template, var_info[1] .. '=')
+        widget:setCursor(0)
+        --widget:selAll()
+      end)
+      
+      -- Mark as set
+      var_in_use[set_var] = true
+    end
+    
+    local solve_queue = build_formula_solve_queue(category, solve_for, solve_with)
+    if solve_queue then
+      local infix_steps = {}
+      for _,v in ipairs(solve_queue) do
+        local var, formula = unpack(v)
+        table.insert(infix_steps, {
+          var = var,
+          infix = tostring(formula:solve_symbolic(var):gsub('=', ':='))
+        })
+      end
+      
+      recordUndo()
+      for _,step in ipairs(infix_steps) do
+        if not stack:pushInfix(step.infix) then
+          undo()
+          break
+        end
+        
+        local var_info = category.variables[step.var]
+        if var_info then
+          stack:top().label = string.format('%s (%s)', var_info[1], stack:top().infix)
+        end
+      end
+    else
+      Error.show('Can not solve')
+    end
+  end)
 end
 
 
@@ -1605,6 +1850,9 @@ function UIMenu:init()
   self.filterString = nil
   self.visible = false
   self.parent = nil
+  -- Callbacks
+  self.onSelect = nil -- void()
+  self.onCancel = nil -- void()
 end
 
 function UIMenu:center(w, h)
@@ -1629,14 +1877,19 @@ end
 function UIMenu:hide()
   if self.parent ~= nil then
     focusView(self.parent)
+  else
+    focusView(input)
   end
 end
 
-function UIMenu:present(parent, items)
+function UIMenu:present(parent, items, onSelect, onCancel)
+  if parent == self then parent = nil end
   self.pageStack = {}
   self.filterString = nil
   self:pushPage(items or {})
   self.parent = parent
+  self.onSelect = onSelect
+  self.onCancel = onCancel
   focusView(self)
 end
 
@@ -1675,10 +1928,6 @@ function UIMenu:onTab()
   end
 end
 
-function UIMenu:onEnter()
-  self:hide()
-end
-
 function UIMenu:onArrowLeft()
   self:prevPage()
 end
@@ -1700,6 +1949,7 @@ function UIMenu:onEscape()
     self:onBackspace()
     return
   end
+  if self.onCancel then self.onCancel() end
   self:hide()
 end
 
@@ -1743,14 +1993,22 @@ function UIMenu:onCharIn(c)
     local item = self.items[self.page * 9 + row * 3 + (col+1)]
     if not item then return end
     
+    -- NOTE: The call order is _very_ important:
+    --  1. Hide the menu
+    --  2. Call the callback
+    --  3. Execute the action
+    -- Otherwise, presenting a new menu from the action sets the current pages callbacks
+    --  which leads to strange behaviour.
     if type(item[2]) == "function" then
-      item[2]()
-      focusView(self.parent)
+      self:hide()
+      if self.onSelect then self.onSelect(item) end
+      item[2]()  
     elseif type(item[2]) == "table" then
       self:pushPage(item[2])
     elseif type(item[2]) == "string" then
-      input:insertText(item[2]) -- TODO
-      focusView(input)
+      self:hide()
+      if self.onSelect then self.onSelect(item) end
+      input:insertText(item[2]) -- HACK
     end
   else
     self.filterString = self.filterString or ''
@@ -1801,10 +2059,10 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
     return
   end
 
-  local itemText = item[1]
+  local itemText = item[1] or ''
   local itemState = item.state
 
-  local tw, th = gc:getStringWidth(item[1]), gc:getStringHeight(item[1])
+  local tw, th = gc:getStringWidth(itemText), gc:getStringHeight(itemText)
   local tx, ty = x + w/2 - tw/2, y + h/2 - th/2
   
   gc:setColorRGB(theme[options.theme].textColor)
@@ -2706,9 +2964,6 @@ function UIInput:onEnter()
   self.inputHandler:onEnter()
   
   self.tempMode = nil
-  if currentMacro ~= nil then
-    coroutine.resume(currentMacro)
-  end
 end
 
 function UIInput:onTab()
@@ -2900,7 +3155,7 @@ function clear()
   stack:invalidate()
   input:setText("", "")
   input:invalidate()
-  currentMacro = nil
+  currentInteractive = nil
 end
 
 function undo()
@@ -3326,6 +3581,34 @@ end
 
 
 -- Menus
+local function make_formula_menu()
+  local category_menu = {}
+  for title,category in pairs(formulas) do
+    local actions_menu = {
+      {"Solve for ...", function()
+         solve_formula_interactive(category)
+      end},
+      {"Formulas ...", (function()
+        local formula_list = {}
+        for _,item in ipairs(category.formulas) do
+          table.insert(formula_list, {item.title, item.infix})
+        end
+        return formula_list
+      end)()},
+      {"Variables ...", (function()
+        local variables_list = {}
+        for var,info in pairs(category.variables) do
+          table.insert(variables_list, {var, var}) -- TODO: Show some info
+        end
+      end)}
+    }
+
+    table.insert(category_menu, {title, actions_menu})
+  end
+  
+  return category_menu
+end
+
 local function make_options_menu()
   local function make_bool_item(title, key)
     return {title, function() options[key] = not options[key] end, state=options[key] == true}
@@ -3348,7 +3631,7 @@ local function make_options_menu()
         name, function() options.theme = name end, state=options.theme == name
       })
     end
-    return {'Theme', items}
+    return {'Theme ...', items}
   end
 
   return {
@@ -3500,6 +3783,11 @@ function on.construction()
       widget:setText('', 'Set Var:')
       widget.completionFun = completion_fn_variables
     end)
+  end)
+
+  -- Formula Library
+  GlobalKbd:setSequence({'F'}, function(sequence)
+    menu:present(focus, make_formula_menu())
   end)
 
   -- Mode
@@ -3706,6 +3994,18 @@ function on.contextMenu()
 end
 
 function on.help()
+
+
+  build_formula_solve_queue(formulas['Resistive Circuits'], 'r', {{'u','12'}, {'i', '2'}})
+  
+  --[[
+  Macro({'@input:f1(x)', 'f1(x):=@1',
+         'f1(0)', 'derivative(f1(x),x)|x=0', '@simp', '(f1(x)-@2-@1)|x=1', '@simp',
+         'string(@1)&"((x+"&string((@2/@1)/2)&")^2+"&string((@3/@1)-(((@2/@1)/2)^2))&")"', '@label:f1(x)', '@clrbot:1',
+         '{zeros(derivative(f1(x),x),x)}[1,1]', '@simp', '@label:SP x=',
+         'f1(@1)', '@simp', '@label:SP y=',
+         'zeros(f1(x),x)', '@simp', '@label:Zeros'}):execute()
+  ]]--
   on_any_key()
   if GlobalKbd:dispatchKey('help') then
     return
