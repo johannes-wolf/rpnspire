@@ -57,6 +57,17 @@ n is the stack level. The stack reference will be replaced with the correspondin
 <img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-ans.gif" width="300px"></img>
 </p>
 
+## Formula Solver
+
+rpnspire has a builtin formula solver that tries to solve for a given variable using a set of input variables.
+The equation-library is currently WIP and contains only a few formulas.
+
+You can start the formula solver by pressing <kbd>F</kbd>, selecting a category and select the "Solve for ..." item.
+The solver asks you for the variable to solve for and the set of given variables. If you have entered all the variables
+select the "Solve [esc]" action or press "esc". The solver should output all equations needed.
+
+Note that the solver sets variables in the current document, as each step is set to the resulting variable.
+
 ## Options
 
 You can access rpnsprires option dialog by pressing <kbd>menu</kbd> and select `Options>Show...`.
@@ -139,9 +150,7 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 * [x] Autocompletion for functions, variables and units
 * [x] A fast numblock driven menu system
 * [x] Nested keyboard shortcuts
-* [x] Writing glue for all of the nspires functions
-* [x] Correct handling of unicode charactes in the input entry
-* [x] Error handling
+* [x] A formula solver that outputs a sequence of formulas to solve a given variable (press <kbd>F</kbd>)
 * [x] Theming support 🔥 
 
 ## Not implemented yet
