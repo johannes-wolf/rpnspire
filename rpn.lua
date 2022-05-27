@@ -859,7 +859,7 @@ function Infix.tokenize(input)
   end
 
   local function unit(input, i)
-    return input:find('^(_%a+)', i)
+    return input:find('^(_[%a\128-\255]+)', i)
   end
 
   local function number(input, pos)
