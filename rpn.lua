@@ -907,6 +907,56 @@ local formulas = (function()
       Formula('w=u*i*t',   {'w', 'u', 'i', 't'})
     }
   }
+  categories["Triangles"] = {
+    variables = {
+      ['a']     = v('Side a'),
+      ['b']     = v('Side b'),
+      ['c']     = v('Side c'),
+      ['ha']    = v('Height on a'),
+      ['hb']    = v('Height on a'),
+      ['hc']    = v('Height on a'),
+      ['alpha'] = v('Angle alpha'),
+      ['beta']  = v('Angle beta'),
+      ['gamma'] = v('Angle gamma'),
+      ['p']     = v('Perimeter P'),
+      ['s']     = v('Semi-Perimeter s'),
+      ['area']  = v('Area A'),
+      ['r']     = v('Circumradius r')
+    },
+    formulas = {
+      Formula('alpha'..Sym.DEGREE..'+beta'..Sym.DEGREE..'+gamma'..Sym.DEGREE..'=180', {'alpha', 'beta', 'gamma'}),
+      -- Perimeter
+      Formula('p=a+b+c', {'a', 'b', 'c', 'p'}),
+      Formula('p=8*r*cos(alpha/2)*cos(beta/2)*cos(gamma/2)', {'p', 'r', 'alpha', 'beta', 'gamma'}),
+      Formula('s=p/2', {'s', 'p'}),
+      Formula('s=(a+b+c)/2', {'s', 'a', 'b', 'c'}),
+      -- Law of sine
+      Formula('sin(alpha)/a=sin(beta)/b', {'alpha', 'a', 'beta', 'b'}),
+      Formula('sin(alpha)/a=sin(gamma)/c', {'alpha', 'a', 'gamma', 'c'}),
+      Formula('sin(beta)/b=sin(gamma)/c', {'beta', 'b', 'gamma', 'c'}),
+      -- Law of cosine
+      Formula('alpha=arccos((b^2+c^2-a^2)/(2*b*c))', {'a', 'b', 'c', 'alpha'}), -- FIXME: TI solves the a^2=... version with an error
+      Formula('beta=arccos((a^2+c^2-b^2)/(2*a*c))', {'a', 'b', 'c', 'beta'}),
+      Formula('gamma=arccos((b^2+a^2-c^2)/(2*b*a))', {'a', 'b', 'c', 'gamma'}),
+      -- Area
+      Formula('area=(a*ha)/2', {'area', 'a', 'ha'}),
+      Formula('area=(b*hb)/2', {'area', 'b', 'hb'}),
+      Formula('area=(c*hc)/2', {'area', 'c', 'hc'}),
+      Formula('area=sqrt(s*(s-a)*(s-b)*(s-c))', {'area' ,'s', 'a', 'b', 'c'}), -- Herons formula
+      -- Heights
+      Formula('ha=c*sin(beta)',  {'ha', 'c', 'beta'}),
+      Formula('ha=b*sin(gamma)', {'ha', 'b', 'gamma'}),
+      Formula('hb=a*sin(gamma)', {'hb', 'a', 'gamma'}),
+      Formula('hb=c*sin(alpha)', {'hb', 'c', 'alpha'}),
+      Formula('hc=b*sin(alpha)', {'hc', 'b', 'alpha'}),
+      Formula('hc=a*sin(beta)',  {'hc', 'a', 'beta'}),
+      -- Circumscribed Circle radius r
+      Formula('r=a/(2*sin(alpha)',  {'r', 'a', 'alpha'}),
+      Formula('r=b/(2*sin(beta)',   {'r', 'b', 'beta'}),
+      Formula('r=c/(2*sin(gamma)',  {'r', 'c', 'gamma'}),
+      Formula('r=(a*b*c)/(4*area)', {'r', 'a', 'b', 'c', 'area'}),
+    }
+  }
   -- TODO: Add formulas
 
   return categories
