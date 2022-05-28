@@ -10,6 +10,7 @@ the Free Software Foundation.
 
 -- Forward declarations
 local input_ask_value = nil
+local completion_catmatch = nil
 local completion_fn_variables = nil
 local temp_mode = {} -- Temporary mode override
 
@@ -710,37 +711,43 @@ local errorCodes = {
 
 
 --[[
-  Interactive Session
+  Interactive Session Stack
 
   Capsules an coroutine for representing an interactive function.
   Only one interactive function can be active at the same time.
 ]]--
-local currentInteractive = nil
-local function interactive_start(fn)
-  if currentInteractive and coroutine.status(currentInteractive) ~= 'dead' then
-    Error.show('Another interactive session is running!')
-    return nil
+local interactiveStack = {}
+local function interactive_get()
+  for i=#interactiveStack,1,-1 do
+    if interactiveStack[i] and coroutine.status(interactiveStack[i]) ~= 'dead' then
+      return interactiveStack[i]
+    end
+    table.remove(interactiveStack, i)
   end
+end
 
-  currentInteractive = coroutine.create(fn)
-  coroutine.resume(currentInteractive)
-  return currentInteractive
+local function interactive_start(fn)
+  table.insert(interactiveStack, coroutine.create(fn))
+  coroutine.resume(interactive_get())
+  print('info: Started interactive #' .. (#interactiveStack))
 end
 
 local function interactive_resume()
-  if currentInteractive then
-    coroutine.resume(currentInteractive)
+  local co = interactive_get()
+  if co then
+    coroutine.resume(co)
   end
 end
 
 local function interactive_yield()
-  if currentInteractive then
-    coroutine.yield(currentInteractive)
+  local co = interactive_get()
+  if co then
+    coroutine.yield(co)
   end
 end
 
 local function interactive_kill()
-  currentInteractive = nil
+  table.remove(interactiveStack, #interactiveStack)
 end
 
 --[[
@@ -3158,7 +3165,7 @@ function clear()
   stack:invalidate()
   input:setText("", "")
   input:invalidate()
-  currentInteractive = nil
+  interactiveStack = {} -- Kill _all_ interactive sessions
 end
 
 function undo()
@@ -3362,7 +3369,7 @@ function focusView(v)
 end
 
 -- Completion functions
-local function completion_catmatch(candidates, prefix, res)
+completion_catmatch = function(candidates, prefix, res)
   res = res or {}
   local plen = prefix and #prefix or 0
   for _,v in ipairs(candidates or {}) do
@@ -3601,8 +3608,9 @@ local function make_formula_menu()
       {"Variables ...", (function()
         local variables_list = {}
         for var,info in pairs(category.variables) do
-          table.insert(variables_list, {var, var}) -- TODO: Show some info
+          table.insert(variables_list, {info[1], var})
         end
+        return variables_list
       end)}
     }
 
