@@ -1177,7 +1177,7 @@ local function solve_formula_interactive(category)
         
         local var_info = category.variables[step.var]
         if var_info then
-          stack:top().label = string.format('%s (%s)', var_info[1], stack:top().infix)
+          stack:top().label = var_info[1]
         end
       end
     else
