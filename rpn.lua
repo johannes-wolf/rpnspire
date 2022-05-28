@@ -871,10 +871,13 @@ function Formula:solve_symbolic(for_var)
   local solveExpr = string.format('solve(%s,%s)%s', self.infix, for_var, withExpr and '|' .. withExpr or '')
   print('info: Formula:solve_symbolic: ' .. solveExpr)
   local res, err = math.evalStr(solveExpr)
+  print('  res: ' .. (res or 'nil'))
+  print('  err: ' .. (err or 'nil'))
+  
   if res then
      return res:gsub(dummy_prefix, '')
   else
-    print(err)
+    Error.show(err)
   end
 end
 
@@ -912,11 +915,15 @@ end)()
 -- Returns a list of {var, formula} to solve in order to solve for `want_var`.
 -- Parameters
 --   category   Formula category table
---   want_var   Variable name
+--   want_var   Variable name(s) [string or table]
 --   have_vars  List of {var, value} pairs
 function build_formula_solve_queue(category, want_var, have_vars)
   local formulas, variables = category.formulas, category.variables
   local var_to_formula = {}
+  
+  if type(want_var) == 'string' then
+    want_var = {want_var}
+  end
 
   -- Insert all given arguments as pseudo formulas
   for _,v in ipairs(have_vars) do
@@ -977,12 +984,15 @@ function build_formula_solve_queue(category, want_var, have_vars)
     end
   end
 
-  add_formula_to_queue(var_to_formula[want_var], want_var)
+  for _,v in ipairs(want_var) do
+    print('info: adding wanted var ' .. v .. ' to queue')
+    add_formula_to_queue(var_to_formula[v], v)
+  end
 
   print('info: formula solve queue:')
   for idx,v in ipairs(solve_queue) do
     local solve_for, formula = unpack(v)
-    print(string.format('%02d %s', idx, solve_for ..  ' = ' .. formula:solve_symbolic(solve_for)))
+    print(string.format('  %02d %s', idx, solve_for ..  ' = ' .. formula:solve_symbolic(solve_for)))
   end
 
   return solve_queue
@@ -993,7 +1003,7 @@ local function solve_formula_interactive(category)
     local var_in_use = {}
     local solve_for, solve_with = nil, {}
     
-    local function interactive_ask_variable(prefix)
+    local function interactive_ask_variable_menu(prefix)
       prefix = prefix or ''
       local ret = nil
     
@@ -1023,16 +1033,53 @@ local function solve_formula_interactive(category)
       return ret
     end
     
-    solve_for = interactive_ask_variable()
+    local function interactive_ask_variable(prefix)
+      local ret = ''
+      
+      local function complete_unset(prefix)
+        local candidates = {}
+        for name,_ in pairs(category.variables) do
+          if not var_in_use[name] then
+            table.insert(candidates, name)
+          end
+        end
+        
+        return completion_catmatch(candidates, prefix)
+      end
+    
+      interactive_input_ask_value(input, function(value)
+        if value == 'solve' or value:ulen() == 0 then
+          ret = nil
+        else
+          ret = value
+        end
+      end, nil, function(widget)
+        widget:setText('', prefix)
+        widget.completionFun = complete_unset
+      end)
+      
+      return ret
+    end
+    
+    solve_for = interactive_ask_variable('Solve for:')
     if not solve_for then
       return
     end
     
+    -- Solve for multiple
+    if solve_for:find(',') then
+      solve_for = string.split(solve_for, ',')
+    else
+      solve_for = {solve_for}
+    end
+    
     -- Mark as in use
-    var_in_use[solve_for] = true
+    for _,v in ipairs(solve_for) do
+      var_in_use[solve_for] = true
+    end
 
     while not empty_input do
-      local set_var = interactive_ask_variable('Set ')
+      local set_var = interactive_ask_variable('Set [empty if done]:')
       if not set_var then
         break
       end
