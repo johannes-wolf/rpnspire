@@ -1904,6 +1904,8 @@ function UIMenu:init()
   self.filterString = nil
   self.visible = false
   self.parent = nil
+  -- Style
+  self.style = 'grid'
   -- Callbacks
   self.onSelect = nil -- void()
   self.onCancel = nil -- void()
@@ -1945,6 +1947,7 @@ function UIMenu:present(parent, items, onSelect, onCancel)
   self.onSelect = onSelect
   self.onCancel = onCancel
   focusView(self)
+  return self
 end
 
 function UIMenu:numPages()
@@ -2138,12 +2141,7 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
   gc:clipRect("reset")
 end
 
-function UIMenu:draw(gc)
-  if not self.visible then return end
-
-  gc:clipRect("set", self:getFrame())
-  local ffamily, fstyle, fsize = gc:setFont('sansserif', 'r', 9)
-  
+function UIMenu:_drawGrid(gc)
   local pageOffset = self.page * 9
   
   local cw, ch = self.frame.width/3, self.frame.height/3
@@ -2152,6 +2150,29 @@ function UIMenu:draw(gc)
       local cx, cy = self.frame.x + cw*(col-1), self.frame.y + ch*(row-1)
       self:drawCell(gc, self.items[pageOffset + (row-1)*3 + col] or nil, cx, cy, cw, ch)
     end
+  end
+end
+
+function UIMenu:_drawList(gc)
+  local pageOffset = self.page * 9
+  
+  local cw, ch = self.frame.width, self.frame.height/9
+  for row=1,9 do
+    local cx, cy = self.frame.x, self.frame.y + ch*(row-1)
+    self:drawCell(gc, self.items[pageOffset + row] or nil, cx, cy, cw, ch)
+  end
+end
+
+function UIMenu:draw(gc)
+  if not self.visible then return end
+
+  gc:clipRect("set", self:getFrame())
+  local ffamily, fstyle, fsize = gc:setFont('sansserif', 'r', 9)
+  
+  if self.style == 'grid' then
+    self:_drawGrid(gc)
+  else
+    self:_drawList(gc)
   end
   
   gc:setFont(ffamily, fstyle, fsize)
@@ -3134,8 +3155,9 @@ function UIInput:draw(gc)
 end
 
 
---[[ === BIG UI === ]]--
--- TODO: Refactor
+--[[
+  Rich text view for displaying expressions in a 2D style.
+]]--
 RichText = class(Widgets.Base)
 function RichText:init()
   self.view = D2Editor.newRichText()
