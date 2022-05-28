@@ -246,9 +246,10 @@ Sym = {
   GEQ     = "≥",
   LIMP    = "⇒",
   DLIMP   = "⇔",
-  RAD     = "∠",
-  TRANSP  = "",
+  RAD     = "\239\128\129",
+  GRAD    = "\239\129\128",
   DEGREE  = "\194\176",
+  TRANSP  = "\239\128\130",
   CONVERT = "\226\150\182",
   EE      = "\239\128\128",
   POWN1   = "\239\128\133", -- ^-1
@@ -264,6 +265,8 @@ local operators = {
   ["!"]             = {nil,     17, 1,  1},
   ["%"]             = {nil,     17, 1,  1},
   [Sym.RAD]         = {nil,     17, 1,  1},
+  [Sym.GRAD]        = {nil,     17, 1,  1},
+  [Sym.DEGREE]      = {nil,     17, 1,  1},
   -- [" "]             = {nil, 17, 1,  1}, -- SUBSCRIPT
   ["@t"]            = {Sym.TRANSP, 17, 1, 1},
   [Sym.TRANSP]      = {nil,     17, 1,  1},
@@ -858,7 +861,7 @@ function Formula:variables()
 end
 
 function Formula:solve_symbolic(for_var)
-  local dummy_prefix = 'dummysolvesym_'
+  local dummy_prefix = 'fslvdmy_'
   local withExpr = nil
   for _,key in ipairs(self.variables) do
     if key ~= for_var then
