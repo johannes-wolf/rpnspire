@@ -1629,6 +1629,92 @@ function RPNExpression:fromInfix(tokens)
   return self.stack
 end
 
+-- Returns the bottom stack index of the branch starting at `index`
+function RPNExpression:findBranch(index)
+  if index == 1 then
+    return 1
+  end
+
+  local token = self.stack[index]
+  assert(token)
+
+  local count = 0
+  if token[2] == 'operator' then
+    local argc = select(3, queryOperatorInfo(token[1]))
+    count = tonumber(argc)
+    index = index - 1
+  elseif token[2] == 'function' then
+    count = tonumber(self.stack[index - 1][1])
+    index = index - 2
+  elseif token[2] == 'syntax' then
+    if token[1] == '}' then
+      count = tonumber(self.stack[index - 1][1])
+      index = index - 2
+    elseif token[1] == ']' then
+      count = tonumber(self.stack[index - 1][1])
+      count = tonumber(self.stack[index - 2][1]) * count
+      index = index - 3
+    end
+  end
+
+  for i=0,count-1 do
+    index = self:findBranch(index)
+    if i < count-1 then
+      index = index - 1
+    end
+  end
+
+  return index
+end
+
+function RPNExpression:split()
+  local top = self.stack[#self.stack]
+
+  local branches = {}
+  local index, count = #self.stack, 0
+  
+  if top[2] == 'operator' then
+    local argc = select(3, queryOperatorInfo(top[1]))
+    count = tonumber(argc)
+    index = index - 1
+  elseif top[2] == 'function' then
+    count = tonumber(self.stack[index - 1][1])
+    index = index - 2
+  elseif top[1] == '}' then
+    count = tonumber(self.stack[#self.stack - 1][1])
+    index = index - 2
+  elseif top[1] == '}' then
+    count = tonumber(self.stack[#self.stack - 1][1])
+    count = tonumber(self.stack[#self.stack - 2][1]) * count
+    index = index - 3
+  else
+    Error.show('Unimplemented')
+    return
+  end
+  
+  local top, bottom = index, nil
+  for i=0,count-1 do
+    bottom = self:findBranch(top)
+    if bottom then
+      table.insert(branches, {top = top, bottom = bottom})
+      top = bottom - 1
+    end
+  end
+
+  for idx,v in ipairs(branches) do
+    local branch_stack = {}
+    for i=v.bottom,v.top do
+      table.insert(branch_stack, self.stack[i])
+    end
+
+    local branch_expr = RPNExpression(branch_stack)
+    branches[idx] = branch_expr
+    print('branch ' .. idx .. ': ' .. branch_expr:infixString())
+  end
+
+  return branches
+end
+
 function RPNExpression:_isReverseOp(value, kind)
   if kind == 'operator' then
     if self.stack[#self.stack][1] == value then
@@ -4149,6 +4235,7 @@ end
 
 function on.help()
   --[[ -- TEST CODE
+  RPNExpression(stack:top().rpn):split()
   Macro({'@input:f1(x)', 'f1(x):=@1',
          'f1(0)', 'derivative(f1(x),x)|x=0', '@simp', '(f1(x)-@2-@1)|x=1', '@simp',
          'string(@1)&"((x+"&string((@2/@1)/2)&")^2+"&string((@3/@1)-(((@2/@1)/2)^2))&")"', '@label:f1(x)', '@clrbot:1',
