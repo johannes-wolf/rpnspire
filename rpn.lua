@@ -812,14 +812,16 @@ local function interactive_input_ask_value(widget, onEnter, onCancel, onSetup)
   end, function()
     if onCancel then onCancel() end
     interactive_kill()
-  end, function(widget)
-    if onSetup then onSetup(widget) end
+  end, function(init_widget)
+    if onSetup then onSetup(init_widget) end
   end)
   interactive_yield()
 end
 
 
 -- Macro
+---@class Macro
+---@field steps string[]
 Macro = class()
 function Macro:init(steps)
   self.steps = steps or {}
@@ -827,27 +829,27 @@ end
 
 function Macro:execute()
   Undo.record_undo()
-  
+
   local stackTop = StackView:size()
-  
+
   local function clrbot(n)
     n = tonumber(n)
     for i=StackView:size() -n,stackTop+1,-1 do
       StackView:pop(i)
     end
   end
-    
+
   local function exec_step(step)
     if step:find('^@%a+') then
       step = step:usub(2)
       local tokens = step:split(':')
       local cmd = tokens[1]
-      
+
       local function numarg(n, def)
         n = n + 1
         return tokens >= n and tonumber(tokens[n]) or def
       end
-      
+
       if cmd == 'clrbot' then
         -- Clear all but top n args
         clrbot(tokens[2] or 1)
@@ -861,7 +863,7 @@ function Macro:execute()
         end
       elseif cmd == 'input' then
         local prefix = tokens[2] or ''
-        
+
         interactive_input_ask_value(InputView, function(value)
           StackView:pushInfix(value)
           interactive_resume()
@@ -874,10 +876,10 @@ function Macro:execute()
     else
       StackView:pushInfix(step)
     end
-    
+
     return true
   end
-  
+
   return interactive_start(function()
     for _,v in ipairs(self.steps) do
       if not exec_step(v) then
@@ -890,9 +892,11 @@ function Macro:execute()
 end
 
 
---[[
-
-]]--
+-- Formula
+---@class Formula
+---@field title string        Title of the formula
+---@field infix string        Infix expression
+---@field variables string[]  List of variables used
 Formula = class()
 function Formula:init(infix, variables)
   self.title = infix -- TODO: Provide helpful names
@@ -900,15 +904,9 @@ function Formula:init(infix, variables)
   self.variables = variables
 end
 
-function Formula:variables()
-  local res = {}
-  for k,_ in pairs(self.variables) do
-    table.insert(res, k)
-  end
-
-  return res
-end
-
+-- Solve formula symbolic (call solve on it)
+---@param for_var string  Variable to solve for
+---@return string | nil
 function Formula:solve_symbolic(for_var)
   local dummy_prefix = 'fslvdmy_'
   local withExpr = nil
@@ -925,11 +923,12 @@ function Formula:solve_symbolic(for_var)
   local res, err = math.evalStr(solveExpr)
   print('  res: ' .. (res or 'nil'))
   print('  err: ' .. (err or 'nil'))
-  
+
   if res then
      return res:gsub(dummy_prefix, '')
   else
     Error.show(err)
+    return
   end
 end
 
@@ -1014,15 +1013,14 @@ local formulas = (function()
   return categories
 end)()
 
--- Returns a list of {var, formula} to solve in order to solve for `want_var`.
--- Parameters
---   category   Formula category table
---   want_var   Variable name(s) [string or table]
---   have_vars  List of {var, value} pairs
+-- Returns a list of {var, formula} to solve in order to solve for wanted variables
+---@param category table      Formula category table
+---@param want_var string[]   Variable name(s) [string or table]
+---@param have_vars string[]  List of {var, value} pairs
+---@return table<string, string>
 local function build_formula_solve_queue(category, want_var, have_vars)
-  local formulas = category.formulas
   local var_to_formula = {}
-  
+
   if type(want_var) == 'string' then
     want_var = {want_var}
   end
@@ -1047,10 +1045,10 @@ local function build_formula_solve_queue(category, want_var, have_vars)
     end
     return missing
   end
-  
-  for i=1,50 do -- Artificial search limit
+
+  for _=1,50 do -- Artificial search limit
     local found = false
-    for _,v in ipairs(formulas) do
+    for _,v in ipairs(category.formulas) do
       local var = get_solvable_for(v)
       if var then
         var_to_formula[var] = v
@@ -1066,7 +1064,7 @@ local function build_formula_solve_queue(category, want_var, have_vars)
   local solve_queue = {}
 
   local function add_formula_to_queue(formula, solve_for)
-    if not formula then return end 
+    if not formula then return end
 
     -- Remove prev element
     for i,v in ipairs(solve_queue) do
@@ -1078,7 +1076,7 @@ local function build_formula_solve_queue(category, want_var, have_vars)
 
     -- Insert at top
     table.insert(solve_queue, 1, {solve_for, formula})
-    
+
     for _,v in ipairs(formula.variables) do
       if v ~= solve_for then
         add_formula_to_queue(var_to_formula[v], v)
@@ -1104,51 +1102,21 @@ local function solve_formula_interactive(category)
   interactive_start(function()
     local var_in_use = {}
     local solve_for, solve_with = nil, {}
-    
-    local function interactive_ask_variable_menu(prefix)
-      prefix = prefix or ''
-      local ret = nil
-    
-      local var_menu = {}
-      for name,info in pairs(category.variables) do
-        if not var_in_use[name] then
-          table.insert(var_menu, {
-            prefix .. info[1], function()
-              ret = name
-              interactive_resume()
-            end
-          })
-        end
-      end
-      table.insert(var_menu, {
-        'Solve [esc]', function()
-          ret = nil
-          interactive_resume()
-        end
-      })
-      
-      MenuView:present(current_focus, var_menu, nil, function()
-        interactive_resume()
-      end)
-      
-      interactive_yield()
-      return ret
-    end
-    
+
     local function interactive_ask_variable(prefix)
       local ret = ''
-      
-      local function complete_unset(prefix)
+
+      local function complete_unset(comp_prefix)
         local candidates = {}
         for name,_ in pairs(category.variables) do
           if not var_in_use[name] then
             table.insert(candidates, name)
           end
         end
-        
-        return completion_catmatch(candidates, prefix)
+
+        return completion_catmatch(candidates, comp_prefix)
       end
-    
+
       interactive_input_ask_value(InputView, function(value)
         if value == 'solve' or value:ulen() == 0 then
           ret = nil
@@ -1159,15 +1127,15 @@ local function solve_formula_interactive(category)
         widget:setText('', prefix)
         widget.completionFun = complete_unset
       end)
-      
+
       return ret
     end
-    
+
     solve_for = interactive_ask_variable('Solve for:')
     if not solve_for then
       return
     end
-    
+
     -- Solve for multiple
     if solve_for:find(',') then
       ---@diagnostic disable-next-line: undefined-field
@@ -1175,10 +1143,10 @@ local function solve_formula_interactive(category)
     else
       solve_for = {solve_for}
     end
-    
+
     -- Mark as in use
     for _,v in ipairs(solve_for) do
-      var_in_use[solve_for] = true
+      var_in_use[v] = true
     end
 
     while true do
@@ -1200,11 +1168,11 @@ local function solve_formula_interactive(category)
         widget:setCursor(0)
         --widget:selAll()
       end)
-      
+
       -- Mark as set
       var_in_use[set_var] = true
     end
-    
+
     local solve_queue = build_formula_solve_queue(category, solve_for, solve_with)
     if solve_queue then
       local infix_steps = {}
@@ -1215,14 +1183,14 @@ local function solve_formula_interactive(category)
           infix = tostring(formula:solve_symbolic(var):gsub('=', ':='))
         })
       end
-      
+
       Undo.record_undo()
       for _,step in ipairs(infix_steps) do
         if not StackView:pushInfix(step.infix) then
           Undo.undo()
           break
         end
-        
+
         local var_info = category.variables[step.var]
         if var_info then
           StackView:top().label = var_info[1]
@@ -1290,10 +1258,10 @@ function Infix.tokenize(input)
     else
       -- Normal number
       i, j, token = input:find('^(%d*%.?%d*)', pos)
-      
+
       -- '.' is not a number
       if i and (token == '' or token == '.') then i = nil end
-      
+
       -- SCI notation exponent
       if i then
         local ei, ej, etoken = input:find('^('..Sym.EE..'[%-%+]?%d+)', j+1)
@@ -1328,20 +1296,21 @@ function Infix.tokenize(input)
     return input:find('^%s+', i)
   end
 
+  -- TODO: Move this elsewhere!
   local function isImplicitMultiplication(token, kind, top)
     if not top then return false end
-    
+
     if kind == 'operator' or
        top[2] == 'operator' then
        return false
     end
-    
+
     -- 1(...)
     if (token == '(' or token == '{' or token == '[') and
        (top[2] == 'number' or top[2] == 'unit' or top[2] == 'string' or top[1] == ')') then
       return true
     end
-    
+
     -- (...)1
     if kind ~= 'syntax' then
       if top[2] ~= 'syntax' or top[1] == ')' or top[1] == '}' or top[1] == ']' then
@@ -1350,6 +1319,8 @@ function Infix.tokenize(input)
     end
   end
 
+  ---@alias TokenKind "number"|"word"|"function"|"syntax"|"operator"|"string"|"ans"|"ws"|"unit"
+  ---@alias TokenPair table<string, TokenKind>
   local matcher = {
     {fn=operator,   kind='operator'},
     {fn=syntax,     kind='syntax'},
@@ -1362,7 +1333,7 @@ function Infix.tokenize(input)
   }
 
   local tokens = {}
- 
+
   local pos = 1
   while pos <= #input do
     local oldPos = pos
@@ -1382,7 +1353,7 @@ function Infix.tokenize(input)
         break
       end
     end
-    
+
     if pos <= oldPos then
       print("error: Infix.tokenize no match at "..pos.." '"..input:usub(pos).."' ("..input:byte(pos)..")")
       return nil, pos
@@ -1391,9 +1362,6 @@ function Infix.tokenize(input)
 
   return tokens
 end
-
----@alias TokenKind "number"|"word"|"function"|"syntax"|"operator"
----@alias TokenPair table<string, TokenKind>
 
 -- RPN Expression stack for transforming from and to infix notation
 ---@class RPNExpression
@@ -1991,21 +1959,25 @@ Widgets = {}
 ---@class Widget
 ---@field invalidate function
 ---@field draw function
+---@field kbd table
 ---@field onFocus function
 ---@field onLooseFocus function
+---@field onEscape function
+---@field onEnter function
+---@field onCharIn function
 Widgets.Base = class()
 function Widgets.Base:invalidate() end
 function Widgets.Base:draw() end
 
 -- Toast Widget
 Widgets.Toast = class(Widgets.Base)
-function Widgets.Toast:init(options)
-  options = options or {}
-  self.location = options.location or 'top'
+function Widgets.Toast:init(args)
+  args = args or {}
+  self.location = args.location or 'top'
   self.margin = 4
   self.padding = 4
   self.text = nil
-  self.style = options.style
+  self.style = args.style
 end
 
 function Widgets.Toast:invalidate()
@@ -2019,19 +1991,19 @@ function Widgets.Toast:getFrame()
 
   local x, y, w, h = 0, 0, platform.window:width(), platform.window:height()
   local textW, textH = 0, 0
-  
+
   platform.withGC(function(gc)
     textW = gc:getStringWidth(self.text)
     textH = gc:getStringHeight(self.text)
   end)
-  
+
   x = x + w/2 - textW/2 - self.margin
   if self.location == 'center' then
     y = h/2 - textH/2 - self.margin -- Mid
   else
     y = self.padding -- Top location
   end
-  
+
   w = textW + 2*self.margin
   h = textH + 2*self.margin
 
@@ -2062,11 +2034,17 @@ end
 
 
 -- KeybindManager
+---@class KeybindManager
+---@field bindings table
+---@field currentTab table
+---@field currentSequence table
+---@field onSequencechanged function
+---@field onExec function
 KeybindManager = class()
 function KeybindManager:init()
   self.bindings = {}
-  
-  -- State 
+
+  -- State
   self.currentTab = nil
   self.currentSequence = nil
 
@@ -2092,14 +2070,14 @@ function KeybindManager:setSequence(sequence, fn)
     end
     tab = tab[key]
   end
-  
+
   tab[sequence[#sequence]] = fn
 end
 
 function KeybindManager:dispatchKey(key)
   self.currentSequence = self.currentSequence or {}
   table.insert(self.currentSequence, key)
-  
+
   self.currentTab = self.currentTab or self.bindings
 
   if type(self.currentTab) == 'table' then
@@ -2144,6 +2122,7 @@ function KeybindManager:dispatchKey(key)
 end
 
 -- Fullscreen 9-tile menu which is navigated using the numpad
+---@class UIMenu
 UIMenu = class(Widgets.Base)
 function UIMenu:init()
   self.frame = {width=0, height=0, x=0, y=0}
@@ -2163,7 +2142,7 @@ end
 function UIMenu:center(w, h)
   w = w or platform.window:width()
   h = h or platform.window:height()
-  
+
   local margin = 4
   self.frame.x = margin
   self.frame.y = margin
@@ -3500,9 +3479,11 @@ local function clear()
 end
 
 
+-- RPN Input Handler
+---@class RPNInput
 RPNInput = class()
 function RPNInput:getInput()
-  return InputView.text
+  return InputView.text -- TODO: fix view access
 end
 
 function RPNInput:setInput(str)
@@ -4157,7 +4138,7 @@ function on.resize(w, h)
   }
 
   MenuView:center(StackView.frame.width,
-              StackView.frame.height)
+                  StackView.frame.height)
 end
 
 function on.escapeKey()
