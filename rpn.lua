@@ -3999,12 +3999,9 @@ function on.construction()
     },
     {"Clear",
       {"Clear A-Z", function() math.evalStr("ClearAZ") end},
-    },
-    {"Options",
-      {"Show...", function() MenuView:present(current_focus, make_options_menu()) end}
     }
   })
-  
+
   GlobalKbd:setSequence({'U'}, function()
     Undo.undo()
   end)

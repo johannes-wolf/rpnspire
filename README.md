@@ -104,6 +104,7 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>M</kbd><kbd>r</kbd>                 | Set mode to RPN                |
 | <kbd>M</kbd><kbd>m</kbd>                 | Toggle mode                    |
 | <kbd>F</kbd>                             | Open then formula-solver       |
+| <kbd>help</kbd><kbd>help</kbd>           | Show settings                  |
 
 ### Input
 | Key                              | Function                                                                |
