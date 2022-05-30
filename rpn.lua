@@ -245,16 +245,20 @@ local options = {
 }
 
 -- Get the current mode
+---@alias Mode "RPN" | "ALG"
+---@return Mode
 local function get_mode()
   return (temp_mode and temp_mode[#temp_mode]) or options.mode
 end
 
--- Oveeride the current mode
+-- Override the current mode
+---@param mode Mode  Mode to set
 local function push_temp_mode(mode)
   temp_mode = temp_mode or {}
   table.insert(temp_mode, mode)
 end
 
+-- Pop top-most mode from mode stack
 local function pop_temp_mode()
   table.remove(temp_mode)
 end
@@ -354,10 +358,18 @@ local operators = {
 local operators_trie = Trie.build(operators)
 
 -- Query operator information
+---comment
+---@param s string  Name of the operator
+---@return string | nil  Name
+---@return number        Precedence
+---@return number        Arguments
+---@return number        Side
+---@return number        Associativity
+---@return boolean       Aggressive
 local function queryOperatorInfo(s)
   local tab = operators[s]
   if tab == nil then return nil end
-  
+
   local str, lvl, args, side, assoc, aggro = unpack(tab)
   return (str or s), lvl, args, side, assoc, aggro
 end
@@ -365,6 +377,8 @@ end
 -- Returns the number of arguments for the nspire function `nam`.
 -- Implementation is hacky, but there seems to be no clean way of
 -- getting this information.
+---@param nam string   Function name
+---@return number | nil
 local function tiGetFnArgs(nam)
   local res, err = math.evalStr("getType("..nam..")")
   if err ~= nil or res ~= "\"FUNC\"" then
@@ -382,7 +396,7 @@ local function tiGetFnArgs(nam)
     else
       return nil
     end
-    
+
     if arglist:len() > 0 then
       arglist = arglist .. ",x"
     else
@@ -630,17 +644,17 @@ local functions = {
   ["zeros"]           = {n = 2},
 }
 
---[[
-Function info table
-  str, args
---]]
+-- Returns information about the function with the name given
+---@param s string             Name of the function
+---@param builtinOnly boolean  If true, do not consider user defined functions
+---@return table<string, number> | nil
 local function functionInfo(s, builtinOnly)
   local name, argc = s:lower(), nil
-  
+
   if name:find('^%d') then
     return nil
   end
-  
+
   local info = functions[name]
   if info then
     if not argc then
@@ -673,9 +687,9 @@ local function functionInfo(s, builtinOnly)
     argc = tiGetFnArgs(s)
     if argc ~= nil then
       return s, argc
-    end  
+    end
   end
-  
+
   return nil
 end
 
@@ -1378,14 +1392,19 @@ function Infix.tokenize(input)
   return tokens
 end
 
+---@alias TokenKind "number"|"word"|"function"|"syntax"|"operator"
+---@alias TokenPair table<string, TokenKind>
 
 -- RPN Expression stack for transforming from and to infix notation
+---@class RPNExpression
 RPNExpression = class()
-
 function RPNExpression:init(stack)
   self.stack = stack or {}
 end
 
+-- Sets the internal stack to the list of infix tokens, transformed
+-- to postfix order
+---@param tokens TokenPair[]  List of parsed token pairs
 function RPNExpression:fromInfix(tokens)
   if not tokens then
     self.stack = {}
@@ -1643,7 +1662,8 @@ function RPNExpression:fromInfix(tokens)
   return self.stack
 end
 
--- Returns the bottom stack index of the branch starting at `index`
+-- Returns the bottom stack index of the branch starting at index
+---@param index number  Stack index to start at
 function RPNExpression:findBranch(index)
   if index == 1 then
     return 1
@@ -1681,12 +1701,15 @@ function RPNExpression:findBranch(index)
   return index
 end
 
+-- Returns a list of stack-indices (top, bottom), one per branch of the top-most
+-- operator/function/list/matrix
+---@return table<number, table<string, number>>[]
 function RPNExpression:split()
   local top = self.stack[#self.stack]
 
   local branches = {}
   local index, count = #self.stack, 0
-  
+
   if top[2] == 'operator' then
     local argc = select(3, queryOperatorInfo(top[1]))
     count = tonumber(argc)
@@ -1697,7 +1720,7 @@ function RPNExpression:split()
   elseif top[1] == '}' then
     count = tonumber(self.stack[#self.stack - 1][1])
     index = index - 2
-  elseif top[1] == '}' then
+  elseif top[1] == ']' then
     count = tonumber(self.stack[#self.stack - 1][1])
     count = tonumber(self.stack[#self.stack - 2][1]) * count
     index = index - 3
@@ -1705,9 +1728,9 @@ function RPNExpression:split()
     Error.show('Unimplemented')
     return
   end
-  
+
   local top, bottom = index, nil
-  for i=0,count-1 do
+  for _=0,count-1 do
     bottom = self:findBranch(top)
     if bottom then
       table.insert(branches, {top = top, bottom = bottom})
@@ -1715,6 +1738,7 @@ function RPNExpression:split()
     end
   end
 
+  --[[
   for idx,v in ipairs(branches) do
     local branch_stack = {}
     for i=v.bottom,v.top do
@@ -1723,8 +1747,8 @@ function RPNExpression:split()
 
     local branch_expr = RPNExpression(branch_stack)
     branches[idx] = branch_expr
-    print('branch ' .. idx .. ': ' .. branch_expr:infixString())
   end
+  ]]
 
   return branches
 end
@@ -1739,15 +1763,60 @@ function RPNExpression:_isReverseOp(value, kind)
   return false
 end
 
+-- Pops the top token, if it is a store operator.
+-- As store operators must be the last operation, they must be
+-- removed before pushing other operaors
+function RPNExpression:popStoreOperation()
+  if #self.stack == 0 then return end
+
+  local function pop_range(top, bottom)
+    for i=top,bottom,-1 do
+      table.remove(self.stack, i)
+    end
+  end
+
+  local value, kind = unpack(self:top())
+  if kind == 'operator' then
+    -- [value] =: [variable]
+    if value == '=:' or value == Sym.STORE then
+      local branches = self:split()
+      assert(#branches == 2)
+      pop_range(branches[1].top, branches[1].bottom)
+      self:pop()
+    elseif value == ':=' then
+      -- [variable] := [value]
+      local branches = self:split()
+      assert(#branches == 2)
+      pop_range(branches[2].top, branches[2].bottom)
+      self:pop()
+    end
+  end
+end
+
+-- Removes and returns the top-most token
+---@return TokenPair
 function RPNExpression:pop()
   return table.remove(self.stack)
 end
 
+-- Returns the top-most token
+---@return TokenPair
+function RPNExpression:top()
+  if #self.stack > 0 then
+    return self.stack[#self.stack]
+  end
+end
+
+-- Push operator
+---@param name string  Operator name
 function RPNExpression:pushOperator(name)
   assert(name)
   self:push({name, 'operator'})
 end
 
+-- Push function call
+---@param name string   Function name
+---@param argc integer  Number of arguments
 function RPNExpression:pushFunctionCall(name, argc)
   assert(name and argc)
   self:push({tostring(argc), 'number'})
@@ -1766,7 +1835,7 @@ function RPNExpression:push(item)
     end
     value, kind = unpack(tokens[1])
   end
-  
+
   if self:_isReverseOp(value, kind) then
     -- Remove double negation/not
     self:pop()
@@ -1775,13 +1844,16 @@ function RPNExpression:push(item)
   end
 end
 
-
+-- Concats all tokens from the given RPNExpression to target
+---@param o RPNExpression  Other rpn stack
 function RPNExpression:appendStack(o)
   for _, item in ipairs(o) do
     table.insert(self.stack, item)
   end
 end
 
+-- Converts the rpn stack to an infix expression string
+---@return string
 function RPNExpression:infixString()
   local stack = {}
 
@@ -1806,15 +1878,15 @@ function RPNExpression:infixString()
     end
     if pos < 0 then str = name .. str end
     if pos > 0 then str = str .. name end
-    
+
     table.insert(stack, {expr=str, prec=prec})
   end
-  
+
   local function pushFunction(name)
     if not stack or #stack < 1 then
       return Error.show("Missing function argument size")
     end
-  
+
     local argc = tonumber(table.remove(stack).expr)
     assert(argc)
 
@@ -1823,14 +1895,14 @@ function RPNExpression:infixString()
       local item = table.remove(stack)
       table.insert(args, 1, item)
     end
-    
+
     local str = ""
     for _,v in ipairs(args) do
       if str:len() > 0 then str = str .. ',' end
       str = str .. v.expr
     end
     str = name .. "(" .. str .. ")"
-    
+
     table.insert(stack, {expr=str, prec=99})
   end
 
@@ -1838,7 +1910,7 @@ function RPNExpression:infixString()
     if not stack or #stack < 1 then
       return Error.show("Missing list length")
     end
-      
+ 
     local length = tonumber(table.remove(stack).expr)
     assert(length)
 
@@ -1858,7 +1930,7 @@ function RPNExpression:infixString()
     local cols = tonumber(table.remove(stack).expr)
     assert(rows and rows >= 1)
     assert(cols and cols >= 1)
-    
+
     local str = ""
     for row=rows,1,-1 do
       local colStr = ''
@@ -1868,14 +1940,14 @@ function RPNExpression:infixString()
       end
       str = '['.. colStr .. ']'..str
     end
-    
+
     if rows > 1 then
       str = "[" .. str .. "]"
     end
- 
+
     table.insert(stack, {expr=str, prec=99})
   end
-  
+
   local function push(value, kind)
     if value == '}' then
       return pushList()
@@ -2608,13 +2680,13 @@ function UIStack:toList(n)
   end
 
   local newTop = math.max(#StackView.stack - n + 1, 1)
-  for i=1,n do
+  for _=1,n do
     local arg = self:pop(newTop)
     if arg then
       newList:add(RPNExpression():fromInfix(Infix.tokenize(arg.result)))
     end
   end
-  
+
   newList:finalize()
 
   self:pushRPNExpression(newList.rpn)
@@ -2623,14 +2695,14 @@ end
 function UIStack:toPostfix()
   if #self.stack <= 0 then return end
   local rpn = self:pop().rpn
-  
+
   local str = ""
   for _,v in ipairs(rpn) do
     if str:len() > 0 then str = str .. " " end
     str = str .. v
   end
   str = '"' .. str .. '"'
-  
+
   local rpn = RPNExpression()
   rpn:push(str)
   self:pushRPNExpression(rpn)
@@ -2954,7 +3026,7 @@ function UIInput:cancelCompletion()
   if self.completionIdx ~= nil then
     self.completionIdx = nil
     self.completionList = nil
-  
+
     if self.cursor.size > 0 then
       self:onBackspace()
     end
@@ -3458,7 +3530,9 @@ function RPNInput:popN(num)
   local newTop = #StackView.stack - num + 1
   local rpn = RPNExpression()
   for i=1,num do
-    rpn:appendStack(StackView:pop(newTop).rpn)
+    local stack_expr = RPNExpression(StackView:pop(newTop).rpn)
+    stack_expr:popStoreOperation()
+    rpn:appendStack(stack_expr.stack)
   end
   return rpn
 end

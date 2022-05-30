@@ -308,20 +308,20 @@ function test.keybind_manager()
 end
 
 function test.rpn_input()
-  UIStack.draw = function(...) end
-  UIInput.draw = function(...) end
+  UIStack.draw = function() end
+  UIInput.draw = function() end
 
   local text = ''
   local rpn = RPNInput()
   rpn.input = {}
-  rpn.setInput = function(self, str)
+  rpn.setInput = function(_, str)
     text = str
   end
-  rpn.getInput = function(self)
+  rpn.getInput = function(_)
     return text
   end
 
-  local function expectStack(input_str, key, stack_infix)
+  local function expectStack(key, stack_infix)
     StackView.stack = {}
     text = ''
     for _,v in ipairs(key) do
@@ -335,6 +335,11 @@ function test.rpn_input()
     end
 
     if type(stack_infix) == 'string' then
+      if not Test.assert(#StackView.stack > 0,
+                         "Expected stack to be not empty!") then
+        return
+      end
+
       local stack_top = StackView.stack[#StackView.stack]
       Test.assert(stack_top.infix == stack_infix,
                   "Expected stack top to be '"..stack_infix.."' but it is '"..stack_top.infix.."'")
@@ -350,27 +355,33 @@ function test.rpn_input()
   ---@diagnostic disable-next-line: duplicate-set-field
   rpn.isBalanced = function() return true end
 
-  expectStack('', {'1', 'ENTER'}, '1')
-  expectStack('', {'1', 'ENTER', '2', 'ENTER'}, {'2', '1'})
-  expectStack('', {'1', '2', 'ENTER'}, '12')
+  expectStack({'1', 'ENTER'}, '1')
+  expectStack({'1', 'ENTER', '2', 'ENTER'}, {'2', '1'})
+  expectStack({'1', '2', 'ENTER'}, '12')
 
   -- Operators
-  expectStack('', {'1', 'ENTER', '2', 'ENTER', '+'}, '1+2')
-  expectStack('', {'1', 'ENTER', '2', '+'}, '1+2')
+  expectStack({'1', 'ENTER', '2', 'ENTER', '+'}, '1+2')
+  expectStack({'1', 'ENTER', '2', '+'}, '1+2')
 
   -- Functions
-  expectStack('', {'1', 'ENTER', 'sin', 'ENTER'}, 'sin(1)')
-  expectStack('', {'1', 'ENTER', '2', '+', 'sin', 'ENTER'}, 'sin(1+2)')
-  expectStack('', {'sin(2)', 'ENTER'}, 'sin(2)')
+  expectStack({'1', 'ENTER', 'sin', 'ENTER'}, 'sin(1)')
+  expectStack({'1', 'ENTER', '2', '+', 'sin', 'ENTER'}, 'sin(1+2)')
+  expectStack({'sin(2)', 'ENTER'}, 'sin(2)')
 
   -- Lists
-  expectStack('', {'{', '1', ',', '2', '}', 'ENTER'}, '{1,2}')
+  expectStack({'{', '1', ',', '2', '}', 'ENTER'}, '{1,2}')
+
+  -- Auto removal of store operations
+  expectStack({'1', 'ENTER', 'a', Sym.STORE, '2', 'ENTER', 'b', Sym.STORE, '+'}, '1+2')
+  expectStack({'a', 'ENTER', '1', ':=', '2', 'ENTER', 'b', Sym.STORE, '+'}, '1+2')
+  expectStack({'1', 'ENTER', 'a', Sym.STORE, 'b', 'ENTER', '2', ':=', '+'}, '1+2')
+  expectStack({'a', 'ENTER', '1', ':=', 'b', 'ENTER', '2', ':=', '+'}, '1+2')
 
   -- Unbalanced (ALG) input
   ---@diagnostic disable-next-line: duplicate-set-field
   rpn.isBalanced = function() return false end
-  expectStack('', {'1', '+', '2', 'x', 'ENTER'}, '1+2*x')
-  expectStack('', {'{', '1', '+', '2', ',', '3', '}', 'ENTER'}, '{1+2,3}')
+  expectStack({'1', '+', '2', 'x', 'ENTER'}, '1+2*x')
+  expectStack({'{', '1', '+', '2', ',', '3', '}', 'ENTER'}, '{1+2,3}')
 end
 
 function test.stack_to_list()
@@ -381,6 +392,10 @@ function test.stack_to_list()
     end
     StackView:toList(n)
 
+    if not Test.assert(#StackView.stack > 0,
+                       "Expected stack to be not empty!") then
+      return
+    end
     local stack_top = StackView.stack[#StackView.stack]
     Test.assert(stack_top.infix == stack_result,
                 "Expected stack top to be '"..stack_result.."' but it is '"..stack_top.infix.."'")
