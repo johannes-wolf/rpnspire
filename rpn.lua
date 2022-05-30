@@ -1194,6 +1194,12 @@ local function solve_formula_interactive(category)
         })
       end
 
+      -- Remember user entered (non solved) variables
+      local user_provided = {}
+      for _, v in ipairs(solve_with) do
+        user_provided[v[1]] = true
+      end
+
       Undo.record_undo()
       for _,step in ipairs(infix_steps) do
         if not StackView:pushInfix(step.infix) then
@@ -1203,11 +1209,14 @@ local function solve_formula_interactive(category)
 
         local var_info = category.variables[step.var]
         if var_info then
-          StackView:top().label = var_info[1]
+          -- Label expression with variable info and asterisk, if it is a solved expression
+          StackView:top().label = var_info[1] .. ' (' .. step.var .. ')' ..
+            (user_provided[step.var] and '' or '*')
         end
       end
     else
       Error.show('Can not solve')
+      return
     end
   end)
 end
