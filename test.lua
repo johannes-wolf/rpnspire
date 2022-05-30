@@ -1,6 +1,6 @@
 -- luacheck: ignore class
 ---@diagnostics disable: lowercase-global
-function class(base)
+function _G.class(base)
   local classdef = {}
 
   setmetatable(classdef, {
@@ -19,7 +19,6 @@ function class(base)
 
   return classdef
 end
----@diagnostics enable
 
 function string.usub(...)
   return string.sub(...)
@@ -37,7 +36,7 @@ function RichTextStub:setBorder()
   return self
 end
 
-D2Editor = {
+_G.D2Editor = {
   newRichText = function() return RichTextStub() end
 }
 
@@ -50,7 +49,7 @@ local GC = {
 }
 
 -- luacheck: ignore platform
-platform = {
+_G.platform = {
   withGC = function(fn) return fn(GC) end,
   window = {
     width = function() return 1 end,
@@ -68,7 +67,8 @@ if not unpack then
 end
 
 -- luacheck: ignore on
-on = {}
+_G.on = {}
+---@diagnostics enable: lowercase-global
 
 -- luacheck: ignore Infix RPNExpression
 require 'rpn'
@@ -85,6 +85,9 @@ function test.tokenize_infix()
 
   local function expect(str, tokens)
     local res = Infix.tokenize(str)
+
+    Test.assert(res ~= nil, "Token list is nil")
+    if not res then return end
 
     Test.assert(#res == #tokens, "Token count missmatch "..str)
     for i=1, #tokens do
@@ -344,6 +347,7 @@ function test.rpn_input()
     end
   end
 
+  ---@diagnostic disable-next-line: duplicate-set-field
   rpn.isBalanced = function() return true end
 
   expectStack('', {'1', 'ENTER'}, '1')
@@ -363,6 +367,7 @@ function test.rpn_input()
   expectStack('', {'{', '1', ',', '2', '}', 'ENTER'}, '{1,2}')
 
   -- Unbalanced (ALG) input
+  ---@diagnostic disable-next-line: duplicate-set-field
   rpn.isBalanced = function() return false end
   expectStack('', {'1', '+', '2', 'x', 'ENTER'}, '1+2*x')
   expectStack('', {'{', '1', '+', '2', ',', '3', '}', 'ENTER'}, '{1+2,3}')

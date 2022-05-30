@@ -786,9 +786,11 @@ local function interactive_kill()
   table.remove(interactiveStack, #interactiveStack)
 end
 
---[[
-  Helper function for using `input_ask_value` in an interactive session.
---]]--
+-- Helper function for using `input_ask_value` in an interactive session.
+---@param widget Widget      Input widget
+---@param onEnter function   Callback called if the user presses enter
+---@param onCancel function  Callback called if the user canceled the request
+---@param onSetup function   Callback called to set up the view
 local function interactive_input_ask_value(widget, onEnter, onCancel, onSetup)
   input_ask_value(widget, function(value)
     if onEnter then onEnter(value) end
@@ -1154,6 +1156,7 @@ local function solve_formula_interactive(category)
     
     -- Solve for multiple
     if solve_for:find(',') then
+      ---@diagnostic disable-next-line: undefined-field
       solve_for = string.split(solve_for, ',')
     else
       solve_for = {solve_for}
@@ -1173,9 +1176,7 @@ local function solve_formula_interactive(category)
       local var_info = category.variables[set_var]
       interactive_input_ask_value(InputView, function(value)
         table.insert(solve_with, {set_var, value})
-      end, function()
-        canceled = true
-      end, function(widget)
+      end, nil, function(widget)
         -- Auto append the matching base unit for convenience
         local template = ''
         if var_info.unit then
@@ -1250,6 +1251,7 @@ function Infix.tokenize(input)
   local function number(input, pos)
     -- Binary or hexadecimal number
     local i, j, prefix = input:find('^0([bh])', pos)
+    local token = nil
     if i then
       if prefix == "b" then
         i, j, token = input:find('^([10]+)', j+1)
@@ -1760,6 +1762,7 @@ function RPNExpression:push(item)
     local tokens = Infix.tokenize(item)
     if not tokens or #tokens < 1 then
       Error.show("Could not parse input")
+      return
     end
     value, kind = unpack(tokens[1])
   end
@@ -1812,7 +1815,7 @@ function RPNExpression:infixString()
       return Error.show("Missing function argument size")
     end
   
-    argc = tonumber(table.remove(stack, #stack).expr)
+    local argc = tonumber(table.remove(stack, #stack).expr)
     assert(argc)
 
     local args = {}
@@ -3415,7 +3418,7 @@ function Undo.redo()
   end
 end
 
-function clear()
+local function clear()
   Undo.record_undo()
   StackView.stack = {}
   StackView:invalidate()
@@ -3820,7 +3823,7 @@ input_ask_value = function(widget, callbackEnter, callbackEscape, callbackSetup)
     local text = widget.text
     restore_state()
     if callbackEnter then
-      enterRes = callbackEnter(text)
+      callbackEnter(text)
     end
   end
   
@@ -3903,7 +3906,7 @@ end
 
 
 -- Called for _any_ keypress
-function on_any_key()
+local function on_any_key()
   Error.hide()
 end
 
