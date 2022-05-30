@@ -1,4 +1,5 @@
 -- luacheck: ignore class
+---@diagnostics disable: lowercase-global
 function class(base)
   local classdef = {}
 
@@ -18,6 +19,7 @@ function class(base)
 
   return classdef
 end
+---@diagnostics enable
 
 function string.usub(...)
   return string.sub(...)
@@ -317,7 +319,7 @@ function test.rpn_input()
   end
 
   local function expectStack(input_str, key, stack_infix)
-    stack.stack = {}
+    StackView.stack = {}
     text = ''
     for _,v in ipairs(key) do
       if v == 'ENTER' then
@@ -330,12 +332,12 @@ function test.rpn_input()
     end
 
     if type(stack_infix) == 'string' then
-      local stack_top = stack.stack[#stack.stack]
+      local stack_top = StackView.stack[#StackView.stack]
       Test.assert(stack_top.infix == stack_infix,
                   "Expected stack top to be '"..stack_infix.."' but it is '"..stack_top.infix.."'")
     else
       for idx,v in ipairs(stack_infix) do
-        local stack_top = stack.stack[#stack.stack - idx + 1]
+        local stack_top = StackView.stack[#StackView.stack - idx + 1]
         Test.assert(stack_top.infix == v,
                     "Expected stack top to be '"..v.."' but it is '"..stack_top.infix.."'")
       end
@@ -368,13 +370,13 @@ end
 
 function test.stack_to_list()
   local function expect(infix_list, n, stack_result)
-    stack.stack = {}
+    StackView.stack = {}
     for _,v in ipairs(infix_list) do
-      stack:pushInfix(v)
+      StackView:pushInfix(v)
     end
-    stack:toList(n)
+    StackView:toList(n)
 
-    local stack_top = stack.stack[#stack.stack]
+    local stack_top = StackView.stack[#StackView.stack]
     Test.assert(stack_top.infix == stack_result,
                 "Expected stack top to be '"..stack_result.."' but it is '"..stack_top.infix.."'")
   end

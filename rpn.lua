@@ -8,17 +8,29 @@ the Free Software Foundation.
 
 
 -- Forward declarations
+local focus_view = nil
 local input_ask_value = nil
 local completion_catmatch = nil
 local completion_fn_variables = nil
-local temp_mode = {} -- Temporary mode override
+
+-- Temporary mode override stack
+local temp_mode = {}
+
+-- Currently focused view
+local current_focus = nil
+
+-- Undo Scope
+local Undo = {
+  undo_stack = {},
+  redo_stack = {}
+}
 
 
 -- Returns the height of string in pixels
----@param s string
+---@param str? string
 ---@return number
-local function getStringHeight(s)
-  return platform.withGC(function(gc) return gc:getStringHeight(s or "A") end)
+local function getStringHeight(str)
+  return platform.withGC(function(gc) return gc:getStringHeight(str or "A") end)
 end
 
 -- Dump table to string
@@ -798,14 +810,14 @@ function Macro:init(steps)
 end
 
 function Macro:execute()
-  recordUndo()
+  Undo.record_undo()
   
-  local stackTop = stack:size()
+  local stackTop = StackView:size()
   
   local function clrbot(n)
     n = tonumber(n)
-    for i=stack:size() -n,stackTop+1,-1 do
-      stack:pop(i)
+    for i=StackView:size() -n,stackTop+1,-1 do
+      StackView:pop(i)
     end
   end
     
@@ -824,27 +836,27 @@ function Macro:execute()
         -- Clear all but top n args
         clrbot(tokens[2] or 1)
       elseif cmd == 'dup' then
-        stack:dup(numarg(1, 1))
+        StackView:dup(numarg(1, 1))
       elseif cmd == 'simp' then
-        stack:pushInfix(stack:pop().result)
+        StackView:pushInfix(StackView:pop().result)
       elseif cmd == 'label' then
-        if stack:size() > 0 then
-          stack:top().label = tokens[2]
+        if StackView:size() > 0 then
+          StackView:top().label = tokens[2]
         end
       elseif cmd == 'input' then
         local prefix = tokens[2] or ''
         
-        interactive_input_ask_value(input, function(value)
-          stack:pushInfix(value)
+        interactive_input_ask_value(InputView, function(value)
+          StackView:pushInfix(value)
           interactive_resume()
         end, function()
-          undo()
+          Undo.undo()
         end, function(widget)
           widget:setText('', prefix)
         end)
       end
     else
-      stack:pushInfix(step)
+      StackView:pushInfix(step)
     end
     
     return true
@@ -853,7 +865,7 @@ function Macro:execute()
   return interactive_start(function()
     for _,v in ipairs(self.steps) do
       if not exec_step(v) then
-        undo()
+        Undo.undo()
         break
       end
     end
@@ -1099,7 +1111,7 @@ local function solve_formula_interactive(category)
         end
       })
       
-      menu:present(focus, var_menu, nil, function()
+      MenuView:present(current_focus, var_menu, nil, function()
         interactive_resume()
       end)
       
@@ -1121,7 +1133,7 @@ local function solve_formula_interactive(category)
         return completion_catmatch(candidates, prefix)
       end
     
-      interactive_input_ask_value(input, function(value)
+      interactive_input_ask_value(InputView, function(value)
         if value == 'solve' or value:ulen() == 0 then
           ret = nil
         else
@@ -1159,7 +1171,7 @@ local function solve_formula_interactive(category)
       end
 
       local var_info = category.variables[set_var]
-      interactive_input_ask_value(input, function(value)
+      interactive_input_ask_value(InputView, function(value)
         table.insert(solve_with, {set_var, value})
       end, function()
         canceled = true
@@ -1189,16 +1201,16 @@ local function solve_formula_interactive(category)
         })
       end
       
-      recordUndo()
+      Undo.record_undo()
       for _,step in ipairs(infix_steps) do
-        if not stack:pushInfix(step.infix) then
-          undo()
+        if not StackView:pushInfix(step.infix) then
+          Undo.undo()
           break
         end
         
         local var_info = category.variables[step.var]
         if var_info then
-          stack:top().label = var_info[1]
+          StackView:top().label = var_info[1]
         end
       end
     else
@@ -1418,7 +1430,7 @@ function RPNExpression:fromInfix(tokens)
     local _, prec, _, _, assoc = queryOperatorInfo(sym)
 
     while testTop('operator') do
-      local topName, top_prec, _, _, _ = queryOperatorInfo(stack[#stack][1])
+      local _, top_prec, _, _, _ = queryOperatorInfo(stack[#stack][1])
       if (assoc ~= 'r' and prec <= top_prec) or
          (assoc == 'r' and prec < top_prec) then
         popTop()
@@ -1428,15 +1440,15 @@ function RPNExpression:fromInfix(tokens)
     end
     table.insert(stack, {sym, 'operator'})
   end
-  
+
   local function handleAns(sym)
     local n = tonumber(sym:sub(2))
     if n then
       if not Error.assertStackN(n) then
         return
       end
-      
-      local rpn = _G.stack.stack[#_G.stack.stack - n + 1].rpn
+
+      local rpn = _G.StackView.stack[#_G.StackView.stack - n + 1].rpn
       for _,v in ipairs(rpn) do
         table.insert(result, v)
       end
@@ -1873,24 +1885,24 @@ function RPNExpression:infixString()
       assert(opname)
       return pushOperator(opname, opprec, opargc, oppos, opassoc, opaggrassoc)
     end
-    
+
     if kind == 'function' then
       local fname = functionInfo(value, false)
       return pushFunction(fname or value)
     end
-    
+
     return table.insert(stack, {expr=value})
   end
-  
+
   for _,v in ipairs(self.stack) do
     push(unpack(v))
   end
-  
+
   local infix = nil
   for _,v in ipairs(stack) do
     infix = (infix or '') .. v.expr
-  end 
-  
+  end
+
   return infix
 end
 
@@ -1901,12 +1913,14 @@ end
 Widgets = {}
 
 -- Widget Base Class
+---@class Widget
+---@field invalidate function
+---@field draw function
+---@field onFocus function
+---@field onLooseFocus function
 Widgets.Base = class()
-function Widgets.Base:invalidate()
-end
-
-function Widgets.Base:draw()
-end
+function Widgets.Base:invalidate() end
+function Widgets.Base:draw() end
 
 -- Toast Widget
 Widgets.Toast = class(Widgets.Base)
@@ -2092,9 +2106,9 @@ end
 
 function UIMenu:hide()
   if self.parent ~= nil then
-    focusView(self.parent)
+    focus_view(self.parent)
   else
-    focusView(input)
+    focus_view(InputView)
   end
 end
 
@@ -2106,7 +2120,7 @@ function UIMenu:present(parent, items, onSelect, onCancel)
   self.parent = parent
   self.onSelect = onSelect
   self.onCancel = onCancel
-  focusView(self)
+  focus_view(self)
   return self
 end
 
@@ -2225,7 +2239,7 @@ function UIMenu:onCharIn(c)
     elseif type(item[2]) == "string" then
       self:hide()
       if self.onSelect then self.onSelect(item) end
-      input:insertText(item[2]) -- HACK
+      InputView:insertText(item[2]) -- HACK
     end
   else
     self.filterString = self.filterString or ''
@@ -2358,29 +2372,29 @@ function UIStack:initBindings()
     self:invalidate()
   end
   self.kbd:setSequence({"x"}, function()
-    recordUndo()
+    Undo.record_undo()
     self:pop(self.sel, false)
   end)
   self.kbd:setSequence({"backspace"}, function()
-    recordUndo()
+    Undo.record_undo()
     self:pop(self.sel, false)
     if #self.stack == 0 then
-      focusView(input)
+      focus_view(InputView)
     end
   end)
   self.kbd:setSequence({"clear"}, function()
-    recordUndo()
+    Undo.record_undo()
     self.stack = {}
     self:selectIdx()
-    focusView(input)
+    focus_view(InputView)
   end)
   self.kbd:setSequence({"enter"}, function()
-    recordUndo()
+    Undo.record_undo()
     self:push(table_clone(self.stack[self.sel]))
     self:selectIdx()
   end)
   self.kbd:setSequence({"="}, function()
-    recordUndo()
+    Undo.record_undo()
     self:pushRPNExpression(RPNExpression(self.stack[self.sel].rpn))
     self:selectIdx()
   end)
@@ -2391,21 +2405,21 @@ function UIStack:initBindings()
     self:roll(1)
   end)
   self.kbd:setSequence({"c", "left"}, function()
-    input:setText(self.stack[self.sel].infix)
-    focusView(input)
+    InputView:setText(self.stack[self.sel].infix)
+    focus_view(InputView)
   end)
   self.kbd:setSequence({"c", "right"}, function()
-    input:setText(self.stack[self.sel].result)
-    focusView(input)
+    InputView:setText(self.stack[self.sel].result)
+    focus_view(InputView)
   end)
   self.kbd:setSequence({"i", "left"}, function()
-    input:insertText(self.stack[self.sel].infix)
+    InputView:insertText(self.stack[self.sel].infix)
   end)
   self.kbd:setSequence({"i", "right"}, function()
-    input:insertText(self.stack[self.sel].result)
+    InputView:insertText(self.stack[self.sel].result)
   end)
   self.kbd:setSequence({"5"}, function()
-    bigv:displayStackItem(self.sel)
+    RichView:displayStackItem(self.sel)
   end)
   self.kbd:setSequence({"7"}, function()
     self:selectIdx(1)
@@ -2590,7 +2604,7 @@ function UIStack:toList(n)
     self.rpn:push('}')
   end
 
-  local newTop = math.max(#stack.stack - n + 1, 1)
+  local newTop = math.max(#StackView.stack - n + 1, 1)
   for i=1,n do
     local arg = self:pop(newTop)
     if arg then
@@ -2680,7 +2694,7 @@ function UIStack:onArrowDown()
   if self.sel < #self.stack then
     self:selectIdx(self.sel + 1)
   else
-    focusView(input)
+    focus_view(InputView)
     self:scrollToIdx()
   end
 end
@@ -2693,7 +2707,7 @@ end
 
 function UIStack:onEscape()
   self.kbd:resetSequence()
-  focusView(input)
+  focus_view(InputView)
 end
 
 function UIStack:onLooseFocus()
@@ -2757,7 +2771,7 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
   local itemHeight = rightPos.y - leftPos.y + rightSize.h + margin
   
   gc:clipRect("set", x, y, w, itemHeight)
-  if focus == self and self.sel ~= nil and self.sel == idx then
+  if current_focus == self and self.sel ~= nil and self.sel == idx then
     gc:setColorRGB(itemBG[3])
   else
     gc:setColorRGB(itemBG[(idx%2)+1])
@@ -2812,7 +2826,7 @@ function UIStack:draw(gc)
   
   gc:clipRect("set", x, y, w, h)
   
-  if #self.stack == 0 and focus == self then
+  if #self.stack == 0 and current_focus == self then
     gc:setColorRGB(theme[options.theme].selectionColor)
   else
     gc:setColorRGB(theme[options.theme].backgroundColor)
@@ -2912,7 +2926,7 @@ function UIInput:init_bindings()
   
   -- Special chars
   self.kbd:setSequence({'I'}, function(sequence)
-    menu:present(input, {
+    MenuView:present(InputView, {
       {'{', '{'}, {'=:', '=:'}, {'}', '}'},
       {'[', '['}, {'@>', '@>'}, {']', ']'},
       {'|', '|'}, {':=', ':='}, {'@', '@'},
@@ -3089,11 +3103,11 @@ function UIInput:onArrowRight()
 end
 
 function UIInput:onArrowDown()
-  stack:swap()
+  StackView:swap()
 end
 
 function UIInput:onArrowUp()
-  focusView(stack)
+  focus_view(StackView)
 end
 
 function UIInput:onEscape()
@@ -3114,7 +3128,7 @@ function UIInput:onCharIn(c)
   self:cancelCompletion()
   if not self.inputHandler:onCharIn(c) then
     -- Inserting an operator into an empty input in ALG mode should insert '@1'
-    if get_mode() == 'ALG' and options.autoAns and self.text:len() == 0 and stack:size() > 0 then
+    if get_mode() == 'ALG' and options.autoAns and self.text:len() == 0 and StackView:size() > 0 then
       local name, _, args, side = queryOperatorInfo(c)
       if name and (args > 1 or (args == 1 and side == 1)) then
         c = '@1'..c
@@ -3179,9 +3193,9 @@ end
 function UIInput:onBackspace()
   self:cancelCompletion()
   if options.autoPop == true and self.text:ulen() <= 0 then
-    recordUndo()
-    stack:pop()
-    stack:scrollToIdx()
+    Undo.record_undo()
+    StackView:pop()
+    StackView:scrollToIdx()
     return
   end
   
@@ -3297,7 +3311,7 @@ function UIInput:drawText(gc)
   gc:setColorRGB(theme[options.theme].textColor)
   gc:drawString(self.text, x + margin + scrollx, y)
   
-  if focus == self then
+  if current_focus == self then
     gc:setColorRGB(get_mode() == "RPN" and 
         theme[options.theme].cursorColor or
         theme[options.theme].cursorColorAlg)
@@ -3326,8 +3340,8 @@ function RichText:init()
 end
 
 function RichText:onFocus()
-  self.view:move(stack.frame.x, stack.frame.y)
-    :resize(stack.frame.width, stack.frame.height)
+  self.view:move(StackView.frame.x, StackView.frame.y)
+    :resize(StackView.frame.width, StackView.frame.height)
     :setVisible(true)
     :setFocus(true)
 end
@@ -3338,95 +3352,92 @@ function RichText:onLooseFocus()
 end
 
 function RichText:onEscape()
-  focusView(stack)
+  focus_view(StackView)
 end
 
 function RichText:displayStackItem(idx)
-  local item = stack.stack[idx or stack:size()]
+  local item = StackView.stack[idx or StackView:size()]
   if item ~= nil then
     self.view:createMathBox()
       :setExpression("\\0el {"..item.infix.."}\n=\n" ..
                      "\\0el {"..item.result.."}")
   end
-  focusView(self)
+  focus_view(self)
 end
 
 function RichText:displayText(text)
   self.view:setExpression(text)
-  focusView(self)
+  focus_view(self)
 end
 
 
---[[ === UNDO/REDO === ]]--
-local UndoStack, RedoStack = {}, {}
-
 -- Returns a new undo-state table by copying the current stack and text input
-local function makeUndoState(text)
+function Undo.make_state(text)
   return {
-    stack=table_clone(stack.stack),
-    input=text or input.text
+    stack=table_clone(StackView.stack),
+    input=text or InputView.text
   }
 end
 
-function recordUndo(input)
-  table.insert(UndoStack, makeUndoState(input))
-  if #UndoStack > options.maxUndo then
-    table.remove(UndoStack, 1)
+function Undo.record_undo(input)
+  table.insert(Undo.undo_stack, Undo.make_state(input))
+  if #Undo.undo_stack > options.maxUndo then
+    table.remove(Undo.undo_stack, 1)
   end
-  RedoStack = {}
+  Undo.redo_stack = {}
 end
 
-function popUndo()
-  table.remove(UndoStack, #UndoStack)
+function Undo.pop_undo()
+  table.remove(Undo.undo_stack, #Undo.undo_stack)
 end
 
-local function applyUndo(state)
-  stack.stack = state.stack
+function Undo.apply_state(state)
+  StackView.stack = state.stack
   if state.input ~= nil then
-    input:setText(state.input)
+    InputView:setText(state.input)
   end
-  stack:invalidate()
+  StackView:invalidate()
+end
+
+function Undo.undo()
+  if #Undo.undo_stack > 0 then
+    local state = table.remove(Undo.undo_stack, #Undo.undo_stack)
+    table.insert(Undo.redo_stack, Undo.make_state())
+    Undo.apply_state(state)
+  end
+end
+
+function Undo.redo()
+  if #Undo.redo_stack > 0 then
+    local state = table.remove(Undo.redo_stack, #Undo.redo_stack)
+    table.insert(Undo.undo_stack, Undo.make_state())
+    Undo.apply_state(state)
+  end
 end
 
 function clear()
-  recordUndo()
-  stack.stack = {}
-  stack:invalidate()
-  input:setText("", "")
-  input:invalidate()
+  Undo.record_undo()
+  StackView.stack = {}
+  StackView:invalidate()
+  InputView:setText("", "")
+  InputView:invalidate()
   interactiveStack = {} -- Kill _all_ interactive sessions
-end
-
-function undo()
-  if #UndoStack > 0 then
-    local state = table.remove(UndoStack, #UndoStack)
-    table.insert(RedoStack, makeUndoState())
-    applyUndo(state)
-  end
-end
-
-function redo()
-  if #RedoStack > 0 then
-    local state = table.remove(RedoStack, #RedoStack)
-    table.insert(UndoStack, makeUndoState())
-    applyUndo(state)
-  end
 end
 
 
 RPNInput = class()
 function RPNInput:getInput()
-  return input.text
+  return InputView.text
 end
 
 function RPNInput:setInput(str)
-  input:setText(str)
+  InputView:setText(str)
 end
 
 function RPNInput:isBalanced()
-  local str = input.text
+  local str = InputView.text
   local paren,brack,brace,dq,sq = 0,0,0,0,0
-  for i=1,input.cursor.pos do
+  for i=1,InputView.cursor.pos do
     local c = str:byte(i)
     if c==40  then paren = paren+1 end -- (
     if c==41  then paren = paren-1 end -- )
@@ -3441,10 +3452,10 @@ function RPNInput:isBalanced()
 end
 
 function RPNInput:popN(num)
-  local newTop = #stack.stack - num + 1
+  local newTop = #StackView.stack - num + 1
   local rpn = RPNExpression()
   for i=1,num do
-    rpn:appendStack(stack:pop(newTop).rpn)
+    rpn:appendStack(StackView:pop(newTop).rpn)
   end
   return rpn
 end
@@ -3453,7 +3464,7 @@ function RPNInput:dispatchInfix(str)
   if not str or str:ulen() == 0 then
     return nil
   end
-  local res = stack:pushInfix(str)
+  local res = StackView:pushInfix(str)
   if res then
     self:setInput('')
   end
@@ -3471,17 +3482,17 @@ end
 function RPNInput:dispatchOperator(str, ignoreInput)
   local name, _, argc = queryOperatorInfo(str)
   if name then
-    recordUndo()
+    Undo.record_undo()
     if (not ignoreInput and not self:dispatchInput()) or
        not Error.assertStackN(argc) then
-      popUndo()
+      Undo.undo.pop_undo()
       return
     end
 
     local rpn = self:popN(argc)
     rpn:pushOperator(name)
     
-    stack:pushRPNExpression(rpn)
+    StackView:pushRPNExpression(rpn)
     return true
   end
 end
@@ -3490,13 +3501,13 @@ function RPNInput:dispatchOperatorSpecial(key)
   local tab = {
     ['^2'] = function()
       self:dispatchInput()
-      stack:pushInfix('2')
+      StackView:pushInfix('2')
       self:dispatchOperator('^')
     end,
     ['10^'] = function()
       self:dispatchInput()
-      stack:pushInfix('10')
-      stack:swap() 
+      StackView:pushInfix('10')
+      StackView:swap()
       self:dispatchOperator('^')
     end
   }
@@ -3507,17 +3518,17 @@ end
 function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
   local name, argc = functionInfo(str, builtinOnly)
   if name then
-    recordUndo()
+    Undo.record_undo()
     if (not ignoreInput and not self:dispatchInput()) or
        not Error.assertStackN(argc) then
-      popUndo()
+      Undo.undo.pop_undo()
       return
     end
 
     local rpn = self:popN(argc)
     rpn:pushFunctionCall(name, argc)
     
-    stack:pushRPNExpression(rpn)
+    StackView:pushRPNExpression(rpn)
     return true
   end
 end
@@ -3570,30 +3581,35 @@ function RPNInput:onEnter()
   end
   
   if self:getInput():ulen() > 0 then
-    recordUndo()
+    Undo.record_undo()
   end
   return self:dispatchInfix(self:getInput())
 end
 
 
 -- UI
-input = UIInput()
-stack = UIStack()
-menu  = UIMenu()
-bigv  = RichText()
-focus = input
+InputView = UIInput()
+StackView = UIStack()
+MenuView  = UIMenu()
+RichView  = RichText()
 
-function focusView(v)
-  if v ~= nil and v ~= focus then
-    if focus.onLooseFocus then
-      focus:onLooseFocus()
+-- Switch focus to view
+---@param view Widget  View to focus
+focus_view = function(view)
+  if view ~= nil and view ~= current_focus then
+    if current_focus then
+      if current_focus.onLooseFocus then
+        current_focus:onLooseFocus()
+      end
+      current_focus:invalidate()
     end
-    focus:invalidate()
-    focus = v
-    if focus.onFocus then
-      focus:onFocus()
+    current_focus = view
+    if current_focus then
+      if current_focus.onFocus then
+        current_focus:onFocus()
+      end
+      current_focus:invalidate()
     end
-    focus:invalidate()
   end
 end
 
@@ -3609,7 +3625,7 @@ completion_catmatch = function(candidates, prefix, res)
       end
     end
   end
-  
+
   table.sort(res)
   return res
 end
@@ -3618,13 +3634,13 @@ completion_fn_variables = function(prefix)
   return completion_catmatch(var:list(), prefix)
 end
 
-input.completionFun = function(prefix)
+InputView.completionFun = function(prefix)
   -- Semantic autocompletion
   local semantic = nil
   if options.smartComplete then
     local semanticValue, semanticKind = nil, nil
 
-    local tokens = Infix.tokenize(input.text:usub(1, input.cursor.pos + 1 - (prefix and prefix:ulen() + 1 or 0)))
+    local tokens = Infix.tokenize(InputView.text:usub(1, InputView.cursor.pos + 1 - (prefix and prefix:ulen() + 1 or 0)))
     if tokens and #tokens > 0 then
       semanticValue, semanticKind = unpack(tokens[#tokens])
       semantic = {}
@@ -3741,8 +3757,8 @@ GlobalKbd.onSequenceChanged = function(sequence)
   Toast:show(str)
 end
 
-stack.kbd.onSequenceChanged = GlobalKbd.onSequenceChanged
-input.kbd.onSequenceChanged = GlobalKbd.onSequenceChanged
+StackView.kbd.onSequenceChanged = GlobalKbd.onSequenceChanged
+InputView.kbd.onSequenceChanged = GlobalKbd.onSequenceChanged
 
 -- Show text as error
 Error = {}
@@ -3753,9 +3769,9 @@ function Error.show(str, pos)
   
   ErrorToast:show(str)
   if not pos then
-    input:selAll()
+    InputView:selAll()
   else
-    input:setCursor(pos)
+    InputView:setCursor(pos)
   end
 end
 
@@ -3764,12 +3780,12 @@ function Error.hide()
 end
 
 function Error.assertStackN(n, pos)
-  if #stack.stack < (n or 1) then
+  if #StackView.stack < (n or 1) then
     Error.show("Too few arguments on stack")
     if not pos then
-      input:selAll()
+      InputView:selAll()
     else
-      input:setCursor(pos)
+      InputView:setCursor(pos)
     end
     return false
   end
@@ -3893,37 +3909,37 @@ end
 
 -- View list
 local views = {
-  stack,
-  input,
+  StackView,
+  InputView,
   Toast,
   ErrorToast,
-  menu
+  MenuView
 }
 
 function on.construction()
   toolpalette.register({
     {"Stack",
-      {"DUP 2",  function() stack:dup(2) end},
-      {"SWAP",   function() stack:swap() end},
-      {"PICK 2", function() stack:pick(2) end},
-      {"ROLL 3", function() stack:roll(3) end},
-      {"DEL",    function() stack:pop() end},
-      {"UNDO",   function() undo() end},
-      {Sym.CONVERT.."List", function() stack:toList() end},
+      {"DUP 2",  function() StackView:dup(2) end},
+      {"SWAP",   function() StackView:swap() end},
+      {"PICK 2", function() StackView:pick(2) end},
+      {"ROLL 3", function() StackView:roll(3) end},
+      {"DEL",    function() StackView:pop() end},
+      {"UNDO",   function() Undo.undo() end},
+      {Sym.CONVERT.."List", function() StackView:toList() end},
     },
     {"Clear",
       {"Clear A-Z", function() math.evalStr("ClearAZ") end},
     },
     {"Options",
-      {"Show...", function() menu:present(focus, make_options_menu()) end}
+      {"Show...", function() MenuView:present(current_focus, make_options_menu()) end}
     }
   })
   
   GlobalKbd:setSequence({'U'}, function()
-    undo()
+    Undo.undo()
   end)
   GlobalKbd:setSequence({'R'}, function()
-    redo()
+    Undo.redo()
   end)
   GlobalKbd:setSequence({'C'}, function()
     clear()
@@ -3931,16 +3947,16 @@ function on.construction()
 
   -- Edit
   GlobalKbd:setSequence({'E'}, function()
-    if stack:size() > 0 then
-      local idx = stack.sel or stack:size()
-      focusView(input)
-      input_ask_value(input, function(expr)
-        recordUndo()
-        stack:pushInfix(expr)
-        stack:swap(idx, #stack.stack)
-        stack:pop()
+    if StackView:size() > 0 then
+      local idx = StackView.sel or StackView:size()
+      focus_view(InputView)
+      input_ask_value(InputView, function(expr)
+        Undo.record_undo()
+        StackView:pushInfix(expr)
+        StackView:swap(idx, #StackView.stack)
+        StackView:pop()
       end, nil, function(widget)
-        widget:setText(stack.stack[idx].infix, 'Edit #'..(#stack.stack - idx + 1))
+        widget:setText(StackView.stack[idx].infix, 'Edit #'..(#StackView.stack - idx + 1))
       end)
     end
   end)
@@ -3948,44 +3964,44 @@ function on.construction()
   -- Stack
   GlobalKbd:setSequence({'S', 'd', '%d'}, function(sequence)
     -- Duplicate N items from top
-    recordUndo()
-    stack:dup(tonumber(sequence[#sequence]))
+    Undo.record_undo()
+    StackView:dup(tonumber(sequence[#sequence]))
   end)
   GlobalKbd:setSequence({'S', 'p', '%d'}, function(sequence)
     -- Pick item at N
-    recordUndo()
-    stack:pick(tonumber(sequence[#sequence]))
+    Undo.record_undo()
+    StackView:pick(tonumber(sequence[#sequence]))
   end)
   GlobalKbd:setSequence({'S', 'r', '%d'}, function(sequence)
     -- Roll stack N times
-    recordUndo()
-    stack:roll(tonumber(sequence[#sequence]))
+    Undo.record_undo()
+    StackView:roll(tonumber(sequence[#sequence]))
   end)
   GlobalKbd:setSequence({'S', 'r', 'r'}, function()
     -- Roll down 1
-    recordUndo()
-    stack:roll(1)
+    Undo.record_undo()
+    StackView:roll(1)
     return 'repeat'
   end)
   GlobalKbd:setSequence({'S', 'x', '%d'}, function(sequence)
     -- Pop item N from top
-    recordUndo()
-    stack:pop(tonumber(sequence[#sequence]), true)
+    Undo.record_undo()
+    StackView:pop(tonumber(sequence[#sequence]), true)
   end)
   GlobalKbd:setSequence({'S', 'x', 'x'}, function()
     -- Pop all items from top
-    recordUndo()
-    stack.stack = {}
+    Undo.record_undo()
+    StackView.stack = {}
   end)
-  GlobalKbd:setSequence({'S', 'l', '%d'}, function()
+  GlobalKbd:setSequence({'S', 'l', '%d'}, function(sequence)
     -- Transform top N items to list
-    recordUndo()
-    stack:toList(tonumber(sequence[#sequence]))
+    Undo.record_undo()
+    StackView:toList(tonumber(sequence[#sequence]))
   end)
   GlobalKbd:setSequence({'S', 'l', 'l'}, function()
     -- Transform top 2 items to list (repeatable)
-    recordUndo()
-    stack:toList(2)
+    Undo.record_undo()
+    StackView:toList(2)
     return 'repeat'
   end)
 
@@ -3994,7 +4010,7 @@ function on.construction()
       math.evalStr('DelVar a-z')
   end)
   GlobalKbd:setSequence({'V', 'backspace'}, function()
-    input_ask_value(input, function(varname)
+    input_ask_value(InputView, function(varname)
       local res, err = math.evalStr('DelVar '..varname)
       if err then
         Error.show(err)
@@ -4005,16 +4021,16 @@ function on.construction()
     end)
   end)
   GlobalKbd:setSequence({'V', '='}, function()
-    input_ask_value(input, function(varname)
-      input_ask_value(input, function(value)
+    input_ask_value(InputView, function(varname)
+      input_ask_value(InputView, function(value)
         local res, err = math.evalStr(varname..':=('..value..')')
         if err then
           Error.show(err)
         end
       end, nil, function(widget)
         local text = ''
-        if #stack.stack > 0 then
-          text = stack.stack[#stack.stack].result
+        if #StackView.stack > 0 then
+          text = StackView.stack[#StackView.stack].result
         end
         widget:setText(text, varname..':=')
         widget:selAll()
@@ -4027,7 +4043,7 @@ function on.construction()
 
   -- Formula Library
   GlobalKbd:setSequence({'F'}, function()
-    menu:present(focus, make_formula_menu())
+    MenuView:present(current_focus, make_formula_menu())
   end)
 
   -- Mode
@@ -4044,53 +4060,53 @@ function on.construction()
     options.mode = options.mode == 'RPN' and 'ALG' or 'RPN'
   end)
 
-  focusView(input)
+  focus_view(InputView)
 end
 
 function on.resize(w, h)
   local inputHeight = getStringHeight()
 
-  stack.frame = {
+  StackView.frame = {
     x = 0,
     y = 0,
     width = w,
     height = h - inputHeight
   }
-  input.frame = {
+  InputView.frame = {
     x = 0,
     y = h - inputHeight,
     width = w,
     height = inputHeight
   }
 
-  menu:center(stack.frame.width,
-              stack.frame.height)
+  MenuView:center(StackView.frame.width,
+              StackView.frame.height)
 end
 
 function on.escapeKey()
   on_any_key()
   GlobalKbd:resetSequence()
-  if focus.kbd then
-    focus.kbd:resetSequence()
+  if current_focus.kbd then
+    current_focus.kbd:resetSequence()
   end
-  if focus.onEscape then
-    focus:onEscape()
+  if current_focus.onEscape then
+    current_focus:onEscape()
   end
 end
 
 function on.tabKey()
   on_any_key()
-  if focus ~= input then
-    focusView(input)
+  if current_focus ~= InputView then
+    focus_view(InputView)
   else
-    input:onTab()
+    InputView:onTab()
   end
 end
 
 function on.backtabKey()
   on_any_key()
-  if focus.onBackTab then
-    focus:onBackTab()
+  if current_focus.onBackTab then
+    current_focus:onBackTab()
   end
 end
 
@@ -4099,12 +4115,12 @@ function on.returnKey()
   if GlobalKbd:dispatchKey('return') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('return') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('return') then
     return
   end
 
-  if focus == input then
-    input:customCompletion({
+  if current_focus == InputView then
+    InputView:customCompletion({
       "=:", ":=", "{}", "[]", "@>"
     })
   end
@@ -4115,11 +4131,11 @@ function on.arrowRight()
   if GlobalKbd:dispatchKey('right') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('right') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('right') then
     return
   end
-  if focus.onArrowRight then
-    focus:onArrowRight()
+  if current_focus.onArrowRight then
+    current_focus:onArrowRight()
   end
 end
 
@@ -4128,11 +4144,11 @@ function on.arrowLeft()
   if GlobalKbd:dispatchKey('left') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('left') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('left') then
     return
   end
-  if focus.onArrowLeft then
-    focus:onArrowLeft()
+  if current_focus.onArrowLeft then
+    current_focus:onArrowLeft()
   end
 end
 
@@ -4141,11 +4157,11 @@ function on.arrowUp()
   if GlobalKbd:dispatchKey('up') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('up') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('up') then
     return
   end
-  if focus.onArrowUp then
-    focus:onArrowUp()
+  if current_focus.onArrowUp then
+    current_focus:onArrowUp()
   end
 end
 
@@ -4154,11 +4170,11 @@ function on.arrowDown()
   if GlobalKbd:dispatchKey('down') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('down') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('down') then
     return
   end
-  if focus.onArrowDown then
-    focus:onArrowDown()
+  if current_focus.onArrowDown then
+    current_focus:onArrowDown()
   end
 end
 
@@ -4167,30 +4183,30 @@ function on.charIn(c)
   if GlobalKbd:dispatchKey(c) then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey(c) then
+  if current_focus.kbd and current_focus.kbd:dispatchKey(c) then
     return
   end
 
   --for i=1,#c do
   --  print(c:byte(i))
   --end
-  
-  if focus.onCharIn then
-    focus:onCharIn(c)
+
+  if current_focus.onCharIn then
+    current_focus:onCharIn(c)
   end
 end
 
 function on.enterKey()
   on_any_key()
   GlobalKbd:resetSequence()
-  if focus.kbd and focus.kbd:dispatchKey('enter') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('enter') then
     return
   end
-  if focus.onEnter then
-    focus:onEnter()
+  if current_focus.onEnter then
+    current_focus:onEnter()
   end
-  if focus.invalidate then
-    focus:invalidate()
+  if current_focus.invalidate then
+    current_focus:invalidate()
   end
 end
 
@@ -4199,11 +4215,11 @@ function on.backspaceKey()
   if GlobalKbd:dispatchKey('backspace') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('backspace') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('backspace') then
     return
   end
-  if focus.onBackspace then
-    focus:onBackspace()
+  if current_focus.onBackspace then
+    current_focus:onBackspace()
   end
 end
 
@@ -4212,11 +4228,11 @@ function on.clearKey()
   if GlobalKbd:dispatchKey('clear') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('clear') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('clear') then
     return
   end
-  if focus.onClear then
-    focus:onClear()
+  if current_focus.onClear then
+    current_focus:onClear()
   end
 end
 
@@ -4225,11 +4241,11 @@ function on.contextMenu()
   if GlobalKbd:dispatchKey('ctx') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('ctx') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('ctx') then
     return
   end
-  if focus.onContextMenu then
-    focus:onContextMenu()
+  if current_focus.onContextMenu then
+    current_focus:onContextMenu()
   end
 end
 
@@ -4247,7 +4263,7 @@ function on.help()
   if GlobalKbd:dispatchKey('help') then
     return
   end
-  if focus.kbd and focus.kbd:dispatchKey('help') then
+  if current_focus.kbd and current_focus.kbd:dispatchKey('help') then
     return
   end
 end
@@ -4265,15 +4281,15 @@ end
 function on.save()
   return {
     ['options'] = options,
-    ['stack'] = stack.stack,
-    ['input'] = input.text,
-    ['undo'] = {UndoStack, RedoStack}
+    ['stack'] = StackView.stack,
+    ['input'] = InputView.text,
+    ['undo'] = {Undo.undo_stack, Undo.redo_stack}
   }
 end
 
 function on.restore(state)
-  UndoStack, RedoStack = unpack(state.undo)
-  stack.stack = state.stack
+  Undo.undo.undo_stack, Undo.undo.redo_stack = unpack(state.undo)
+  StackView.stack = state.stack
   options = state.options
-  input:setText(state.input)
+  InputView:setText(state.input)
 end
