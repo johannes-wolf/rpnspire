@@ -178,53 +178,46 @@ function Trie.find(str, tab, pos)
   return nil
 end
 
+-- Theme
+---@class Theme
+local Theme = class()
+function Theme:init(bg, fg, opts)
+  self.bg = bg or 0xffffff
+  self.fg = fg or 0x000000
+  for k, v in pairs(opts) do
+    self[k] = v
+  end
+end
+
 -- Themes
-local theme = {
-  ["light"] = {
-    rowColor = 0xFFFFFF,
-    altRowColor = 0xEEEEEE,
-    selectionColor = 0xDFDFFF,
-    fringeTextColor = 0xAAAAAA,
-    menuActiveColor = 0x88FF98,
-    textColor = 0,
-    cursorColor = 0xEE0000,
-    cursorColorAlg = 0x0000FF,
-    cursorColorAlt = 0x999999,
-    backgroundColor = 0xFFFFFF,
-    borderColor = 0,
-    errorBackgroundColor = 0xEE0000,
-    errorTextColor = 0xffffff,
-  },
-  ["nordlike"] = {
-    rowColor = 0x2e3440,
-    altRowColor = 0x323844,
-    selectionColor = 0x636c7e,
-    menuActiveColor = 0x636c7e,
-    fringeTextColor = 0x4c566a,
-    textColor = 0xd8dee9,
-    cursorColor = 0xd8dee9,
-    cursorColorAlg = 0x0000FF,
-    cursorColorAlt = 0x777777,
-    backgroundColor = 0x2e3440,
-    borderColor = 0x1b2232,
-    errorBackgroundColor = 0xbf616a,
-    errorTextColor = 0xd8dee9,
-  },
-  ["dark"] = {
-    rowColor = 0x444444,
-    altRowColor = 0x222222,
-    selectionColor = 0xEE0000,
-    menuActiveColor = 0x00EE00,
-    fringeTextColor = 0xAAAAAA,
-    textColor = 0xFFFFFF,
-    cursorColor = 0xEE0000,
-    cursorColorAlg = 0xEE00EE,
-    cursorColorAlt = 0x999999,
-    backgroundColor = 0x111111,
-    borderColor = 0x888888,
-    errorBackgroundColor = 0x0000ff,
-    errorTextColor = 0x000000,
-  },
+local themes = {
+  ['light'] = Theme(0xffffff, 0x000000, {
+    row_bg         = 0xffffff,
+    alt_bg         = 0xeeeeee,
+    selection_bg   = 0xdfdfff,
+    fringe_fg      = 0xaaaaaa,
+    menu_active_bg = 0x88ff98,
+    cursor_bg      = 0xee0000,
+    cursor_alg_bg  = 0x0000ff,
+    cursor_alt_bg  = 0x999999,
+    error_bg       = 0xee0000,
+    error_fg       = 0xffffff,
+    border_bg      = 0x000000,
+  }),
+  ['dark'] = Theme(0x444444, 0xffffff, {
+    row_bg         = 0x444444,
+    alt_bg         = 0x222222,
+    selection_bg   = 0xdd0000,
+    selection_fg   = 0xffffff,
+    fringe_fg      = 0xaaaaaa,
+    menu_active_bg = 0x999999,
+    cursor_bg      = 0xee0000,
+    cursor_alg_bg  = 0x0000ee,
+    cursor_alt_bg  = 0x999999,
+    error_bg       = 0xee0000,
+    error_fg       = 0xffffff,
+    border_bg      = 0x000000,
+  })
 }
 
 -- Global options
@@ -243,6 +236,23 @@ local options = {
   autoAns = true,        -- Auto insert @1 in ALG mode
   maxUndo = 20,          -- Max num of undo steps
 }
+
+-- Returns value for key of the current theme
+---@param key string
+---@return any
+local function theme_val(key)
+  local val = themes[options.theme][key]
+  if not val then
+    if key:find('fg$') then
+      return themes[options.theme].fg or 0x000000
+    elseif key:find('bg$') then
+      return themes[options.theme].bg or 0xffffff
+    elseif key:find('font$') then
+      return {'sansserif', 'r', 11}
+    end
+  end
+  return val
+end
 
 -- Get the current mode
 ---@alias Mode "RPN" | "ALG"
@@ -2023,11 +2033,11 @@ function Widgets.Toast:draw(gc)
   local isError = self.style == 'error'
 
   gc:clipRect("set", x, y, w, h)
-  gc:setColorRGB(theme[options.theme][isError and 'errorBackgroundColor' or 'altRowColor'])
+  gc:setColorRGB(theme_val(isError and 'error_bg' or 'alt_bg'))
   gc:fillRect(x, y, w, h)
-  gc:setColorRGB(theme[options.theme].borderColor)
+  gc:setColorRGB(theme_val('border_bg'))
   gc:drawRect(x, y, w-1, h-1)
-  gc:setColorRGB(theme[options.theme][isError and 'errorTextColor' or 'textColor'])
+  gc:setColorRGB(theme_val(isError and 'error_rf' or 'fg'))
   gc:drawString(self.text, x + self.margin, y + self.margin)
   gc:clipRect("reset")
 end
@@ -2331,14 +2341,14 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
   if w < 0 or h < 0 then return end
 
   if item then
-    gc:setColorRGB(theme[options.theme].altRowColor)
+    gc:setColorRGB(theme_val('alt_bg'))
     gc:fillRect(x,y,w,h)
-    gc:setColorRGB(theme[options.theme].borderColor)
+    gc:setColorRGB(theme_val('border_bg'))
     gc:drawRect(x,y,w,h)
   else
-    gc:setColorRGB(theme[options.theme].rowColor)
+    gc:setColorRGB(theme_val('row_bg'))
     gc:fillRect(x,y,w,h)
-    gc:setColorRGB(theme[options.theme].borderColor)
+    gc:setColorRGB(theme_val('border_bg'))
     gc:drawRect(x,y,w,h)
     return
   end
@@ -2350,28 +2360,28 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
 
   local tw, th = gc:getStringWidth(itemText), gc:getStringHeight(itemText)
   local tx, ty = x + w/2 - tw/2, y + h/2 - th/2
-  
-  gc:setColorRGB(theme[options.theme].textColor)
+
+  gc:setColorRGB(theme_val('fg'))
   gc:drawString(item[1], tx, ty)
-  
-  if itemState ~= nil then 
+
+  if itemState ~= nil then
     local iw, ih = w * 0.66, 4
     local ix, iy = x + w/2 - iw/2, y + h - ih - margin
 
     if itemState == true then
-      gc:setColorRGB(theme[options.theme].menuActiveColor)
+      gc:setColorRGB(theme_val('menu_active_bg'))
       gc:fillRect(ix,iy,iw,ih)
     end
-    gc:setColorRGB(theme[options.theme].borderColor)
+    gc:setColorRGB(theme_val('border_bg'))
     gc:drawRect(ix, iy, iw, ih)
   end
-  
+
   gc:clipRect("reset")
 end
 
 function UIMenu:_drawGrid(gc)
   local pageOffset = self.page * 9
-  
+
   local cw, ch = self.frame.width/3, self.frame.height/3
   for row=1,3 do
     for col=1,3 do
@@ -2383,7 +2393,7 @@ end
 
 function UIMenu:_drawList(gc)
   local pageOffset = self.page * 9
-  
+
   local cw, ch = self.frame.width, self.frame.height/9
   for row=1,9 do
     local cx, cy = self.frame.x, self.frame.y + ch*(row-1)
@@ -2396,13 +2406,13 @@ function UIMenu:draw(gc)
 
   gc:clipRect("set", self:getFrame())
   local ffamily, fstyle, fsize = gc:setFont('sansserif', 'r', 9)
-  
+
   if self.style == 'grid' then
     self:_drawGrid(gc)
   else
     self:_drawList(gc)
   end
-  
+
   gc:setFont(ffamily, fstyle, fsize)
   gc:clipRect("reset")
 end
@@ -2800,54 +2810,58 @@ function UIStack:itemHeight(gc, idx)
 end
 
 function UIStack:drawItem(gc, x, y, w, idx, item)
-  local itemBG = {theme[options.theme].rowColor,
-                  theme[options.theme].altRowColor,
-                  theme[options.theme].selectionColor}
+  local itemBG = {
+    theme_val('row_bg'),
+    theme_val('alt_bg'),
+    theme_val('selection_bg')
+  }
+
   local minDistance, margin = 12, 2
-  
+
   local leftStr = item.label or item.infix or ''
-  
+
   local leftSize = {w = gc:getStringWidth(leftStr or ""), h = gc:getStringHeight(leftStr or "")}
   local rightSize = {w = gc:getStringWidth(item.result or ""), h = gc:getStringHeight(item.result or "")}
-  
+
   local fringeSize = gc:getStringWidth("0")*math.floor(math.log10(#self.stack)+1)
   local fringeMargin = options.showFringe and fringeSize + 3*margin or 0
-  
+
   local leftPos = {x = x + fringeMargin + margin,
                    y = y}
   local rightPos = {x = x + w - margin - rightSize.w,
                     y = y}
-  
+
   if rightPos.x < leftPos.x + leftSize.w + minDistance then
     rightPos.y = leftPos.y + margin*2 + leftSize.h
   end
-  
+
   local itemHeight = rightPos.y - leftPos.y + rightSize.h + margin
-  
+  local isSelected = current_focus == self and self.sel ~= nil and self.sel == idx
+
   gc:clipRect("set", x, y, w, itemHeight)
-  if current_focus == self and self.sel ~= nil and self.sel == idx then
+  if isSelected then
     gc:setColorRGB(itemBG[3])
   else
     gc:setColorRGB(itemBG[(idx%2)+1])
   end
-  
+
   gc:fillRect(x, y, w, itemHeight)
-  
+
   -- Render fringe (stack number)
   local fringeX = 0
   if options.showFringe == true then
     gc:setColorRGB(itemBG[((idx+1)%2)+1])
-    
+
     fringeX = x + fringeSize + 2*margin
     gc:drawLine(fringeX, y, fringeX, y + itemHeight)
-    gc:setColorRGB(theme[options.theme].fringeTextColor)
+    gc:setColorRGB(theme_val('fringe_fg'))
     gc:drawString(#self.stack - idx + 1, x + margin, y)
-    
+
     gc:clipRect("set", fringeX-1, y, w, itemHeight)
   end
-  
+
   -- Render expression and result
-  gc:setColorRGB(theme[options.theme].textColor)
+  gc:setColorRGB(theme_val(isSelected and 'selection_fg' or 'fg'))
   if not item.label then
     if options.showExpr == true then
       gc:drawString(item.infix or "", leftPos.x, leftPos.y)
@@ -2859,17 +2873,17 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
     local ffamily, fstyle, fsize = gc:setFont('serif', 'i', 11)
     gc:drawString(item.label, leftPos.x, leftPos.y)
     gc:setFont(ffamily, fstyle, fsize)
-    
+
     gc:drawString(item.result or "", rightPos.x, rightPos.y)
   end
-  
+
   -- Render overflow indicator
   if rightPos.x < fringeX + 1 then
-    gc:setColorRGB(theme[options.theme].cursorColor)
+    gc:setColorRGB(theme_val('cursor_bg'))
     gc:drawLine(fringeX, rightPos.y,
                 fringeX, rightPos.y + rightSize.h)
   end
-  
+
   gc:clipRect("reset")
   return itemHeight
 end
@@ -2877,17 +2891,17 @@ end
 function UIStack:draw(gc)
   local x,y,w,h = self:getFrame()
   local yoffset = y + self.scrolly
-  
+
   gc:clipRect("set", x, y, w, h)
-  
+
   if #self.stack == 0 and current_focus == self then
-    gc:setColorRGB(theme[options.theme].selectionColor)
+    gc:setColorRGB(theme_val('selection_bg'))
   else
-    gc:setColorRGB(theme[options.theme].backgroundColor)
+    gc:setColorRGB(theme_val('bg'))
   end
-   
+
   gc:fillRect(x,y,w,h)
- 
+
   for idx, item in ipairs(self.stack) do
     yoffset = yoffset + self:drawItem(gc, x, yoffset, w, idx, item)
   end
@@ -3322,9 +3336,9 @@ function UIInput:getFrame()
 end
 
 function UIInput:drawFrame(gc)
-  gc:setColorRGB(theme[options.theme].backgroundColor)
+  gc:setColorRGB(theme_val('bg'))
   gc:fillRect(self:getFrame())
-  gc:setColorRGB(theme[options.theme].borderColor)
+  gc:setColorRGB(theme_val('border_bg'))
   gc:drawLine(self.frame.x-1, self.frame.y,
               self.frame.x + self.frame.width, self.frame.y)
   gc:drawLine(self.frame.x-1, self.frame.y + self.frame.height,
@@ -3337,43 +3351,41 @@ function UIInput:drawText(gc)
   local scrollx = self.scrollx
   local cursorx = math.max(gc:getStringWidth(string.usub(self.text, 1, self.cursor.pos)) or 0, 0)
   cursorx = cursorx + x + scrollx
-  
+
   gc:clipRect("set", x, y, w, h)
-  
+
   -- Draw prefix text
   if self.prefix and self.prefix:len() > 0 then
     local prefixWidth = gc:getStringWidth(self.prefix) + 2*margin
 
-    --gc:setColorRGB(theme[options.theme].altRowColor)
+    --gc:setColorRGB(theme_val('alt_bg'))
     --gc:fillRect(x, y+1, prefixWidth, h-2)
-    gc:setColorRGB(theme[options.theme].fringeTextColor)
+    gc:setColorRGB(theme_val('fringe_fg'))
     gc:drawString(self.prefix, x + margin, y)
-    
+
     x = x + prefixWidth
     cursorx = cursorx + prefixWidth
     gc:clipRect("set", x, y, w, h)
   end
-  
-  -- Draw cursor selection box  
+
+  -- Draw cursor selection box
   if self.cursor.size ~= 0 then
     local selWidth = gc:getStringWidth(string.usub(self.text, self.cursor.pos+1, self.cursor.pos + self.cursor.size))
     local cursorLeft, cursorRight = math.min(cursorx, cursorx + selWidth), math.max(cursorx, cursorx + selWidth)
 
     gc:drawRect(cursorLeft + 1, y + 2, cursorRight - cursorLeft, h-3)
   end
-  
-  gc:setColorRGB(theme[options.theme].textColor)
+
+  gc:setColorRGB(theme_val('fg'))
   gc:drawString(self.text, x + margin + scrollx, y)
-  
+
   if current_focus == self then
-    gc:setColorRGB(get_mode() == "RPN" and 
-        theme[options.theme].cursorColor or
-        theme[options.theme].cursorColorAlg)
+    gc:setColorRGB(theme_val(get_mode() == "RPN" and 'cursor_bg' or 'cursor_alg_bg'))
   else
-    gc:setColorRGB(theme[options.theme].cursorColorAlt)
+    gc:setColorRGB(theme_val('cursor_alt_bg'))
   end
   gc:fillRect(cursorx+1, y+2, options.cursorWidth, h-3)
-  
+
   gc:clipRect("reset")
 end
 
@@ -3940,7 +3952,7 @@ local function make_options_menu()
 
   local function make_theme_menu()
     local items = {}
-    for name,_ in pairs(theme) do
+    for name,_ in pairs(themes) do
       table.insert(items, {
         name, function() options.theme = name end, state=options.theme == name
       })
@@ -4117,6 +4129,9 @@ function on.construction()
     -- Toggle mode
     options.mode = options.mode == 'RPN' and 'ALG' or 'RPN'
   end)
+
+  -- Settings
+  GlobalKbd:setSequence({'help', 'help'}, function() MenuView:present(current_focus, make_options_menu()) end)
 
   focus_view(InputView)
 end
