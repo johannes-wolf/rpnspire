@@ -6,7 +6,6 @@ under the terms of the GNU General Public License version 3 as published by
 the Free Software Foundation.
 ]]--
 
--- luacheck: ignore on
 
 -- Forward declarations
 local input_ask_value = nil
@@ -15,12 +14,16 @@ local completion_fn_variables = nil
 local temp_mode = {} -- Temporary mode override
 
 
--- Returns the height of string `s`
+-- Returns the height of string in pixels
+---@param s string
+---@return number
 local function getStringHeight(s)
   return platform.withGC(function(gc) return gc:getStringHeight(s or "A") end)
 end
 
--- Dump table `o` to string
+-- Dump table to string
+---@param o table
+---@return string | nil
 local function dump(o)
    if type(o) == "table" then
       local s = '{ '
@@ -34,7 +37,9 @@ local function dump(o)
    end
 end
 
--- Deep copy a table
+-- Deep copy table
+---@param t table  Input table
+---@return table
 local function table_clone(t)
     if type(t) ~= 'table' then return t end
     local meta = getmetatable(t)
@@ -51,6 +56,10 @@ local function table_clone(t)
 end
 
 -- Copy certain table fields
+---@param source table   Source table
+---@param fields table   List of field names to copy
+---@param target? table  Target table
+---@return table
 local function table_copy_fields(source, fields, target)
   target = target or {}
   for _,v in ipairs(fields) do
@@ -63,15 +72,22 @@ local function table_copy_fields(source, fields, target)
   return target
 end
 
--- Remove quotes from `str`
-function string.unquote(str)
-  if str:sub(1, 1) == '"' and
-     str:sub(-1)   == '"' then
+-- Trim quotes from string
+---@param str string  Input string
+---@param q? string   Quote character (defaults to ")
+---@return string
+function string.unquote(str, q)
+  q = q or '"'
+  if str:sub(1, 1) == q and
+     str:sub(-1)   == q then
     return str:sub(2, -2)
   end
   return str
 end
 
+-- Returns the number of utf-8 codepoints in string
+---@param str string
+---@return number
 function string.ulen(str)
   return select(2, str:gsub('[^\128-\193]', ''))
 end
@@ -107,10 +123,12 @@ function Rect.intersection(r, x, y, width, height)
 end
 
 
--- Prefix
+-- Prefix tree
 Trie = {}
 
--- Build a prefix tree from `tab` keys
+-- Build a prefix tree (trie) from table
+---@param tab table  Input table
+---@return table     Prefix tree
 function Trie.build(tab)
   local trie = {}
   for key, _ in pairs(tab) do
@@ -125,6 +143,10 @@ function Trie.build(tab)
   return trie
 end
 
+-- Search for string in prefix table
+---@param str string   Search string
+---@param tab table    Prefix table (trie)
+---@param pos? number  Position in string
 function Trie.find(str, tab, pos)
   assert(str)
   assert(tab)
@@ -581,7 +603,6 @@ local functions = {
   ["tcollect"]        = {n = 1},
   ["texpand"]         = {n = 1},
   ["tmpcnv"]          = {n = 2},
-  ["deltatmpcnv"]     = {n = 2},
   ["tpdf"]            = {n = 2},
   ["trace"]           = {n = 1},
   ["tvmfv"]           = {n = 7, min = 4},
@@ -970,8 +991,8 @@ end)()
 --   category   Formula category table
 --   want_var   Variable name(s) [string or table]
 --   have_vars  List of {var, value} pairs
-function build_formula_solve_queue(category, want_var, have_vars)
-  local formulas, variables = category.formulas, category.variables
+local function build_formula_solve_queue(category, want_var, have_vars)
+  local formulas = category.formulas
   local var_to_formula = {}
   
   if type(want_var) == 'string' then
@@ -1131,7 +1152,7 @@ local function solve_formula_interactive(category)
       var_in_use[solve_for] = true
     end
 
-    while not empty_input do
+    while true do
       local set_var = interactive_ask_variable('Set [empty if done]:')
       if not set_var then
         break
@@ -1798,7 +1819,7 @@ Widgets.Base = class()
 function Widgets.Base:invalidate()
 end
 
-function Widgets.Base:draw(gc)
+function Widgets.Base:draw()
 end
 
 -- Toast Widget
@@ -2032,8 +2053,8 @@ function UIMenu:onLooseFocus()
 end
 
 function UIMenu:onTab()
-  if #items > 9 then
-    self.page = (self.page + 1) % math.floor(#items / 9)
+  if #self.items > 9 then
+    self.page = (self.page + 1) % math.floor(#self.items / 9)
     self:invalidate()
   end
 end
@@ -3525,21 +3546,21 @@ input.completionFun = function(prefix)
 
     if semanticValue == '@>' or semanticValue == Sym.CONVERT or semanticKind == 'number' then
       semantic['unit'] = true
-    end 
-    
+    end
+
     if semanticValue == '@>' or semanticValue == Sym.CONVERT then
       semantic['conversion_fn'] = true
     end
-    
+
     if semanticKind == 'unit' then
       semantic['conversion_op'] = true
     end
-    
+
     if semanticValue ~= '@>' and semanticValue ~= Sym.CONVERT and semanticKind == 'operator'  then
       semantic['function'] = true
       semantic['variable'] = true
     end
-    
+
     if not semanticValue then
       semantic = semantic or {}
       semantic['common'] = true
@@ -3571,7 +3592,7 @@ input.completionFun = function(prefix)
   }
 
   -- Provide semantic
-  if semantic then 
+  if semantic then
     local candidates = {}
     if semantic['unit'] then
       candidates = completion_catmatch(unitTab, prefix, candidates)
@@ -3591,10 +3612,10 @@ input.completionFun = function(prefix)
       candidates = completion_catmatch(functionTab, prefix, candidates)
     end
     if semantic['variable'] then
-      candidates = completion_catmatchtch(var.list(), prefix, candidates)
+      candidates = completion_catmatch(var.list(), prefix, candidates)
     end
     if semantic['common'] then
-      candidates = completion_catmatch(commonTab, prefix, candidates) -- TODO: Add common tab
+      --candidates = completion_catmatch(commonTab, prefix, candidates) -- TODO: Add common tab
       candidates = completion_catmatch(var.list(), prefix,
                    completion_catmatch(functionTab, prefix,
                    completion_catmatch(unitTab, prefix, candidates)))
