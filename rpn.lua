@@ -25,34 +25,34 @@ end
 ---@param o table
 ---@return string | nil
 local function dump(o)
-   if type(o) == "table" then
-      local s = '{ '
-      for k,v in pairs(o) do
-         if type(k) ~= 'number' then k = '"'..k..'"' end
-         s = s .. '['..k..'] = ' .. dump(v) .. ','
-      end
-      return s .. '} '
-   else
-      return tostring(o)
-   end
+  if type(o) == "table" then
+    local s = '{ '
+    for k,v in pairs(o) do
+      if type(k) ~= 'number' then k = '"'..k..'"' end
+      s = s .. '['..k..'] = ' .. dump(v) .. ','
+    end
+    return s .. '} '
+  else
+    return tostring(o)
+  end
 end
 
 -- Deep copy table
 ---@param t table  Input table
 ---@return table
 local function table_clone(t)
-    if type(t) ~= 'table' then return t end
-    local meta = getmetatable(t)
-    local target = {}
-    for k, v in pairs(t) do
-        if type(v) == 'table' then
-            target[k] = table_clone(v)
-        else
-            target[k] = v
-        end
+  if type(t) ~= 'table' then return t end
+  local meta = getmetatable(t)
+  local target = {}
+  for k, v in pairs(t) do
+    if type(v) == 'table' then
+      target[k] = table_clone(v)
+    else
+      target[k] = v
     end
-    setmetatable(target, meta)
-    return target
+  end
+  setmetatable(target, meta)
+  return target
 end
 
 -- Copy certain table fields
