@@ -256,7 +256,7 @@ local function push_temp_mode(mode)
 end
 
 local function pop_temp_mode()
-  table.remove(temp_mode, #temp_mode)
+  table.remove(temp_mode)
 end
 
 
@@ -783,7 +783,7 @@ local function interactive_yield()
 end
 
 local function interactive_kill()
-  table.remove(interactiveStack, #interactiveStack)
+  table.remove(interactiveStack)
 end
 
 -- Helper function for using `input_ask_value` in an interactive session.
@@ -1415,7 +1415,7 @@ function RPNExpression:fromInfix(tokens)
   end
   
   local function popTop()
-    table.insert(result, table.remove(stack, #stack))
+    table.insert(result, table.remove(stack))
   end
   
   local function popUntil(value)
@@ -1423,7 +1423,7 @@ function RPNExpression:fromInfix(tokens)
       if stack[#stack][1] == value then
         return true
       end
-      table.insert(result, table.remove(stack, #stack))
+      table.insert(result, table.remove(stack))
     end
     return false
   end
@@ -1469,7 +1469,7 @@ function RPNExpression:fromInfix(tokens)
       table.insert(stack, {value, kind})
     elseif kind == 'syntax' and value == ')' then
       if popUntil('(') then
-        table.remove(stack, #stack)
+        table.remove(stack)
       else
         print("error: RPNExpression.fromInfix missing '('")
       end
@@ -1511,7 +1511,7 @@ function RPNExpression:fromInfix(tokens)
         end
       elseif value == ')' and parenLevel == 1 then
         if popUntil('(') then
-          table.remove(stack, #stack)
+          table.remove(stack)
           table.insert(result, {tostring(argc or 0), 'number'})
           table.insert(result, {name, 'function'})
           return
@@ -1555,7 +1555,7 @@ function RPNExpression:fromInfix(tokens)
         end
       elseif value == '}' then
         if popUntil('{') then
-          table.remove(stack, #stack)
+          table.remove(stack)
           table.insert(result, {tostring(argc or 0), 'number'})
           table.insert(result, {'}', 'syntax'})
           return
@@ -1610,7 +1610,7 @@ function RPNExpression:fromInfix(tokens)
         if rows == 0 then rows = 1 end
         if popUntil('[') then
           if curCol == 0 then
-            table.remove(stack, #stack)
+            table.remove(stack)
             table.insert(result, {tostring(cols), 'number'})
             table.insert(result, {tostring(rows), 'number'})
             table.insert(result, {']', 'syntax'})
@@ -1740,7 +1740,7 @@ function RPNExpression:_isReverseOp(value, kind)
 end
 
 function RPNExpression:pop()
-  return table.remove(self.stack, #self.stack)
+  return table.remove(self.stack)
 end
 
 function RPNExpression:pushOperator(name)
@@ -1790,7 +1790,7 @@ function RPNExpression:infixString()
  
     local args = {}
     for i=1,argc do
-      local item = table.remove(stack, #stack)
+      local item = table.remove(stack)
       table.insert(args, item)
     end
     
@@ -1815,12 +1815,12 @@ function RPNExpression:infixString()
       return Error.show("Missing function argument size")
     end
   
-    local argc = tonumber(table.remove(stack, #stack).expr)
+    local argc = tonumber(table.remove(stack).expr)
     assert(argc)
 
     local args = {}
     for i=1,argc do
-      local item = table.remove(stack, #stack)
+      local item = table.remove(stack)
       table.insert(args, 1, item)
     end
     
@@ -1839,12 +1839,12 @@ function RPNExpression:infixString()
       return Error.show("Missing list length")
     end
       
-    local length = tonumber(table.remove(stack, #stack).expr)
+    local length = tonumber(table.remove(stack).expr)
     assert(length)
 
     local str = ""
     while length > 0 do
-      str = table.remove(stack, #stack).expr .. str
+      str = table.remove(stack).expr .. str
       if length > 1 then str = "," .. str end
       length = length - 1
     end
@@ -1854,8 +1854,8 @@ function RPNExpression:infixString()
   end
 
   local function pushMatrix()
-    local rows = tonumber(table.remove(stack, #stack).expr)
-    local cols = tonumber(table.remove(stack, #stack).expr)
+    local rows = tonumber(table.remove(stack).expr)
+    local cols = tonumber(table.remove(stack).expr)
     assert(rows and rows >= 1)
     assert(cols and cols >= 1)
     
@@ -1863,7 +1863,7 @@ function RPNExpression:infixString()
     for row=rows,1,-1 do
       local colStr = ''
       for col=cols,1,-1 do
-        colStr = table.remove(stack, #stack).expr .. colStr
+        colStr = table.remove(stack).expr .. colStr
         if col > 1 then colStr = "," .. colStr end
       end
       str = '['.. colStr .. ']'..str
@@ -2212,7 +2212,7 @@ end
 
 function UIMenu:popPage()
   if #self.pageStack > 1 then
-    table.remove(self.pageStack, #self.pageStack)
+    table.remove(self.pageStack)
     self.items = self.pageStack[#self.pageStack]
     self.origItems = self.items
     self.filterString = ''
@@ -2541,7 +2541,7 @@ function UIStack:roll(n)
   n = n or 1
   if n > 0 then
     for i=1,n do
-      table.insert(self.stack, 1, table.remove(self.stack, #self.stack))
+      table.insert(self.stack, 1, table.remove(self.stack))
     end
   else
     for i=1,math.abs(n) do
@@ -2584,9 +2584,9 @@ function UIStack:toList(n)
 
   function newList:join(rpn)
     if rpn and rpn[#rpn][1] == '}' then
-      table.remove(rpn, #rpn)
+      table.remove(rpn)
 
-      local size = tonumber(table.remove(rpn, #rpn)[1])
+      local size = tonumber(table.remove(rpn)[1])
       assert(size)
 
       self.rpn:appendStack(rpn)
@@ -3391,7 +3391,7 @@ function Undo.record_undo(input)
 end
 
 function Undo.pop_undo()
-  table.remove(Undo.undo_stack, #Undo.undo_stack)
+  table.remove(Undo.undo_stack)
 end
 
 function Undo.apply_state(state)
@@ -3404,7 +3404,7 @@ end
 
 function Undo.undo()
   if #Undo.undo_stack > 0 then
-    local state = table.remove(Undo.undo_stack, #Undo.undo_stack)
+    local state = table.remove(Undo.undo_stack)
     table.insert(Undo.redo_stack, Undo.make_state())
     Undo.apply_state(state)
   end
@@ -3412,7 +3412,7 @@ end
 
 function Undo.redo()
   if #Undo.redo_stack > 0 then
-    local state = table.remove(Undo.redo_stack, #Undo.redo_stack)
+    local state = table.remove(Undo.redo_stack)
     table.insert(Undo.undo_stack, Undo.make_state())
     Undo.apply_state(state)
   end
