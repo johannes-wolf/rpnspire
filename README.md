@@ -59,12 +59,11 @@ n is the stack level. The stack reference will be replaced with the correspondin
 
 ## Formula Solver
 
-rpnspire has a builtin formula solver that tries to solve for a given variable using a set of input variables.
+rpnspire has a builtin formula solver that tries to solve for given variables using a set of input variables.
 The equation-library is currently WIP and contains only a few formulas.
 
 You can start the formula solver by pressing <kbd>F</kbd>, selecting a category and select the "Solve for ..." item.
-The solver asks you for the variable to solve for and the set of given variables. If you have entered all the variables
-select the "Solve [esc]" action or press "esc". The solver should output all equations needed.
+The solver asks you for the variables to solve for (comma separated) and the set of given variables. If you have entered all the variables enter an empty variable name. The solver should output all equations needed.
 
 Note that the solver sets variables in the current document, as each step is set to the resulting variable.
 
