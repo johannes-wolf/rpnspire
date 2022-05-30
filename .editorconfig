@@ -1,0 +1,20 @@
+root = true
+
+[*.lua]
+indent_style = space
+indent_size = 4
+
+# [basic code reformat option]
+quote_style = none
+call_arg_parentheses = keep
+align_call_args = true
+align_function_define_params = true
+
+# [diagnostic]
+enable_check_codestyle = true
+max_line_length = 120
+insert_final_newline = true
+
+# [name style check]
+enable_name_style_check = false
+local_name_define_style = snake_case
