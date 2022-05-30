@@ -3833,18 +3833,18 @@ function on.construction()
     }
   })
   
-  GlobalKbd:setSequence({'U'}, function(sequence)
+  GlobalKbd:setSequence({'U'}, function()
     undo()
   end)
-  GlobalKbd:setSequence({'R'}, function(sequence)
+  GlobalKbd:setSequence({'R'}, function()
     redo()
   end)
-  GlobalKbd:setSequence({'C'}, function(sequence)
+  GlobalKbd:setSequence({'C'}, function()
     clear()
   end)
 
   -- Edit
-  GlobalKbd:setSequence({'E'}, function(sequence)
+  GlobalKbd:setSequence({'E'}, function()
     if stack:size() > 0 then
       local idx = stack.sel or stack:size()
       focusView(input)
@@ -3875,7 +3875,7 @@ function on.construction()
     recordUndo()
     stack:roll(tonumber(sequence[#sequence]))
   end)
-  GlobalKbd:setSequence({'S', 'r', 'r'}, function(sequence)
+  GlobalKbd:setSequence({'S', 'r', 'r'}, function()
     -- Roll down 1
     recordUndo()
     stack:roll(1)
@@ -3886,17 +3886,17 @@ function on.construction()
     recordUndo()
     stack:pop(tonumber(sequence[#sequence]), true)
   end)
-  GlobalKbd:setSequence({'S', 'x', 'x'}, function(sequence)
+  GlobalKbd:setSequence({'S', 'x', 'x'}, function()
     -- Pop all items from top
     recordUndo()
     stack.stack = {}
   end)
-  GlobalKbd:setSequence({'S', 'l', '%d'}, function(sequence)
+  GlobalKbd:setSequence({'S', 'l', '%d'}, function()
     -- Transform top N items to list
     recordUndo()
     stack:toList(tonumber(sequence[#sequence]))
   end)
-  GlobalKbd:setSequence({'S', 'l', 'l'}, function(sequence)
+  GlobalKbd:setSequence({'S', 'l', 'l'}, function()
     -- Transform top 2 items to list (repeatable)
     recordUndo()
     stack:toList(2)
@@ -3940,20 +3940,20 @@ function on.construction()
   end)
 
   -- Formula Library
-  GlobalKbd:setSequence({'F'}, function(sequence)
+  GlobalKbd:setSequence({'F'}, function()
     menu:present(focus, make_formula_menu())
   end)
 
   -- Mode
-  GlobalKbd:setSequence({'M', 'r'}, function(sequence)
+  GlobalKbd:setSequence({'M', 'r'}, function()
     -- Set mode to RPN
     options.mode = 'RPN'
   end)
-  GlobalKbd:setSequence({'M', 'a'}, function(sequence)
+  GlobalKbd:setSequence({'M', 'a'}, function()
     -- Set mode to ALG
     options.mode = 'ALG'
   end)
-  GlobalKbd:setSequence({'M', 'm'}, function(sequence)
+  GlobalKbd:setSequence({'M', 'm'}, function()
     -- Toggle mode
     options.mode = options.mode == 'RPN' and 'ALG' or 'RPN'
   end)
