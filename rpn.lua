@@ -2077,7 +2077,7 @@ function Widgets.Toast:draw(gc)
   gc:fillRect(x, y, w, h)
   gc:setColorRGB(theme_val('border_bg'))
   gc:drawRect(x, y, w-1, h-1)
-  gc:setColorRGB(theme_val(isError and 'error_rf' or 'fg'))
+  gc:setColorRGB(theme_val(isError and 'error_fg' or 'fg'))
   gc:drawString(self.text, x + self.margin, y + self.margin)
   gc:clipRect("reset")
 end
