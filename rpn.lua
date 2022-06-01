@@ -1416,6 +1416,12 @@ function RPNExpression:fromInfix(tokens)
     return token
   end
 
+  local error_message = ''
+  local function error(message)
+    error_message = message
+    return _G.error(message)
+  end
+
   local function testTop(kind)
     return #stack > 0 and stack[#stack][2] == kind or nil
   end
@@ -1661,7 +1667,8 @@ function RPNExpression:fromInfix(tokens)
     return self.stack
   else
     self.stack = {}
-    Error.show(tostring(err))
+    Error.show(tostring(error_message))
+    print(err)
   end
 
   return
@@ -1678,27 +1685,28 @@ function RPNExpression:findBranch(index)
   assert(token)
 
   local count = 0
-  if token[2] == 'operator' then
-    local argc = select(3, queryOperatorInfo(token[1]))
+  local kind, value = token[2], token[1]
+  if kind == 'operator' then
+    local argc = select(3, queryOperatorInfo(value))
     count = tonumber(argc)
     index = index - 1
-  elseif token[2] == 'function' then
+  elseif kind == 'function' then
     count = tonumber(self.stack[index - 1][1])
     index = index - 2
-  elseif token[2] == 'syntax' then
-    if token[1] == '}' then
+  elseif kind == 'syntax' then
+    if value == '}' then
       count = tonumber(self.stack[index - 1][1])
       index = index - 2
-    elseif token[1] == ']' then
+    elseif value == ']' then
       count = tonumber(self.stack[index - 1][1])
       count = tonumber(self.stack[index - 2][1]) * count
       index = index - 3
     end
   end
 
-  for i=0,count-1 do
+  for i = 0, count - 1 do
     index = self:findBranch(index)
-    if i < count-1 then
+    if i < count - 1 then
       index = index - 1
     end
   end
@@ -1711,24 +1719,27 @@ end
 ---@return table<number, table<string, number>>[]
 function RPNExpression:split()
   local top = self.stack[#self.stack]
+  local kind, value = top[2], top[1]
 
   local branches = {}
   local index, count = #self.stack, 0
 
-  if top[2] == 'operator' then
+  if kind == 'operator' then
     local argc = select(3, queryOperatorInfo(top[1]))
     count = tonumber(argc)
     index = index - 1
-  elseif top[2] == 'function' then
+  elseif kind == 'function' then
     count = tonumber(self.stack[index - 1][1])
     index = index - 2
-  elseif top[1] == '}' then
-    count = tonumber(self.stack[#self.stack - 1][1])
-    index = index - 2
-  elseif top[1] == ']' then
-    count = tonumber(self.stack[#self.stack - 1][1])
-    count = tonumber(self.stack[#self.stack - 2][1]) * count
-    index = index - 3
+  elseif kind == 'syntax' then
+    if value == '}' then
+      count = tonumber(self.stack[#self.stack - 1][1])
+      index = index - 2
+    elseif value == ']' then
+      count = tonumber(self.stack[#self.stack - 1][1])
+      count = tonumber(self.stack[#self.stack - 2][1]) * count
+      index = index - 3
+    end
   else
     Error.show('Unimplemented')
     return
@@ -1742,18 +1753,6 @@ function RPNExpression:split()
       top = bottom - 1
     end
   end
-
-  --[[
-  for idx,v in ipairs(branches) do
-    local branch_stack = {}
-    for i=v.bottom,v.top do
-      table.insert(branch_stack, self.stack[i])
-    end
-
-    local branch_expr = RPNExpression(branch_stack)
-    branches[idx] = branch_expr
-  end
-  ]]
 
   return branches
 end
@@ -1862,6 +1861,12 @@ end
 function RPNExpression:infixString()
   local stack = {}
 
+  local error_message = ''
+  local function error(message)
+    error_message = message
+    _G.error(message)
+  end
+
   local function pushOperator(name, prec, argc, pos, assoc, aggrassoc)
     local assoc = assoc == "r" and 2 or (assoc == "l" and 1 or 0)
  
@@ -1884,12 +1889,12 @@ function RPNExpression:infixString()
     if pos < 0 then str = name .. str end
     if pos > 0 then str = str .. name end
 
-    table.insert(stack, {expr=str, prec=prec})
+    table.insert(stack, { expr = str, prec = prec })
   end
 
   local function pushFunction(name)
     if not stack or #stack < 1 then
-      return Error.show("Missing function argument size")
+      error("Missing function argument size")
     end
 
     local argc = tonumber(table.remove(stack).expr)
@@ -1913,7 +1918,7 @@ function RPNExpression:infixString()
 
   local function pushList()
     if not stack or #stack < 1 then
-      return Error.show("Missing list length")
+      error("Missing list length")
     end
  
     local length = tonumber(table.remove(stack).expr)
@@ -1974,16 +1979,24 @@ function RPNExpression:infixString()
     return table.insert(stack, {expr=value})
   end
 
-  for _,v in ipairs(self.stack) do
-    push(unpack(v))
+  local success, err = pcall(function()
+    for _,v in ipairs(self.stack) do
+      push(unpack(v))
+    end
+  end)
+
+  if success then
+    local infix = nil
+    for _,v in ipairs(stack) do
+      infix = (infix or '') .. v.expr
+    end
+
+    return infix
+  else
+    Error.show(error_message)
   end
 
-  local infix = nil
-  for _,v in ipairs(stack) do
-    infix = (infix or '') .. v.expr
-  end
-
-  return infix
+  return
 end
 
 --------------------------------------------------
