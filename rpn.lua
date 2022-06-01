@@ -3642,7 +3642,7 @@ function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
     Undo.record_undo()
     if (not ignoreInput and not self:dispatchInput()) or
        not Error.assertStackN(argc) then
-      Undo.undo.pop_undo()
+      Undo.pop_undo()
       return
     end
 
@@ -4427,7 +4427,7 @@ function on.save()
 end
 
 function on.restore(state)
-  Undo.undo.undo_stack, Undo.undo.redo_stack = unpack(state.undo)
+  Undo.undo_stack, Undo.redo_stack = unpack(state.undo)
   StackView.stack = state.stack
   options = state.options
   InputView:setText(state.input)
