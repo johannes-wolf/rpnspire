@@ -3538,7 +3538,7 @@ local function clear()
   StackView:invalidate()
   InputView:setText("", "")
   InputView:invalidate()
-  interactiveStack = {} -- Kill _all_ interactive sessions
+  --interactiveStack = {} -- Kill _all_ interactive sessions
 end
 
 
