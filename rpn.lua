@@ -2559,6 +2559,13 @@ function UIStack:top()
   return #self.stack > 0 and self.stack[#self.stack] or nil
 end
 
+function UIStack:selectionOrTop()
+  if current_focus == self and #self.stack then
+    return self.stack[self.sel or #self.stack]
+  end
+  return self:top()
+end
+
 function UIStack:pushInfix(input)
   print("info: UIStack.pushInfix call with '"..input.."'")
 
@@ -4120,7 +4127,7 @@ function on.construction()
   end)
   GlobalKbd:setSequence({'V', 'backspace'}, function()
     input_ask_value(InputView, function(varname)
-      local res, err = math.evalStr('DelVar '..varname)
+      local _, err = math.evalStr('DelVar '..varname)
       if err then
         Error.show(err)
       end
@@ -4130,6 +4137,26 @@ function on.construction()
     end)
   end)
   GlobalKbd:setSequence({'V', '='}, function()
+    local item = StackView:selectionOrTop()
+    local var_name, var_value = '', ''
+    if item then
+      var_value = item.result
+
+      -- Guess a function signature
+      local tokens = Infix.tokenize(item.result)
+      if tokens then
+        local args = {}
+        for _, v in ipairs(tokens) do
+          if v[2] == 'word' then
+            table.insert(args, v[1])
+          end
+        end
+        if #args > 0 then
+          var_name = '(' .. table.concat(args, ',') .. ')'
+        end
+      end
+    end
+
     input_ask_value(InputView, function(varname)
       input_ask_value(InputView, function(value)
         local res, err = math.evalStr(varname..':=('..value..')')
@@ -4137,15 +4164,12 @@ function on.construction()
           Error.show(err)
         end
       end, nil, function(widget)
-        local text = ''
-        if #StackView.stack > 0 then
-          text = StackView.stack[#StackView.stack].result
-        end
-        widget:setText(text, varname..':=')
+        widget:setText(var_value, varname .. ':=')
         widget:selAll()
       end)
     end, nil, function(widget)
-      widget:setText('', 'Set Var:')
+      widget:setText(var_name, 'Set Var:')
+      widget:setCursor(0)
       widget.completionFun = completion_fn_variables
     end)
   end)
