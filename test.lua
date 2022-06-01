@@ -75,6 +75,15 @@ require 'rpn'
 local Test = require 'testlib'
 
 
+-- Print a list of tokens
+---@param stack TokenPair[]
+local function debug_print_stack(stack)
+  for idx, v in ipairs(stack) do
+    print(string.format('[%03d|%s] %s', idx, v[2]:subs(1, 4), v[1]))
+  end
+end
+
+
 local test = {}
 
 function test.tokenize_infix()
@@ -182,14 +191,22 @@ function test.infix_to_rpn_to_infix()
     other = other or str
 
     local rpn = RPNExpression()
-    rpn:fromInfix(Infix.tokenize(str))
+    Test.assert(rpn:fromInfix(Infix.tokenize(str)))
+
     local new = rpn:infixString()
-    if not Test.assert(new == other, "Expected "..other.." got "..(new or "nil")) then
-      print("RPN Stack:")
-      for idx,v in ipairs(rpn.stack) do
-        print(string.format('%0.2d| %10s (%s)', idx, v[1], v[2]))
-      end
+    if not Test.assert(new and new == other, "Expected " .. (other or 'nil') .. " got " .. (new or "nil")) then
+      debug_print_stack(rpn.stack)
     end
+  end
+
+  local function fail(str)
+    local rpn = RPNExpression()
+    Test.assert(not rpn:fromInfix(Infix.tokenize(str)),
+                "Expected fromInfix to return nil (input: '" .. str .. "')\n")
+
+    local infix = rpn:infixString()
+    Test.assert(not infix,
+                "Expected infix string to be nil, is '" .. (infix or 'nil') .. "'")
   end
 
   expect("1+2")
@@ -251,6 +268,15 @@ function test.infix_to_rpn_to_infix()
   -- Remove parens
   expect("(2^2)", "2^2")
   expect("(((2^2)))", "2^2")
+
+  -- Syntax errors
+  fail("+")
+  fail(",")
+  fail(")")
+  fail("}")
+  fail(")")
+  fail("())")
+  fail("(+)")
 end
 
 function test.rpn_to_infix()

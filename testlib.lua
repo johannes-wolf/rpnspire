@@ -4,7 +4,7 @@ local Test = {
 }
 
 function Test.fail(message)
-  Test.failed = message or "fail"
+  error(message or 'fail')
   return false
 end
 
@@ -35,7 +35,7 @@ function Test.run(tests)
       else
         failed = failed + 1
         print("[FAILED] "..(Test.failed or (err or "")))
-        for _,v in ipairs(output) do
+        for _, v in ipairs(output) do
           if type(v) == 'string' then
             print("> "..(v or nil))
           end

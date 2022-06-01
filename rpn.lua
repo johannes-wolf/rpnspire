@@ -1419,17 +1419,25 @@ function RPNExpression:fromInfix(tokens)
   local function testTop(kind)
     return #stack > 0 and stack[#stack][2] == kind or nil
   end
-  
+
   local function popTop()
+    local top = stack[#stack]
+    if top[2] == 'operator' then
+      local argc = select(3, queryOperatorInfo(top[1]))
+      if #result < argc then
+        error('Missing operands')
+      end
+    end
+
     table.insert(result, table.remove(stack))
   end
-  
+
   local function popUntil(value)
     while #stack > 0 do
       if stack[#stack][1] == value then
         return true
       end
-      table.insert(result, table.remove(stack))
+      popTop()
     end
     return false
   end
@@ -1453,6 +1461,7 @@ function RPNExpression:fromInfix(tokens)
     local n = tonumber(sym:sub(2))
     if n then
       if not Error.assertStackN(n) then
+        error('Too few arguments on stack')
         return
       end
 
@@ -1463,6 +1472,8 @@ function RPNExpression:fromInfix(tokens)
     end
   end
 
+  ---@param value string
+  ---@param kind TokenKind
   local function handleDefault(value, kind)
     assert(value)
     assert(kind)
@@ -1477,7 +1488,7 @@ function RPNExpression:fromInfix(tokens)
       if popUntil('(') then
         table.remove(stack)
       else
-        print("error: RPNExpression.fromInfix missing '('")
+        error('Missing (')
       end
     elseif kind == 'syntax' and value == '{' then
       table.insert(stack, {value, kind})
@@ -1494,10 +1505,8 @@ function RPNExpression:fromInfix(tokens)
     elseif kind == 'ans' then
       handleAns(value)
     else
-      return false
+      error('Unexpected token')
     end
-
-    return true
   end
 
   beginFunction = function(name)
@@ -1509,10 +1518,10 @@ function RPNExpression:fromInfix(tokens)
         if argc then
           argc = argc + 1
         else
-          print("error: RPNExpression.fromInfix expected '('")
+          error('Expected (')
         end
         if not popUntil('(') then
-          print("error: RPNExpression.fromInfix missing '('")
+          error('Missing (')
           return
         end
       elseif value == ')' and parenLevel == 1 then
@@ -1522,7 +1531,7 @@ function RPNExpression:fromInfix(tokens)
           table.insert(result, {name, 'function'})
           return
         else
-          print("error: RPNExpression.fromInfix missing '('")
+          error('Missing (')
           return
         end
       else
@@ -1542,7 +1551,7 @@ function RPNExpression:fromInfix(tokens)
 
   beginList = function()
     if listLevel > 1 then
-      print("error: RPNExpression.fromInfix Nested lists are not allowed")
+      error('Nested lists are not allowed')
       return
     end
 
@@ -1553,10 +1562,10 @@ function RPNExpression:fromInfix(tokens)
         if argc then
           argc = argc + 1
         else
-          print("error: RPNExpression.fromInfix expected '{'")
+          error('Expected {')
         end
         if not popUntil('{') then
-          print("error: RPNExpression.fromInfix missing '{'")
+          error('Missing {')
           return
         end
       elseif value == '}' then
@@ -1566,7 +1575,7 @@ function RPNExpression:fromInfix(tokens)
           table.insert(result, {'}', 'syntax'})
           return
         else
-          print("error: RPNExpression.fromInfix missing '{'")
+          error('Missing {')
           return
         end
       else
@@ -1581,7 +1590,7 @@ function RPNExpression:fromInfix(tokens)
 
   beginMatrix = function()
     if matrixLevel > 1 then
-      print("error: RPNExpression.fromInfix nested matrices are not allowed")
+      error('Nested matrices are not allowed')
       return
     end
 
@@ -1595,20 +1604,20 @@ function RPNExpression:fromInfix(tokens)
         else
           curCol = curCol + 1
           if curCol > cols then
-            print("error: RPNExpression.fromInfix different column count")
+            error('Matrix different column lengths')
             return
           end
         end
-        
+
         if not popUntil('[') then
-          print("error: RPNExpression.fromInfix missing '['")
+          error('Missing [')
           return
         end
       elseif value == '[' then
         curCol = 1
         rows = rows + 1
         if not popUntil('[') then
-          print("error: RPNExpression.fromInfix missing '['")
+          error('Missing [')
           return
         end
         --handleDefault(value, kind)
@@ -1623,7 +1632,7 @@ function RPNExpression:fromInfix(tokens)
             return
           end
         else
-          print("error: RPNExpression.fromInfix missing '['")
+          error('Missing [')
           return
         end
         curCol = 0
@@ -1633,20 +1642,29 @@ function RPNExpression:fromInfix(tokens)
     end
   end
 
-  for token in next do
-    handleDefault(token[1], token[2])
-  end
-
-  while #stack > 0 do
-    if stack[#stack][1] == '(' then
-      print("error: RPNExpression.fromInfix paren missmatch")
-      return nil
+  local success, err = pcall(function()
+    for token in next do
+      handleDefault(token[1], token[2])
     end
-    popTop()
+
+    while #stack > 0 do
+      if stack[#stack][1] == '(' then
+        error('Paren missmatch')
+        break
+      end
+      popTop()
+    end
+  end)
+
+  if success then
+    self.stack = result
+    return self.stack
+  else
+    self.stack = {}
+    Error.show(tostring(err))
   end
 
-  self.stack = result
-  return self.stack
+  return
 end
 
 -- Returns the bottom stack index of the branch starting at index
@@ -3845,7 +3863,7 @@ function Error.show(str, pos)
   if type(str) == 'number' then
     str = errorCodes[str] or str
   end
-  
+
   ErrorToast:show(str)
   if not pos then
     InputView:selAll()
