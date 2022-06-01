@@ -2544,6 +2544,9 @@ end
 function UIStack:evalStr(str)
   local res, err = math.evalStr(str)
   -- Ignore unknown-function errors (for allowing to define functions in RPN mode)
+  if err and err == 750 then
+    return str, nil
+  end
   if err and err ~= 750 then
     Error.show(err)
     return nil
