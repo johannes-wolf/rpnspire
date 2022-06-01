@@ -3420,7 +3420,8 @@ function UIInput:drawText(gc)
   gc:drawString(self.text, x + margin + scrollx, y)
 
   if current_focus == self then
-    gc:setColorRGB(theme_val(get_mode() == "RPN" and 'cursor_bg' or 'cursor_alg_bg'))
+    local is_alg_mode = get_mode() == 'ALG' or not self.inputHandler:isBalanced()
+    gc:setColorRGB(theme_val(is_alg_mode and 'cursor_alg_bg' or 'cursor_bg'))
   else
     gc:setColorRGB(theme_val('cursor_alt_bg'))
   end
@@ -3545,7 +3546,7 @@ end
 function RPNInput:isBalanced()
   local str = InputView.text
   local paren,brack,brace,dq,sq = 0,0,0,0,0
-  for i=1,InputView.cursor.pos do
+  for i = 1, InputView.cursor.pos do
     local c = str:byte(i)
     if c==40  then paren = paren+1 end -- (
     if c==41  then paren = paren-1 end -- )
@@ -3941,6 +3942,7 @@ input_ask_value = function(widget, callbackEnter, callbackEscape, callbackSetup)
     restore_state()
   end
   
+  focus_view(widget)
   widget:invalidate()
 end
 
