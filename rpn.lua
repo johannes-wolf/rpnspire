@@ -3249,7 +3249,7 @@ function UIInput:customCompletion(tab)
 end
 
 function UIInput:nextCompletion(offset)
-  if not self.completionList then
+  if not self.completionList or #self.completionList == 0 then
     if not self.completionFun then return end
 
     local prefixSize = 0
@@ -3265,28 +3265,32 @@ function UIInput:nextCompletion(offset)
       end
     end
 
-    local prefix = "" 
+    local prefix = ''
     if prefixSize > 0 then
       prefix = self.text:sub(self.cursor.pos + 1 - prefixSize, self.cursor.pos)
     end
 
     self.completionList = self.completionFun(prefix)
     if not self.completionList or #self.completionList == 0 then
+      -- If prefix is a function, add parentheses
+      if functionInfo(prefix, false) then
+        self:_insertChar('(')
+      end
       return
     end
-    
+
     self.completionIdx = 1
   else
     -- Apply single entry using [tab]
-    if #self.completionList == 1 then
+    if #self.completionList <= 1 then
       self:moveCursor(1)
       self:cancelCompletion()
       return
     end
-   
+
     -- Advance completion index
     self.completionIdx = (self.completionIdx or 0) + (offset or 1)
-    
+
     -- Reset completion list
     if self.completionIdx > #self.completionList then
       self.completionIdx = 1
