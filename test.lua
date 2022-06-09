@@ -46,6 +46,7 @@ local GC = {
   drawRect = function() end,
   fillRect = function() end,
   setColorRGB = function() end,
+  setFont = function() end,
 }
 
 -- luacheck: ignore platform
