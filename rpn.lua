@@ -1156,8 +1156,8 @@ local formulas = (function()
       ['b']     = v('Side b'),
       ['c']     = v('Side c'),
       ['ha']    = v('Height on a'),
-      ['hb']    = v('Height on a'),
-      ['hc']    = v('Height on a'),
+      ['hb']    = v('Height on b'),
+      ['hc']    = v('Height on c'),
       ['alpha'] = v('Angle alpha'),
       ['beta']  = v('Angle beta'),
       ['gamma'] = v('Angle gamma'),
@@ -1194,9 +1194,9 @@ local formulas = (function()
       Formula('hc=b*sin(alpha)', {'hc', 'b', 'alpha'}),
       Formula('hc=a*sin(beta)',  {'hc', 'a', 'beta'}),
       -- Circumscribed Circle radius r
-      Formula('r=a/(2*sin(alpha)',  {'r', 'a', 'alpha'}),
-      Formula('r=b/(2*sin(beta)',   {'r', 'b', 'beta'}),
-      Formula('r=c/(2*sin(gamma)',  {'r', 'c', 'gamma'}),
+      Formula('r=a/(2*sin(alpha))', {'r', 'a', 'alpha'}),
+      Formula('r=b/(2*sin(beta))',  {'r', 'b', 'beta'}),
+      Formula('r=c/(2*sin(gamma))', {'r', 'c', 'gamma'}),
       Formula('r=(a*b*c)/(4*area)', {'r', 'a', 'b', 'c', 'area'}),
     }
   }
@@ -4208,8 +4208,6 @@ end
 
 -- View list
 local views = {
-  --StackView,
-  --InputView,
   Toast,
   ErrorToast,
   MenuView
