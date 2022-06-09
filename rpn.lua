@@ -12,6 +12,7 @@ local focus_view = nil
 local input_ask_value = nil
 local completion_catmatch = nil
 local completion_fn_variables = nil
+local theme_val = nil
 
 -- Temporary mode override stack
 local temp_mode = {}
@@ -104,6 +105,50 @@ function string.ulen(str)
   return select(2, str:gsub('[^\128-\193]', ''))
 end
 
+-- Call callback with temporary font set
+---@param gc table     GC
+---@param size number  Font size
+---@param fn function  Callback
+local function with_temp_font(gc, size, fn, ...)
+  local ffamily, fstyle, fsize = gc:setFont('sansserif', 'r', size)
+  local res = fn(gc, ...)
+  gc:setFont(ffamily, fstyle, fsize)
+  return res
+end
+
+-- Draw string aligned
+---@param gc table        GC
+---@param text string     Text
+---@param halign integer  left (<0), center (0), right (>0)
+---@param valign integer  top (<0), mid (0), bottom (>0)
+---@return integer x1     Left position
+---@return integer x2     Right position
+---@return integer y      Top position
+local function draw_string_aligned(gc, text, x, y, w, h, halign, valign)
+  halign = halign or -1
+  valign = valign or -1
+
+  if halign >= 0 then
+    local text_w = gc:getStringWidth(text)
+    if halign == 0 then
+      x = x + w/2 - text_w/2
+    else
+      x = x + w - text_w
+    end
+  end
+
+  if valign >= 0 then
+    local text_h = gc:getStringHeight(text)
+    if valign == 0 then
+      y = y + h/2 - text_h/2
+    else
+      y = y + h - text_h
+    end
+  end
+
+  return x, gc:drawString(text, x, y), y
+end
+
 
 -- Rectangle utility functions
 Rect = {}
@@ -132,6 +177,148 @@ function Rect.intersection(r, x, y, width, height)
     }
   end
   return nil
+end
+
+-- UI
+UI = {}
+
+-- Widget base class
+---@class UI.Widget
+UI.Widget = class()
+function UI.Widget:init(frame)
+  self._frame = frame or {0, 0, 0, 0}
+  self._visible = true
+end
+
+---@return number  x
+---@return number  y
+---@return number  width
+---@return number  height
+function UI.Widget:frame()
+  return unpack(self._frame)
+end
+
+function UI.Widget:set_frame(x, y, w, h)
+  self._frame = {x, y, w, h}
+end
+
+function UI.Widget:visible()
+  return self._visible
+end
+
+function UI.Widget:invalidate()
+  platform.window:invalidate(self:frame())
+end
+
+function UI.Widget:draw(gc)
+  gc:drawRect(self:frame())
+end
+
+-- Vertical row layout container
+---@class UI.RowLayout
+UI.RowLayout = class()
+function UI.RowLayout:init()
+  self.children = {}
+end
+
+-- Add child widget
+---@param widget UI.Widget  Child widget to add
+---@param index? number     Index at which to add the widget
+---@param height? number    Size in units
+---@return UI.Widget widget
+function UI.RowLayout:add_widget(widget, index, height)
+  index = index or #self.children
+  table.insert(self.children, index, {
+    widget = widget,
+    height = height
+  })
+  return self.children[index].widget
+end
+
+-- Calculate child layout
+function UI.RowLayout:layout(x, y, w, h)
+  x = x or 0
+  y = y or 0
+  w = w or platform.window:width()
+  h = h or platform.window:height()
+
+  local dyn_height = h
+  local dyn_child_count = 0
+  for _, child in ipairs(self.children) do
+    if child.widget:visible() then
+      if child.height then
+        dyn_height = dyn_height - child.height
+      else
+        dyn_child_count = dyn_child_count + 1
+      end
+    end
+  end
+
+  for _, child in ipairs(self.children) do
+    if child.widget:visible() then
+      local child_height = child.height or (dyn_height / dyn_child_count)
+      child.widget:set_frame(x, y, w, child_height)
+
+      y = y + child_height
+    end
+  end
+end
+
+-- Render layout
+function UI.RowLayout:draw(gc, x, y, w, h)
+  self:layout()
+
+  for _, child in ipairs(self.children) do
+    if child.widget:visible() then
+      child.widget:draw(gc, x, y, w, h)
+    end
+  end
+end
+
+-- Bar for text
+---@class UI.OmniBar : UI.Widget
+UI.OmniBar = class(UI.Widget)
+function UI.OmniBar:init()
+  UI.Widget.init(self)
+  self.text_left = nil
+  self.text_right = nil
+end
+
+function UI.OmniBar:draw(gc)
+  local x, y, w, h = self:frame()
+
+  gc:clipRect('set', x, y, w, h)
+  with_temp_font(gc, 7, function(gc)
+    gc:setColorRGB(theme_val('omni_bg'))
+    gc:fillRect(x, y, w, h)
+
+    gc:setColorRGB(theme_val('omni_fg'))
+    if self.text_right then
+      w = draw_string_aligned(gc, self.text_right, x, y, w, h, 1, 0) - x - 2
+    end
+
+    if self.text_left then
+      gc:clipRect('set', x, y, w, h)
+      draw_string_aligned(gc, self.text_left, x, y, w, h, -1, 0)
+    end
+  end)
+end
+
+function UI.OmniBar:visible()
+  return self.text_left or self.text_right
+end
+
+function UI.OmniBar:set_text(left, right)
+  self.text_left = left
+  self.text_right = right
+end
+
+function UI.OmniBar.height()
+  return platform.withGC(function(gc)
+    return with_temp_font(gc, 7, function(gc)
+      return gc:getStringHeight('A')
+    end)
+  end)
 end
 
 
@@ -203,6 +390,8 @@ local themes = {
     error_bg       = 0xee0000,
     error_fg       = 0xffffff,
     border_bg      = 0x000000,
+    omni_bg        = 0x222222,
+    omni_fg        = 0xEEEEEE,
   }),
   ['dark'] = Theme(0x444444, 0xffffff, {
     row_bg         = 0x444444,
@@ -240,7 +429,7 @@ local options = {
 -- Returns value for key of the current theme
 ---@param key string
 ---@return any
-local function theme_val(key)
+theme_val = function(key)
   local val = themes[options.theme][key]
   if not val then
     if key:find('fg$') then
@@ -811,7 +1000,7 @@ local function interactive_kill()
 end
 
 -- Helper function for using `input_ask_value` in an interactive session.
----@param widget Widget      Input widget
+---@param widget UIInput     Input widget
 ---@param onEnter function   Callback called if the user presses enter
 ---@param onCancel function  Callback called if the user canceled the request
 ---@param onSetup function   Callback called to set up the view
@@ -1670,8 +1859,6 @@ function RPNExpression:fromInfix(tokens)
     Error.show(tostring(error_message))
     print(err)
   end
-
-  return
 end
 
 -- Returns the bottom stack index of the branch starting at index
@@ -1716,7 +1903,7 @@ end
 
 -- Returns a list of stack-indices (top, bottom), one per branch of the top-most
 -- operator/function/list/matrix
----@return table<number, table<string, number>>[]
+---@return table<number, table<"top"|"bottom", number>>[]
 function RPNExpression:split()
   local top = self.stack[#self.stack]
   local kind, value = top[2], top[1]
@@ -1995,33 +2182,16 @@ function RPNExpression:infixString()
   else
     Error.show(error_message)
   end
-
-  return
 end
 
 --------------------------------------------------
 --                     UI                       --
 --------------------------------------------------
 
-Widgets = {}
-
--- Widget Base Class
----@class Widget
----@field invalidate function
----@field draw function
----@field kbd table
----@field onFocus function
----@field onLooseFocus function
----@field onEscape function
----@field onEnter function
----@field onCharIn function
-Widgets.Base = class()
-function Widgets.Base:invalidate() end
-function Widgets.Base:draw() end
-
 -- Toast Widget
-Widgets.Toast = class(Widgets.Base)
-function Widgets.Toast:init(args)
+UI.Toast = class(UI.Widget)
+function UI.Toast:init(args)
+  UI.Widget.init(self)
   args = args or {}
   self.location = args.location or 'top'
   self.margin = 4
@@ -2030,11 +2200,7 @@ function Widgets.Toast:init(args)
   self.style = args.style
 end
 
-function Widgets.Toast:invalidate()
-  platform.window:invalidate(self:getFrame())
-end
-
-function Widgets.Toast:getFrame()
+function UI.Toast:frame()
   if not self.text or self.text:ulen() == 0 then
     return 0, 0, 0, 0
   end
@@ -2060,16 +2226,16 @@ function Widgets.Toast:getFrame()
   return x, y, w, h
 end
 
-function Widgets.Toast:show(text)
+function UI.Toast:show(text)
   self:invalidate()
   self.text = text and tostring(text) or nil
   self:invalidate()
 end
 
-function Widgets.Toast:draw(gc)
+function UI.Toast:draw(gc)
   if not self.text then return end
 
-  local x,y,w,h = self:getFrame()
+  local x,y,w,h = self:frame()
   local isError = self.style == 'error'
 
   gc:clipRect("set", x, y, w, h)
@@ -2172,15 +2338,15 @@ function KeybindManager:dispatchKey(key)
 end
 
 -- Fullscreen 9-tile menu which is navigated using the numpad
----@class UIMenu
-UIMenu = class(Widgets.Base)
+---@class UIMenu : UI.Widget
+UIMenu = class(UI.Widget)
 function UIMenu:init()
-  self.frame = {width=0, height=0, x=0, y=0}
+  UI.Widget.init(self)
   self.page = 0
   self.pageStack = {}
   self.items = {}
   self.filterString = nil
-  self.visible = false
+  self._visible = false
   self.parent = nil
   -- Style
   self.style = 'grid'
@@ -2194,18 +2360,12 @@ function UIMenu:center(w, h)
   h = h or platform.window:height()
 
   local margin = 4
-  self.frame.x = margin
-  self.frame.y = margin
-  self.frame.width = w - 2*margin
-  self.frame.height = h - 2*margin
-end
-
-function UIMenu:getFrame()
-  return self.frame.x, self.frame.y, self.frame.width, self.frame.height
-end
-
-function UIMenu:invalidate()
-  platform.window:invalidate(self:getFrame())
+  self._frame = {
+    margin,
+    margin,
+    w - 2*margin,
+    h - 2*margin
+  }
 end
 
 function UIMenu:hide()
@@ -2249,11 +2409,11 @@ function UIMenu:nextPage()
 end
 
 function UIMenu:onFocus()
-  self.visible = true
+  self._visible = true
 end
 
 function UIMenu:onLooseFocus()
-  self.visible = false
+  self._visible = false
 end
 
 function UIMenu:onTab()
@@ -2420,31 +2580,35 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
 end
 
 function UIMenu:_drawGrid(gc)
+  local x, y, width, height = self:frame()
   local pageOffset = self.page * 9
 
-  local cw, ch = self.frame.width/3, self.frame.height/3
+  local cw, ch = width/3, height/3
   for row=1,3 do
     for col=1,3 do
-      local cx, cy = self.frame.x + cw*(col-1), self.frame.y + ch*(row-1)
+      local cx, cy = x + cw*(col-1), y + ch*(row-1)
       self:drawCell(gc, self.items[pageOffset + (row-1)*3 + col] or nil, cx, cy, cw, ch)
     end
   end
 end
 
 function UIMenu:_drawList(gc)
+  local x, y, width, height = self:frame()
   local pageOffset = self.page * 9
 
-  local cw, ch = self.frame.width, self.frame.height/9
+  local cw, ch = width, height/9
   for row=1,9 do
-    local cx, cy = self.frame.x, self.frame.y + ch*(row-1)
+    local cx, cy = x, y + ch*(row-1)
     self:drawCell(gc, self.items[pageOffset + row] or nil, cx, cy, cw, ch)
   end
 end
 
 function UIMenu:draw(gc)
-  if not self.visible then return end
+  if not self:visible() then
+    return
+  end
 
-  gc:clipRect("set", self:getFrame())
+  gc:clipRect("set", self:frame())
   local ffamily, fstyle, fsize = gc:setFont('sansserif', 'r', 9)
 
   if self.style == 'grid' then
@@ -2458,17 +2622,23 @@ function UIMenu:draw(gc)
 end
 
 -- RPN stack view
-UIStack = class(Widgets.Base)
+---@class UIStack : UI.Widget
+UIStack = class(UI.Widget)
 function UIStack:init()
+  UI.Widget.init(self)
   self.stack = {}
   -- View
-  self.frame = {x=0, y=0, width=0, height=0}
   self.scrolly = 0
   -- Selection
   self.sel = nil
   -- Bindings
   self.kbd = KeybindManager()
   self:initBindings()
+end
+
+function UIStack:set_frame(x, y, w, h)
+  UI.Widget.set_frame(self, x, y, w, h)
+  self:scrollToIdx(self.sel)
 end
 
 function UIStack:initBindings()
@@ -2531,14 +2701,6 @@ function UIStack:initBindings()
   self.kbd:setSequence({"3"}, function()
     self:selectIdx(#self.stack)
   end)
-end
-
-function UIStack:getFrame()
-  return self.frame.x, self.frame.y, self.frame.width, self.frame.height
-end
-
-function UIStack:invalidate()
-  platform.window:invalidate()
 end
 
 function UIStack:evalStr(str)
@@ -2763,7 +2925,7 @@ function UIStack:frameAtIdx(idx)
   idx = idx or #self.stack
   
   local x,y,w,h = 0,0,0,0
-  local fx,_,fw,_ = self:getFrame()
+  local fx,_,fw,_ = self:frame()
   
   for i=1,idx-1 do
     y = y + platform.withGC(function(gc) return self:itemHeight(gc, i) end)
@@ -2788,7 +2950,7 @@ function UIStack:scrollToIdx(idx)
   local _,itemY,_,itemHeight = self:frameAtIdx(idx)
   local top, bottom = itemY, itemY + itemHeight
   local sy = self.scrolly
-  local _,_,_,h = self:getFrame()
+  local _,_,_,h = self:frame()
   
   if top + sy < 0 then
     sy = 0 - top
@@ -2836,7 +2998,7 @@ end
 
 function UIStack:itemHeight(gc, idx)
   -- TODO: Refactor und mit drawItem zusammen!
-  local x,y,w,h = self:getFrame()
+  local x,y,w,h = self:frame()
   local minDistance, margin = 12, 2
   local fringeSize = gc:getStringWidth("0")*math.floor(math.log10(#self.stack)+1)
   local fringeMargin = fringeSize + 3*margin
@@ -2939,7 +3101,7 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
 end
 
 function UIStack:draw(gc)
-  local x,y,w,h = self:getFrame()
+  local x,y,w,h = self:frame()
   local yoffset = y + self.scrolly
 
   gc:clipRect("set", x, y, w, h)
@@ -2960,9 +3122,10 @@ end
 
 
 -- Text input widget
-UIInput = class(Widgets.Base)
+---@class UIInput : UI.Widget
+UIInput = class(UI.Widget)
 function UIInput:init(frame)
-  self.frame = frame or {x=0, y=0, width=0, height=0}
+  UI.Widget.init(self, frame)
   self.text = ""
   self.cursor = {pos=string.len(self.text), size=0}
   self.scrollx = 0
@@ -2979,6 +3142,14 @@ function UIInput:init(frame)
   self:init_bindings()
 end
 
+function UIInput.height()
+  return platform.withGC(function(gc)
+    return with_temp_font(gc, 11, function(gc)
+      return gc:getStringHeight('A')
+    end)
+  end)
+end
+
 function UIInput:save_state()
   return table_copy_fields(self, {
     'text', 'prefix', 'cursor', 'scrollx', 'completionFun', 'completionIdx', 'completionList'})
@@ -2989,7 +3160,6 @@ function UIInput:restore_state(state)
     'text', 'prefix', 'cursor', 'scrollx', 'completionFun', 'completionIdx', 'completionList'}, self)
   self:invalidate()
 end
-
 
 function UIInput:init_bindings()
   local function findNearestChr(chr, origin, direction)
@@ -3060,10 +3230,6 @@ function UIInput:init_bindings()
   end)
 end
 
-function UIInput:invalidate()
-  platform.window:invalidate(self:getFrame())
-end
-
 -- Reset the completion state, canceling pending completions
 function UIInput:cancelCompletion()
   if self.completionIdx ~= nil then
@@ -3073,7 +3239,10 @@ function UIInput:cancelCompletion()
     if self.cursor.size > 0 then
       self:onBackspace()
     end
+    return true
   end
+
+  OmniBar:set_text()
 end
 
 -- Starts a completion with the given list
@@ -3132,6 +3301,10 @@ function UIInput:nextCompletion(offset)
       self.completionIdx = #self.completionList
     end
   end
+
+  -- Generate omnibar string
+  OmniBar:set_text('Completion',
+                   string.format('%d/%d', self.completionIdx, #self.completionList))
   
   local tail = ""
   if self.cursor.pos + self.cursor.size < #self.text then
@@ -3191,7 +3364,7 @@ function UIInput:getCursorX(pos)
 end
 
 function UIInput:scrollToPos(pos)
-  local _,_,w,_ = self:getFrame()
+  local _,_,w,_ = self:frame()
   local margin = self.margin
   local cx = self:getCursorX(pos or self.cursor.pos + self.cursor.size)
   local sx = self.scrollx
@@ -3309,12 +3482,13 @@ function UIInput:_insertChar(c)
 end
 
 function UIInput:onBackspace()
-  self:cancelCompletion()
-  if options.autoPop == true and self.text:ulen() <= 0 then
-    Undo.record_undo()
-    StackView:pop()
-    StackView:scrollToIdx()
-    return
+  if not self:cancelCompletion() then
+    if options.autoPop == true and self.text:ulen() <= 0 then
+      Undo.record_undo()
+      StackView:pop()
+      StackView:scrollToIdx()
+      return
+    end
   end
   
   if self.cursor.size > 0 then
@@ -3381,23 +3555,22 @@ function UIInput:selAll()
   self:invalidate()
 end
 
-function UIInput:getFrame()
-  return self.frame.x, self.frame.y, self.frame.width, self.frame.height
-end
 
 function UIInput:drawFrame(gc)
+  local x, y, width, height = self:frame()
+
   gc:setColorRGB(theme_val('bg'))
-  gc:fillRect(self:getFrame())
+  gc:fillRect(x, y, width, height)
   gc:setColorRGB(theme_val('border_bg'))
-  gc:drawLine(self.frame.x-1, self.frame.y,
-              self.frame.x + self.frame.width, self.frame.y)
-  gc:drawLine(self.frame.x-1, self.frame.y + self.frame.height,
-              self.frame.x + self.frame.width, self.frame.y + self.frame.height)
+  gc:drawLine(x-1, y,
+              x + width, y)
+  gc:drawLine(x-1, y + height,
+              x + width, y + height)
 end
 
 function UIInput:drawText(gc)
   local margin = self.margin
-  local x,y,w,h = self:getFrame()
+  local x,y,w,h = self:frame()
   local scrollx = self.scrollx
   local cursorx = math.max(gc:getStringWidth(string.usub(self.text, 1, self.cursor.pos)) or 0, 0)
   cursorx = cursorx + x + scrollx
@@ -3449,23 +3622,27 @@ end
 --[[
   Rich text view for displaying expressions in a 2D style.
 ]]--
-RichText = class(Widgets.Base)
+RichText = class(UI.Widget)
 function RichText:init()
+  UI.Widget.init(self)
   self.view = D2Editor.newRichText()
   self.view:setReadOnly(true)
   self.view:setBorder(0)
 end
 
 function RichText:onFocus()
-  self.view:move(StackView.frame.x, StackView.frame.y)
-    :resize(StackView.frame.width, StackView.frame.height)
+  self:set_frame(StackView:frame())
+  self.view:move(self:frame())
+    :resize(select(3, self:frame()))
     :setVisible(true)
     :setFocus(true)
+  self._visible = true
 end
 
 function RichText:onLooseFocus()
   self.view:setVisible(false)
     :setFocus(false)
+  self._visible = false
 end
 
 function RichText:onEscape()
@@ -3709,13 +3886,16 @@ end
 
 
 -- UI
-InputView = UIInput()
-StackView = UIStack()
+local main_layout = UI.RowLayout()
+StackView = main_layout:add_widget(UIStack(), 1)
+OmniBar   = main_layout:add_widget(UI.OmniBar(), 2, UI.OmniBar.height())
+InputView = main_layout:add_widget(UIInput(), 3, UIInput.height())
+
 MenuView  = UIMenu()
 RichView  = RichText()
 
 -- Switch focus to view
----@param view Widget  View to focus
+---@param view UI.Widget  View to focus
 focus_view = function(view)
   if view ~= nil and view ~= current_focus then
     if current_focus then
@@ -3854,8 +4034,8 @@ InputView.completionFun = function(prefix)
 end
 
 
-Toast = Widgets.Toast()
-ErrorToast = Widgets.Toast({location = 'center', style = 'error'})
+Toast = UI.Toast()
+ErrorToast = UI.Toast({location = 'center', style = 'error'})
 GlobalKbd = KeybindManager()
 
 -- After execution of any kbd command invaidate all
@@ -4031,8 +4211,8 @@ end
 
 -- View list
 local views = {
-  StackView,
-  InputView,
+  --StackView,
+  --InputView,
   Toast,
   ErrorToast,
   MenuView
@@ -4203,23 +4383,8 @@ function on.construction()
 end
 
 function on.resize(w, h)
-  local inputHeight = getStringHeight()
-
-  StackView.frame = {
-    x = 0,
-    y = 0,
-    width = w,
-    height = h - inputHeight
-  }
-  InputView.frame = {
-    x = 0,
-    y = h - inputHeight,
-    width = w,
-    height = inputHeight
-  }
-
-  MenuView:center(StackView.frame.width,
-                  StackView.frame.height)
+  MenuView:center(w, h)
+  main_layout:layout(0, 0, w, h)
 end
 
 function on.escapeKey()
@@ -4410,8 +4575,10 @@ end
 function on.paint(gc, x, y, w, h)
   local frame = {x = x, y = y, width = w, height = h}
 
+  main_layout:draw(gc, x, y, w, h)
+
   for _,view in ipairs(views) do
-    if Rect.intersection(frame, view:getFrame()) then
+    if Rect.intersection(frame, view:frame()) then
       view:draw(gc, frame)
     end
   end
