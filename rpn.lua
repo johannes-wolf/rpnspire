@@ -4155,7 +4155,7 @@ local function make_formula_menu()
           table.insert(variables_list, {info[1], var})
         end
         return variables_list
-      end)}
+      end)()}
     }
 
     table.insert(category_menu, {title, actions_menu})
