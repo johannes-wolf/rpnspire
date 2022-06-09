@@ -4214,21 +4214,6 @@ local views = {
 }
 
 function on.construction()
-  toolpalette.register({
-    {"Stack",
-      {"DUP 2",  function() StackView:dup(2) end},
-      {"SWAP",   function() StackView:swap() end},
-      {"PICK 2", function() StackView:pick(2) end},
-      {"ROLL 3", function() StackView:roll(3) end},
-      {"DEL",    function() StackView:pop() end},
-      {"UNDO",   function() Undo.undo() end},
-      {Sym.CONVERT.."List", function() StackView:toList() end},
-    },
-    {"Clear",
-      {"Clear A-Z", function() math.evalStr("ClearAZ") end},
-    }
-  })
-
   GlobalKbd:setSequence({'U'}, function()
     Undo.undo()
   end)
