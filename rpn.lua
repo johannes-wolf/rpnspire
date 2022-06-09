@@ -27,13 +27,6 @@ local Undo = {
 }
 
 
--- Returns the height of string in pixels
----@param str? string
----@return number
-local function getStringHeight(str)
-  return platform.withGC(function(gc) return gc:getStringHeight(str or "A") end)
-end
-
 -- Dump table to string
 ---@param o table
 ---@return string | nil
