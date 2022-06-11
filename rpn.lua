@@ -798,7 +798,7 @@ local operators = {
   [Sym.STORE]       = {nil,      5, 2,  0, 'r'},
   ["=:"]            = {Sym.STORE,5, 2,  0, 'r'},
   [":="]            = {nil,      5, 2,  0, 'r'},
-  
+
   [Sym.CONVERT]     = {nil, 1, 2, 0},
   ["@>"]            = {Sym.CONVERT, 1, 2,  0}
 }
@@ -1665,11 +1665,11 @@ function Infix.tokenize(input)
   local function operator(input, i)
     return Trie.find(input, operators_trie, i)
   end
-  
+
   local function ans(input, i)
     return input:find('^(@[0-9]+)', i)
   end
-  
+
   local function syntax(input, i)
     return input:find('^([(){}[%],])', i)
   end
@@ -2197,7 +2197,7 @@ function RPNExpression:_isReverseOp(value, kind)
     if self.stack[#self.stack][1] == value then
       return value == Sym.NEGATE or value == "(-)" or
              value == "not" or value == "not "
-    end 
+    end
   end
   return false
 end
@@ -2304,13 +2304,13 @@ function RPNExpression:infixString()
 
   local function pushOperator(name, prec, argc, pos, assoc, aggrassoc)
     local assoc = assoc == "r" and 2 or (assoc == "l" and 1 or 0)
- 
+
     local args = {}
     for i=1,argc do
       local item = table.remove(stack)
       table.insert(args, item)
     end
-    
+
     local str = ""
     for i,v in ipairs(args) do
       if pos == 0 and str:len() > 0 then str = name .. str end
@@ -2355,7 +2355,7 @@ function RPNExpression:infixString()
     if not stack or #stack < 1 then
       error("Missing list length")
     end
- 
+
     local length = tonumber(table.remove(stack).expr)
     assert(length)
 
@@ -2735,7 +2735,7 @@ function UIMenu:onCharIn(c)
     local row, col = 2 - math.floor(n / 3), n % 3
     local item = self.items[self.page * 9 + row * 3 + (col+1)]
     if not item then return end
-    
+
     -- NOTE: The call order is _very_ important:
     --  1. Hide the menu
     --  2. Call the callback
@@ -2745,7 +2745,7 @@ function UIMenu:onCharIn(c)
     if type(item[2]) == "function" then
       self:hide()
       if self.onSelect then self.onSelect(item) end
-      item[2]()  
+      item[2]()
     elseif type(item[2]) == "table" then
       self:pushPage(item[2])
     elseif type(item[2]) == "string" then
@@ -2760,20 +2760,20 @@ function UIMenu:onCharIn(c)
     elseif c:byte(1) >= 97 and c:byte(1) <= 122 then
       self.filterString = self.filterString..c:lower()
     end
-    
+
     local function matchFn(title)
       if title:lower():find(self.filterString) then
         return true
       end
     end
-    
+
     local filteredItems = {}
     for _,v in ipairs(self.origItems) do
       if matchFn(v[1]) then
         table.insert(filteredItems, v)
       end
     end
-    
+
     self.items = filteredItems
     self:invalidate()
   end
@@ -3000,7 +3000,7 @@ function UIStack:pushInfix(input)
     print("error: UIStack.pushInfix infix is nil")
     return false
   end
-  
+
   local res, err = self:evalStr(infix)
   if res then
     self:push({["rpn"]=stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
@@ -3031,7 +3031,7 @@ end
 
 function UIStack:swap(idx1, idx2)
   if #self.stack < 2 then return end
-  
+
   idx1 = idx1 or (#self.stack - 1)
   idx2 = idx2 or #self.stack
   if idx1 <= #self.stack and idx2 <= #self.stack then
@@ -3171,15 +3171,15 @@ end
 --[[ UI helper ]]--
 function UIStack:frameAtIdx(idx)
   idx = idx or #self.stack
-  
+
   local x,y,w,h = 0,0,0,0
   local fx,_,fw,_ = self:frame()
-  
+
   for i=1,idx-1 do
     y = y + platform.withGC(function(gc) return self:itemHeight(gc, i) end)
   end
   h = platform.withGC(function(gc) return self:itemHeight(gc, idx) end)
-  
+
   return fx,y,fw,h
 end
 
@@ -3199,14 +3199,14 @@ function UIStack:scrollToIdx(idx)
   local top, bottom = itemY, itemY + itemHeight
   local sy = self.scrolly
   local _,_,_,h = self:frame()
-  
+
   if top + sy < 0 then
     sy = 0 - top
   end
   if bottom + sy > h then
     sy = 0 - bottom + h
   end
-  
+
   if sy ~= self.scrolly then
     self.scrolly = sy
     self:invalidate()
@@ -3263,18 +3263,18 @@ function UIStack:itemHeight(gc, idx)
   if not item then return 0 end
   local leftSize = {w = gc:getStringWidth(item.infix or ""), h = gc:getStringHeight(item.infix or "")}
   local rightSize = {w = gc:getStringWidth(item.result or ""), h = gc:getStringHeight(item.result or "")}
-  
+
   local leftPos = {x = x + fringeMargin + margin,
                    y = y}
   local rightPos = {x = x + w - margin - rightSize.w,
                     y = y}
-    
+
    if options.showExpr then
      if rightPos.x < leftPos.x + leftSize.w + minDistance then
        rightPos.y = leftPos.y + margin*2 + leftSize.h
      end
    end
-    
+
    return rightPos.y - leftPos.y + rightSize.h + margin
 end
 
@@ -3430,7 +3430,7 @@ function UIInput:init_bindings()
       if direction == 'left' then
         if newPos >= pos and newPos < byteOrigin then
           pos = newPos + 1
-        else 
+        else
           return pos - 1
         end
       else
@@ -3438,7 +3438,7 @@ function UIInput:init_bindings()
       end
     end
   end
-  
+
   self.kbd:setSequence({'G', '('}, function()
     local byteCursor = self.text:usub(1, self.cursor.pos):len()
     local left = findNearestChr('[%(%[%{,]', byteCursor, 'left')
@@ -3503,7 +3503,7 @@ function UIInput:cancelCompletion()
 end
 
 -- Starts a completion with the given list
--- No prefix matching takes place 
+-- No prefix matching takes place
 function UIInput:customCompletion(tab)
   if not self.completionIdx then
     self.completionIdx = #tab
@@ -3566,15 +3566,15 @@ function UIInput:nextCompletion(offset)
   -- Generate omnibar string
   OmniBar:set_text('Completion',
                    string.format('%d/%d', self.completionIdx, #self.completionList))
-  
+
   local tail = ""
   if self.cursor.pos + self.cursor.size < #self.text then
     tail = self.text:usub(self.cursor.pos + self.cursor.size + 1)
   end
-  
+
   if not self.completionList[self.completionIdx] then return end
-  
-  self.text = self.text:usub(1, self.cursor.pos) .. 
+
+  self.text = self.text:usub(1, self.cursor.pos) ..
               self.completionList[self.completionIdx] ..
               tail
 
@@ -3590,23 +3590,23 @@ function UIInput:moveCursor(offset)
       offset = self.cursor.size
     end
   end
-  
+
   self:setCursor(self.cursor.pos + offset)
 end
 
 function UIInput:setCursor(pos, scroll)
   local oldPos, oldSize = unpack(self.cursor)
-  
+
   self.cursor.pos = math.min(math.max(0, pos or self.text:ulen()), self.text:ulen())
   self.cursor.size = 0
-  
+
   scroll = scroll or true
   if scroll == true then
     self:scrollToPos()
   end
-  
+
   self:cancelCompletion()
-  
+
   if oldPos ~= self.cursor.pos or
      oldSize ~= self.cursor.size then
     self:invalidate()
@@ -3629,13 +3629,13 @@ function UIInput:scrollToPos(pos)
   local margin = self.margin
   local cx = self:getCursorX(pos or self.cursor.pos + self.cursor.size)
   local sx = self.scrollx
-  
+
   if cx + sx > w - margin then
     sx = w - cx - margin
   elseif cx + sx < w / 2 then
     sx = math.max(0, -cx)
   end
-  
+
   if sx ~= self.scrollx then
     self.scrollx = sx
     self:invalidate()
@@ -3694,7 +3694,7 @@ function UIInput:onPaste()
   for _, item in ipairs(Clipboard.items) do
     ctx:add(item, function() self:insertText(item) end)
   end
-  
+
   local _, y = self:frame()
   ctx.sel = #ctx.items
   ctx:open_at(self:getCursorX(), y + 4)
@@ -3708,9 +3708,9 @@ function UIInput:onCharIn(c)
       local name, _, args, side = queryOperatorInfo(c)
       if name and (args > 1 or (args == 1 and side == 1)) then
         c = '@1'..c
-      end 
+      end
     end
-    
+
     if c == ' ' and get_mode() == 'RPN' and options.spaceAsEnter then
       self:onEnter()
     else
@@ -3723,7 +3723,7 @@ end
 function UIInput:_insertChar(c)
   c = c or ""
   self:cancelCompletion()
-  
+
   local expanded = c
   if options.autoClose == true then
     -- Add closing paren
@@ -3731,7 +3731,7 @@ function UIInput:_insertChar(c)
     if matchingParen and isOpening then
       expanded = c..matchingParen
     end
-    
+
     -- Skip closing paren
     local rhsPos = self.cursor.pos + 1
     local rhs = self.text:ulen() >= rhsPos and self.text:usub(rhsPos, rhsPos) or nil
@@ -3741,7 +3741,7 @@ function UIInput:_insertChar(c)
       return
     end
   end
-  
+
   if self.cursor.pos == self.text:ulen() then
     self.text = self.text .. expanded
   else
@@ -3756,13 +3756,13 @@ function UIInput:_insertChar(c)
         right = right:usub(2)
       end
     end
-    
+
     self.text = left .. expanded .. right
   end
-  
+
   self.cursor.pos = self.cursor.pos + string.ulen(c) -- c!
   self.cursor.size = 0
-  
+
   self:invalidate()
 end
 
@@ -3775,7 +3775,7 @@ function UIInput:onBackspace()
       return
     end
   end
-  
+
   if self.cursor.size > 0 then
     self:_insertChar("")
     self.cursor.size = 0
@@ -3791,7 +3791,7 @@ function UIInput:onEnter()
   if self.text:ulen() == 0 then return end
 
   self.inputHandler:onEnter()
-  
+
   self.tempMode = nil
 end
 
@@ -4075,7 +4075,7 @@ function RPNInput:dispatchOperator(str, ignoreInput)
 
     local rpn = self:popN(argc)
     rpn:pushOperator(name)
-    
+
     StackView:pushRPNExpression(rpn)
     return true
   end
@@ -4095,7 +4095,7 @@ function RPNInput:dispatchOperatorSpecial(key)
       self:dispatchOperator('^')
     end
   }
-  
+
   tab[key]()
 end
 
@@ -4111,7 +4111,7 @@ function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
 
     local rpn = self:popN(argc)
     rpn:pushFunctionCall(name, argc)
-    
+
     StackView:pushRPNExpression(rpn)
     return true
   end
@@ -4137,7 +4137,7 @@ function RPNInput:onCharIn(key)
   local function isFunction(key)
     return functionInfo(key, true) ~= nil
   end
-  
+
   -- Remove trailing '(' from some TI keys
   if key:ulen() > 1 and key:usub(-1) == '(' then
     key = key:sub(1, -2)
@@ -4163,7 +4163,7 @@ function RPNInput:onEnter()
       self:setInput('')
     end
   end
-  
+
   if self:getInput():ulen() > 0 then
     Undo.record_undo()
   end
@@ -4389,20 +4389,20 @@ input_ask_value = function(widget, callbackEnter, callbackEscape, callbackSetup)
   local state = widget:save_state()
   local onEnter = widget.onEnter
   local onEscape = widget.onEscape
-  
+
   local function restore_state()
     pop_temp_mode()
     widget:restore_state(state)
     widget.onEnter = onEnter
     widget.onEscape = onEscape
   end
-  
+
   push_temp_mode('ALG')
   widget:setText('', '')
   if callbackSetup then
     callbackSetup(widget)
   end
-  
+
   widget.onEnter = function()
     local text = widget.text
     restore_state()
@@ -4410,14 +4410,14 @@ input_ask_value = function(widget, callbackEnter, callbackEscape, callbackSetup)
       callbackEnter(text)
     end
   end
-  
+
   widget.onEscape = function()
-    if callbackEscape then 
+    if callbackEscape then
       callbackEscape()
     end
     restore_state()
   end
-  
+
   focus_view(widget)
   widget:invalidate()
 end
@@ -4449,7 +4449,7 @@ local function make_formula_menu()
 
     table.insert(category_menu, {title, actions_menu})
   end
-  
+
   return category_menu
 end
 
