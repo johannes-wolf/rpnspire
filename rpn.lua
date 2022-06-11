@@ -4903,3 +4903,10 @@ function on.restore(state)
   options = state.options
   InputView:setText(state.input)
 end
+
+if platform.registerErrorHandler then
+  platform.registerErrorHandler(function(line, msg)
+    Error.show(string.format('Internal: %s (%d)', msg or '', line))
+    return true
+  end)
+end
