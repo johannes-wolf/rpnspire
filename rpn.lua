@@ -142,6 +142,16 @@ local function draw_string_aligned(gc, text, x, y, w, h, halign, valign)
   return x, gc:drawString(text, x, y), y
 end
 
+-- Draw rect with 1px shadow
+---@param gc table
+function draw_rect_shadow(gc, x, y, w, h)
+  gc:drawRect(x, y, w, h)
+  x = x + 1
+  y = y + 1
+  gc:drawLine(x, y + h, x + w, y + h)
+  gc:drawLine(x + w, y, x + w, y + h)
+end
+
 
 -- Rectangle utility functions
 Rect = {}
@@ -343,7 +353,7 @@ UI.Menu.current_menu = nil           --- Current root menu
 UI.Menu.last_focus = nil             --- Last focused non-menu
 UI.Menu.submenu_indicator_width = 8  --- Submenu indicator width (units)
 UI.Menu.hmargin = 4
-UI.Menu.item_height = 20
+UI.Menu.item_height = 22
 
 function UI.Menu.draw_current(gc)
   if UI.Menu.current_menu then
@@ -546,11 +556,11 @@ function UI.Menu:draw(gc)
     return
   end
 
-  gc:clipRect('set', x, y, w, h)
+  --gc:clipRect('set', x, y, w+1, h+1)
   gc:setColorRGB(theme_val('bg'))
   gc:fillRect(x, y, w, h)
   gc:setColorRGB(theme_val('border_bg'))
-  gc:drawRect(x, y, w - 1, h - 1)
+  draw_rect_shadow(gc, x, y, w - 1, h - 1)
 
   local item_y = y
   for idx, item in ipairs(self.items) do
