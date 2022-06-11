@@ -206,6 +206,56 @@ end
 -- UI
 UI = {}
 
+-- Incremental search helper
+---@class UI.IncSearch
+UI.IncSearch = class()
+UI.IncSearch.incremental_search_timeout_ms = 2000 --- Timeout for incremental searches
+function UI.IncSearch.get_ms()
+  return _G.timer.getMilliSecCounter()
+end
+
+function UI.IncSearch:init(on_change)
+  self.str = ''
+  self.last_input_ms = nil
+  -- Callbacks
+  self.on_change = on_change
+end
+
+function UI.IncSearch:reset()
+  self.str = ''
+  self.last_input_ms = nil
+end
+
+function UI.IncSearch:onClear()
+  self.str = ''
+  if self.on_change then
+    self.on_change(self.str)
+  end
+end
+
+function UI.IncSearch:onBackspace()
+  self.str = ''
+  if self.on_change then
+    self.on_change(self.str)
+  end
+end
+
+function UI.IncSearch:onCharIn(c)
+  local now = UI.IncSearch.get_ms()
+  if self.last_input_ms then
+    if now - self.last_input_ms > UI.IncSearch.incremental_search_timeout_ms then
+      self.str = ''
+    end
+  end
+
+  self.str = self.str .. c
+  if self.on_change then
+    self.on_change(self.str)
+  end
+
+  self.last_input_ms = now
+end
+
 -- Widget base class
 ---@class UI.Widget
 UI.Widget = class()
@@ -376,6 +426,23 @@ function UI.Menu:init(parent)
   self.height = nil
   self.parent = parent
   self._visible = false
+  self.isearch = UI.IncSearch(function(str)
+    for idx, item in ipairs(self.items) do
+      if item['title'] and item['title']:find('^.*' .. str) then
+        self:select_item(idx)
+        return
+      end
+    end
+  end)
+
+  -- Lazy init item height
+  if not UI.Menu.item_height then
+    UI.Menu.item_height = platform.withGC(function(gc)
+      with_temp_font(gc, 11, function(gc)
+        return gc:getStringHeight("A")
+      end)
+    end)
+  end
 end
 
 function UI.Menu:add(title, action)
@@ -446,28 +513,20 @@ function UI.Menu:close(recurse)
   end
 end
 
-function UI.Menu.onCharIn(c)
-  -- TODO support num keys
-end
-
-function UI.Menu:onArrowUp()
-  self.sel = self.sel - 1
-  if self.sel <= 0 then self.sel = #self.items end
-end
-
-function UI.Menu:onArrowDown()
-  self.sel = self.sel + 1
-  if self.sel > #self.items then self.sel = 1 end
-end
-
-function UI.Menu:onArrowLeft()
-  if self.parent then
-    self:close(false)
+function UI.Menu:select_item(idx, exec)
+  if idx == 0 then idx = 10 end
+  idx = math.max(1, idx)
+  if #self.items >= idx then
+    self.sel = idx
+    if exec then
+      self:exec_item(idx)
+    end
+    self:invalidate()
   end
 end
 
-function UI.Menu:onArrowRight()
-  local item = self:selected_item()
+function UI.Menu:exec_item(idx)
+  local item = self.items[idx]
   if item then
     if item['submenu'] then
       local x, y, w = self:item_rect(self.sel)
@@ -480,6 +539,40 @@ function UI.Menu:onArrowRight()
       end
     end
   end
+end
+
+function UI.Menu:onCharIn(c)
+  if c:find('^%d+$') then
+    self:select_item(tonumber(c), true)
+  else
+    self.isearch:onCharIn(c)
+  end
+end
+
+function UI.Menu:onArrowUp()
+  self.sel = self.sel - 1
+  if self.sel <= 0 then
+    self.sel = #self.items
+  end
+  self.isearch:reset()
+end
+
+function UI.Menu:onArrowDown()
+  self.sel = self.sel + 1
+  if self.sel > #self.items then
+    self.sel = 1
+  end
+  self.isearch:reset()
+end
+
+function UI.Menu:onArrowLeft()
+  if self.parent then
+    self:close(false)
+  end
+end
+
+function UI.Menu:onArrowRight()
+  self:exec_item(self.sel or 1)
 end
 
 function UI.Menu:onEnter()
