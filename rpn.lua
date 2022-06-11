@@ -172,6 +172,27 @@ function Rect.intersection(r, x, y, width, height)
   return nil
 end
 
+-- Clipboard
+local Clipboard = {
+  max = 5,
+  items = {}
+}
+
+function Clipboard.yank(str)
+  if str:ulen() == 0 then
+    return
+  end
+
+  table.insert(Clipboard.items, tostring(str))
+  while #Clipboard.items > Clipboard.max do
+    table.remove(Clipboard.items, 1)
+  end
+end
+
+function Clipboard.get(index)
+  return Clipboard.items[index or #Clipboard.items] or ''
+end
+
 -- UI
 UI = {}
 
@@ -314,6 +335,240 @@ function UI.OmniBar.height()
   end)
 end
 
+---@class UI.Menu : UI.Widget
+---@field items table  List of items
+---@field sel number   Selected item
+UI.Menu = class(UI.Widget)
+UI.Menu.current_menu = nil           --- Current root menu
+UI.Menu.last_focus = nil             --- Last focused non-menu
+UI.Menu.submenu_indicator_width = 8  --- Submenu indicator width (units)
+UI.Menu.hmargin = 4
+UI.Menu.item_height = 20
+
+function UI.Menu.draw_current(gc)
+  if UI.Menu.current_menu then
+    UI.Menu.current_menu:draw(gc)
+  end
+end
+
+function UI.Menu.close_current()
+  if getmetatable(current_focus) == UI.Menu then
+    current_focus:close(true)
+  end
+end
+
+function UI.Menu:init(parent)
+  UI.Widget.init(self)
+  self.items = {}
+  self.sel = nil
+
+  self.width = nil
+  self.height = nil
+  self.parent = parent
+  self._visible = false
+end
+
+function UI.Menu:add(title, action)
+  if not title and not action then
+    return self.parent
+  end
+
+  if type(action) == 'function' then
+    table.insert(self.items, {title=title, action=action})
+    return self
+  elseif type(action) == 'table' then
+    table.insert(self.items, {title=title, submenu=action})
+    return self
+  else
+    local sub = UI.Menu(self)
+    table.insert(self.items, {title=title, submenu=sub})
+    return sub
+  end
+end
+
+function UI.Menu:open_at(x, y, parent)
+  if not parent then
+    UI.Menu.current_menu = self
+    UI.Menu.last_focus = current_focus
+  end
+
+  if not self.width or not self.height then
+    self:calc_size()
+  end
+
+  -- If in the lower quarter of the screen, open menus to the top
+  if y > platform.window:height() * 0.75 then
+    y = y - self.height
+  end
+
+  local x_offset = x + self.width - platform.window:width()
+  if x_offset > 0 then
+    x = x - x_offset
+  end
+
+  local y_offset = y + self.height - platform.window:height()
+  if y_offset > 0 then
+    y = y - y_offset
+  end
+
+  self.parent = parent
+  self:set_frame(math.max(0, x), math.max(0, y), 0, 0)
+  focus_view(self)
+  self._visible = true
+  self.sel = self.sel or 1
+end
+
+function UI.Menu:close(recurse)
+  self._visible = false
+
+  if self.parent then
+    if recurse then
+      self.parent:close()
+      self.parent = nil
+    else
+      if current_focus == self then
+        focus_view(self.parent)
+      end
+    end
+  else
+    UI.Menu.current_menu = nil
+    focus_view(UI.Menu.last_focus)
+  end
+end
+
+function UI.Menu.onCharIn(c)
+  -- TODO support num keys
+end
+
+function UI.Menu:onArrowUp()
+  self.sel = self.sel - 1
+  if self.sel <= 0 then self.sel = #self.items end
+end
+
+function UI.Menu:onArrowDown()
+  self.sel = self.sel + 1
+  if self.sel > #self.items then self.sel = 1 end
+end
+
+function UI.Menu:onArrowLeft()
+  if self.parent then
+    self:close(false)
+  end
+end
+
+function UI.Menu:onArrowRight()
+  local item = self:selected_item()
+  if item then
+    if item['submenu'] then
+      local x, y, w = self:item_rect(self.sel)
+      item.submenu:open_at(x + w - 4, y + 4, self)
+    end
+
+    if item['action'] then
+      if item['action']() ~= 'repeat' then
+        self:close(true)
+      end
+    end
+  end
+end
+
+function UI.Menu:onEnter()
+  self:onArrowRight()
+end
+
+function UI.Menu:onEscape()
+  self:close(true)
+end
+
+function UI.Menu:selected_item()
+  if self.sel then
+    return self.items[self.sel]
+  end
+end
+
+function UI.Menu:frame()
+  return self._frame[1], self._frame[2], self.width, self.height
+end
+
+function UI.Menu:calc_size()
+  platform.withGC(function(gc)
+    with_temp_font(gc, 11, function(gc)
+      local max_width = 1
+
+      for _, item in ipairs(self.items) do
+        local item_width = gc:getStringWidth(item['title'])
+        if item['submenu'] then
+          item_width = item_width + UI.Menu.submenu_indicator_width
+        end
+        max_width = math.max(max_width, item_width)
+      end
+
+      self.width = max_width + UI.Menu.hmargin * 2
+      self.height = UI.Menu.item_height * #self.items
+    end)
+  end)
+end
+
+function UI.Menu:item_rect(idx)
+  local x, y, w, h = self:frame()
+
+  local item = self.items[idx]
+  return x + UI.Menu.hmargin,
+         y + (idx - 1) * UI.Menu.item_height,
+         w - UI.Menu.hmargin,
+         UI.Menu.item_height
+end
+
+---@param gc table     GC
+---@param item table   Item
+---@param sel boolean  Selection state
+---@param x number     X
+---@param y number     Y
+---@return number height
+function UI.Menu:draw_item(gc, item, sel, x, y)
+  local title = item['title']
+
+  gc:setColorRGB(theme_val('fg'))
+  gc:drawString(title, x, y)
+
+  if item['submenu'] then
+    local _, _, w = self:frame()
+    gc:fillRect(x + w - UI.Menu.hmargin - 8, y + UI.Menu.item_height / 2 - 1, 4, 4)
+  end
+
+  return gc:getStringHeight(title)
+end
+
+function UI.Menu:draw(gc)
+  if not self._visible then return end
+  local x, y, w, h = self:frame()
+  if h == 0 then
+    return
+  end
+
+  gc:clipRect('set', x, y, w, h)
+  gc:setColorRGB(theme_val('bg'))
+  gc:fillRect(x, y, w, h)
+  gc:setColorRGB(theme_val('border_bg'))
+  gc:drawRect(x, y, w - 1, h - 1)
+
+  local item_y = y
+  for idx, item in ipairs(self.items) do
+    if self.sel == idx then
+      gc:setColorRGB(theme_val('selection_bg'))
+      gc:fillRect(x + 1, item_y + 1, w - 2, h / #self.items - 2)
+    end
+
+    self:draw_item(gc, item, self.sel == idx, x + UI.Menu.hmargin, item_y)
+    if item['submenu'] then
+      item['submenu']:draw(gc)
+    end
+
+    item_y = item_y + UI.Menu.item_height
+  end
+
+  gc:clipRect('reset', x, y, w, h)
+end
 
 -- Prefix tree
 Trie = {}
@@ -2959,6 +3214,15 @@ function UIStack:scrollToIdx(idx)
 end
 
 --[[ Events ]]--
+function UIStack:onCopy()
+  Clipboard.yank(self.stack[self.sel].infix)
+end
+
+function UIStack:onCut()
+  Clipboard.yank(self.stack[self.sel].infix)
+  self:pop(self.sel)
+end
+
 function UIStack:onArrowDown()
   if self.sel < #self.stack then
     self:selectIdx(self.sel + 1)
@@ -3412,6 +3676,30 @@ function UIInput:onFocus()
   --self:setCursor(#self.text)
 end
 
+function UIInput:onCopy()
+  Clipboard.yank(self.text)
+end
+
+function UIInput:onCut()
+  Clipboard.yank(self.text)
+  self:setText('')
+end
+
+function UIInput:onPaste()
+  if #Clipboard.items == 0 then
+    return
+  end
+
+  local ctx = UI.Menu()
+  for _, item in ipairs(Clipboard.items) do
+    ctx:add(item, function() self:insertText(item) end)
+  end
+  
+  local _, y = self:frame()
+  ctx.sel = #ctx.items
+  ctx:open_at(self:getCursorX(), y + 4)
+end
+
 function UIInput:onCharIn(c)
   self:cancelCompletion()
   if not self.inputHandler:onCharIn(c) then
@@ -3532,7 +3820,7 @@ end
 
 function UIInput:setText(s, prefix)
   self.text = s or ""
-  self.prefix = prefix or ""
+  self.prefix = prefix or self.prefix
   self:setCursor(#self.text)
   self:cancelCompletion()
   self:invalidate()
@@ -3542,6 +3830,7 @@ function UIInput:insertText(s)
   if s then
     self:cancelCompletion()
     self:_insertChar(s)
+    self:scrollToPos()
   end
 end
 
@@ -4214,6 +4503,10 @@ local views = {
 }
 
 function on.construction()
+  toolpalette.enableCopy(true)
+  toolpalette.enableCut(true)
+  toolpalette.enablePaste(true)
+
   GlobalKbd:setSequence({'U'}, function()
     Undo.undo()
   end)
@@ -4367,6 +4660,24 @@ function on.resize(w, h)
   main_layout:layout(0, 0, w, h)
 end
 
+function on.copy()
+  if current_focus.onCopy then
+    current_focus:onCopy()
+  end
+end
+
+function on.cut()
+  if current_focus.onCut then
+    current_focus:onCut()
+  end
+end
+
+function on.paste()
+  if current_focus.onPaste then
+    current_focus:onPaste()
+  end
+end
+
 function on.escapeKey()
   on_any_key()
   GlobalKbd:resetSequence()
@@ -4381,6 +4692,7 @@ end
 function on.tabKey()
   on_any_key()
   if current_focus ~= InputView then
+    UI.Menu.close_current()
     focus_view(InputView)
   else
     InputView:onTab()
@@ -4562,6 +4874,8 @@ function on.paint(gc, x, y, w, h)
       view:draw(gc, frame)
     end
   end
+
+  UI.Menu.draw_current(gc)
 end
 
 function on.save()
