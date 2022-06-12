@@ -110,17 +110,6 @@ function string.ulen(str)
   return select(2, str:gsub('[^\128-\193]', ''))
 end
 
--- Call callback with temporary font set
----@param gc table     GC
----@param size number  Font size
----@param fn function  Callback
-local function with_temp_font(gc, size, fn, ...)
-  local ffamily, fstyle, fsize = gc:setFont('sansserif', 'r', size)
-  local res = fn(gc, ...)
-  gc:setFont(ffamily, fstyle, fsize)
-  return res
-end
-
 -- Draw string aligned
 ---@param gc table        GC
 ---@param text string     Text
@@ -373,21 +362,21 @@ end
 function UI.OmniBar:draw(gc)
   local x, y, w, h = self:frame()
 
+  local old_f, old_s, old_size = gc:setFont('sansserif', 'r', 6)
   gc:clipRect('set', x, y, w, h)
-  with_temp_font(gc, 7, function(gc)
-    gc:setColorRGB(theme_val('omni_bg'))
-    gc:fillRect(x, y, w, h)
+  gc:setColorRGB(theme_val('omni_bg'))
+  gc:fillRect(x, y, w, h)
 
-    gc:setColorRGB(theme_val('omni_fg'))
-    if self.text_right then
-      w = draw_string_aligned(gc, self.text_right, x, y, w, h, 1, 0) - x - 2
-    end
+  gc:setColorRGB(theme_val('omni_fg'))
+  if self.text_right then
+    w = draw_string_aligned(gc, self.text_right, x, y, w, h, 1, 0) - x - 2
+  end
 
-    if self.text_left then
-      gc:clipRect('set', x, y, w, h)
-      draw_string_aligned(gc, self.text_left, x, y, w, h, -1, 0)
-    end
-  end)
+  if self.text_left then
+    gc:clipRect('set', x, y, w, h)
+    draw_string_aligned(gc, self.text_left, x, y, w, h, -1, 0)
+  end
+  gc:setFont(old_f, old_s, old_size)
 end
 
 function UI.OmniBar:visible()
@@ -401,9 +390,8 @@ end
 
 function UI.OmniBar.height()
   return platform.withGC(function(gc)
-    return with_temp_font(gc, 7, function(gc)
-      return gc:getStringHeight('A')
-    end)
+    gc:setFont('sansserif', 'r', 6)
+    return gc:getStringHeight('A')
   end)
 end
 
@@ -449,9 +437,8 @@ function UI.Menu:init(parent)
 
   -- Lazy globals
   UI.Menu.item_height = UI.Menu.item_height or platform.withGC(function(gc)
-    return with_temp_font(gc, 11, function(gc)
-      return gc:getStringHeight("A")
-    end)
+    gc:setFont('sansserif', 'r', 11)
+    return gc:getStringHeight("A")
   end)
 
   -- Callbacks
@@ -634,21 +621,20 @@ end
 
 function UI.Menu:calc_size()
   platform.withGC(function(gc)
-    with_temp_font(gc, 11, function(gc)
-      local max_width = 1
+    local max_width = 1
+    gc:setFont('sansserif', 'r', 11)
 
-      for _, item in ipairs(self.items) do
-        local item_width = gc:getStringWidth(item['title'])
-        if item['submenu'] then
-          item_width = item_width + UI.Menu.submenu_indicator_width
-        end
-        max_width = math.max(max_width, item_width)
+    for _, item in ipairs(self.items) do
+      local item_width = gc:getStringWidth(item['title'])
+      if item['submenu'] then
+        item_width = item_width + UI.Menu.submenu_indicator_width
       end
+      max_width = math.max(max_width, item_width)
+    end
 
-      self.width = max_width + UI.Menu.hmargin * 2
-      self.height = UI.Menu.item_height * #self.items
-    end)
-  end)
+    self.width = max_width + UI.Menu.hmargin * 2
+    self.height = UI.Menu.item_height * #self.items
+end)
 end
 
 function UI.Menu:item_rect(idx)
@@ -3545,9 +3531,8 @@ end
 
 function UIInput.height()
   return platform.withGC(function(gc)
-    return with_temp_font(gc, 11, function(gc)
-      return gc:getStringHeight('A')
-    end)
+    gc:setFont('sansserif', 'r', 11)
+    return gc:getStringHeight('A')
   end)
 end
 
