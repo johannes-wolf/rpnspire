@@ -3512,7 +3512,7 @@ UIInput = class(UI.Widget)
 function UIInput:init(frame)
   UI.Widget.init(self, frame)
   self.text = ""
-  self.cursor = {pos=string.len(self.text), size=0}
+  self.cursor = {pos=0, size=0}
   self.scrollx = 0
   self.margin = 2
   -- Completion
@@ -3527,6 +3527,8 @@ function UIInput:init(frame)
   self.inputHandler = RPNInput()
   self.kbd = KeybindManager()
   self:init_bindings()
+  self:setText('', '')
+  self:setCursor(0)
 end
 
 function UIInput.height()
@@ -5096,14 +5098,16 @@ function on.save()
     ['options'] = options,
     ['stack'] = StackView.stack,
     ['input'] = InputView.text,
-    ['undo'] = {Undo.undo_stack, Undo.redo_stack}
+    ['undo'] = {Undo.undo_stack, Undo.redo_stack},
+    ['clip'] = Clipboard.stack
   }
 end
 
 function on.restore(state)
   Undo.undo_stack, Undo.redo_stack = unpack(state.undo)
-  StackView.stack = state.stack
+  StackView.stack = state['stack'] or {}
   options = state.options
+  Clipboard.stack = state['clip'] or {}
   InputView:setText(state.input)
 end
 
