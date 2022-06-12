@@ -27,6 +27,18 @@ local Undo = {
 }
 
 
+-- Helper for loading user-defined lua code
+---@param name string  TI-BASIC function name (rpnuser\\*)
+---@return any
+local function load_user_code(name)
+  local ok, res = pcall(function()
+    return loadstring(_G.math.eval('rpnuser\\' .. name))()
+  end)
+
+  return ok and res
+end
+
+
 -- Dump table to string
 ---@param o table
 ---@return string | nil
@@ -403,7 +415,7 @@ UI.Menu.current_menu = nil           --- Current root menu
 UI.Menu.last_focus = nil             --- Last focused non-menu
 UI.Menu.submenu_indicator_width = 8  --- Submenu indicator width (units)
 UI.Menu.hmargin = 4
-UI.Menu.item_height = 22
+UI.Menu.item_height = nil
 
 function UI.Menu.draw_current(gc)
   if UI.Menu.current_menu then
@@ -434,32 +446,34 @@ function UI.Menu:init(parent)
       end
     end
   end)
-
-  -- Lazy init item height
-  if not UI.Menu.item_height then
-    UI.Menu.item_height = platform.withGC(function(gc)
-      with_temp_font(gc, 11, function(gc)
-        return gc:getStringHeight("A")
-      end)
+  
+  -- Lazy globals
+  UI.Menu.item_height = UI.Menu.item_height or platform.withGC(function(gc)
+    return with_temp_font(gc, 11, function(gc)
+      return gc:getStringHeight("A")
     end)
-  end
+  end)
+
+  -- Callbacks 
+  self.onExec = nil --- onExec(action : any) : string
 end
 
+-- Add menu item
+---@param title string   Title
+---@param action? any    Value; set nil for opening a submenu
+---@return UI.Menu menu  Returs self or sub-menu
 function UI.Menu:add(title, action)
   if not title and not action then
     return self.parent
   end
 
-  if type(action) == 'function' then
-    table.insert(self.items, {title=title, action=action})
-    return self
-  elseif type(action) == 'table' then
-    table.insert(self.items, {title=title, submenu=action})
-    return self
-  else
+  if not action then
     local sub = UI.Menu(self)
     table.insert(self.items, {title=title, submenu=sub})
     return sub
+  else
+    table.insert(self.items, {title=title, action=action})
+    return self
   end
 end
 
@@ -467,6 +481,8 @@ function UI.Menu:open_at(x, y, parent)
   if not parent then
     UI.Menu.current_menu = self
     UI.Menu.last_focus = current_focus
+  else
+    self.onExec = self.onExec or parent.onExec
   end
 
   if not self.width or not self.height then
@@ -534,7 +550,12 @@ function UI.Menu:exec_item(idx)
     end
 
     if item['action'] then
-      if item['action']() ~= 'repeat' then
+      if self.onExec then
+        if self.onExec(item['action']) ~= 'repeat' then
+          self:close(true)
+        end
+      elseif type(item['action']) == 'function' and
+             item['action']() ~= 'repeat' then
         self:close(true)
       end
     end
@@ -613,9 +634,7 @@ function UI.Menu:calc_size()
 end
 
 function UI.Menu:item_rect(idx)
-  local x, y, w, h = self:frame()
-
-  local item = self.items[idx]
+  local x, y, w, _ = self:frame()
   return x + UI.Menu.hmargin,
          y + (idx - 1) * UI.Menu.item_height,
          w - UI.Menu.hmargin,
@@ -937,7 +956,7 @@ local function tiGetFnArgs(nam)
 
   local argc = 0
   local arglist = ""
-  for i=0,10 do
+  for _ = 0, 10 do
     res, err = math.evalStr("string("..nam.."("..arglist.."))")
     if err == nil or err == 210 then
       return argc
@@ -2883,7 +2902,7 @@ function UIMenu:onCharIn(c)
 end
 
 function UIMenu:drawCell(gc, item, x, y, w ,h)
-  local margin = 1
+  local margin = 2
   x = x + margin
   y = y + margin
   w = w - 2*margin
@@ -2895,12 +2914,12 @@ function UIMenu:drawCell(gc, item, x, y, w ,h)
     gc:setColorRGB(theme_val('alt_bg'))
     gc:fillRect(x,y,w,h)
     gc:setColorRGB(theme_val('border_bg'))
-    gc:drawRect(x,y,w,h)
+    draw_rect_shadow(gc, x, y, w, h)
   else
     gc:setColorRGB(theme_val('row_bg'))
     gc:fillRect(x,y,w,h)
     gc:setColorRGB(theme_val('border_bg'))
-    gc:drawRect(x,y,w,h)
+    draw_rect_shadow(gc, x, y, w, h)
     return
   end
 
@@ -4753,7 +4772,40 @@ function on.construction()
   end)
 
   -- Settings
-  GlobalKbd:setSequence({'help', 'help'}, function() MenuView:present(current_focus, make_options_menu()) end)
+  GlobalKbd:setSequence({'help', 'help'}, function()
+    MenuView:present(current_focus, make_options_menu())
+  end)
+
+  -- User assignable bindings
+  GlobalKbd:setSequence({'help', '%d'}, function(sequence)
+    local last = tostring(sequence[#sequence])
+    local res = load_user_code(string.format('key_%s()', last))
+    if res then
+      -- Handle special cases
+      if type(res) == 'table' then
+        if getmetatable(res) == UI.Menu then
+          local menu = res
+          menu.onExec = function(action)
+            if type(action) == 'function' then
+              return action()
+            else
+              InputView:insertText(tostring(action))
+            end
+          end
+
+          local _, y = InputView:frame()
+          menu:open_at(InputView:getCursorX(), y)
+        else
+          print('warning: Can not handle user returned type!')
+        end
+      end
+
+      -- Handel basic values
+      if type(res) == 'string' or type(res) == 'number' then
+        InputView:insertText(res)
+      end
+    end
+  end)
 
   focus_view(InputView)
 end

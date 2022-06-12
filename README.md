@@ -78,6 +78,18 @@ rpnspire uses key-sequences for its bindings. <kbd>A</kbd><kbd>r</kbd> means: Pr
 The current sequence of keys pressed (that are part of a binding) is displayed by a dialog at the
 top of the screen. Bindings with an asterisk can be repeated by pressing the last key of the sequence again.
 
+User definable bindings are available as <kbd>help</kbd><kbd>0-9</kbd> and execute lua code from TI-Basic
+functions in `rpnuser\key_<KEY>`. Such a function could look like:
+``` basic
+Defile LibPub key_7()=
+Func
+  return "UI.Menu():add('Item', 'Value')"
+EndFunc
+```
+
+Some returned objects are treated in a special way: Menus are shown at the current cursor position and insert
+their item values.
+
 ### Global
 
 The global shortcuts work from everywhere, regardless of the currently focused view.
