@@ -504,7 +504,7 @@ function UI.Menu:close(recurse)
 
   if self.parent then
     if recurse then
-      self.parent:close()
+      self.parent:close(recurse)
       self.parent = nil
     else
       if current_focus == self then
