@@ -446,7 +446,7 @@ function UI.Menu:init(parent)
       end
     end
   end)
-  
+
   -- Lazy globals
   UI.Menu.item_height = UI.Menu.item_height or platform.withGC(function(gc)
     return with_temp_font(gc, 11, function(gc)
@@ -454,8 +454,9 @@ function UI.Menu:init(parent)
     end)
   end)
 
-  -- Callbacks 
+  -- Callbacks
   self.onExec = nil --- onExec(action : any) : string
+  self.onSelect = nil -- onSelect(idx : number, item : table)
 end
 
 -- Add menu item
@@ -508,7 +509,7 @@ function UI.Menu:open_at(x, y, parent)
   self:set_frame(math.max(0, x), math.max(0, y), 0, 0)
   focus_view(self)
   self._visible = true
-  self.sel = self.sel or 1
+  self:select_item(self.sel or 1, false)
 end
 
 function UI.Menu:close(recurse)
@@ -534,6 +535,9 @@ function UI.Menu:select_item(idx, exec)
   idx = math.max(1, idx)
   if #self.items >= idx then
     self.sel = idx
+    if self.onSelect then
+      self.onSelect(self.sel, self.items[self.sel])
+    end
     if exec then
       self:exec_item(idx)
     end
@@ -576,6 +580,7 @@ function UI.Menu:onArrowUp()
     self.sel = #self.items
   end
   self.isearch:reset()
+  self:select_item(self.sel, false)
 end
 
 function UI.Menu:onArrowDown()
@@ -584,6 +589,15 @@ function UI.Menu:onArrowDown()
     self.sel = 1
   end
   self.isearch:reset()
+  self:select_item(self.sel, false)
+end
+
+function UI.Menu:onTab()
+  self:onArrowDown()
+end
+
+function UI.Menu:onBackTab()
+  self:onArrowUp()
 end
 
 function UI.Menu:onArrowLeft()
@@ -602,6 +616,10 @@ end
 
 function UI.Menu:onEscape()
   self:close(true)
+end
+
+function UI.Menu:onBackspace()
+  self:onEscape()
 end
 
 function UI.Menu:selected_item()
@@ -662,6 +680,7 @@ function UI.Menu:draw_item(gc, item, sel, x, y)
 end
 
 function UI.Menu:draw(gc)
+
   if not self._visible then return end
   local x, y, w, h = self:frame()
   if h == 0 then
@@ -781,19 +800,20 @@ local themes = {
 
 -- Global options
 local options = {
-  autoClose = true,      -- Auto close parentheses
-  autoKillParen = true,  -- Auto kill righthand paren when killing left one
-  showFringe = true,     -- Show fringe (stack number)
-  showExpr = true,       -- Show stack expression (infix)
-  autoPop = true,        -- Pop stack when pressing backspace
-  theme = "light",       -- Well...
-  cursorWidth = 2,       -- Width of the cursor
-  mode = "RPN",          -- What else
-  saneHexDigits = false, -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
-  smartComplete = true,  -- Try to be smart when completing
-  spaceAsEnter = false,  -- Space acts as enter in RPN mode
-  autoAns = true,        -- Auto insert @1 in ALG mode
-  maxUndo = 20,          -- Max num of undo steps
+  autoClose = true,        -- Auto close parentheses
+  autoKillParen = true,    -- Auto kill righthand paren when killing left one
+  showFringe = true,       -- Show fringe (stack number)
+  showExpr = true,         -- Show stack expression (infix)
+  autoPop = true,          -- Pop stack when pressing backspace
+  theme = "light",         -- Well...
+  cursorWidth = 2,         -- Width of the cursor
+  mode = "RPN",            -- What else
+  saneHexDigits = false,   -- Whether to disallow 0hfx or not (if not, 0hfx produces 0hf*x)
+  smartComplete = true,    -- Try to be smart when completing
+  spaceAsEnter = false,    -- Space acts as enter in RPN mode
+  autoAns = true,          -- Auto insert @1 in ALG mode
+  maxUndo = 20,            -- Max num of undo steps
+  completionStyle = 'menu',-- Default completion style
 }
 
 -- Returns value for key of the current theme
@@ -3513,6 +3533,8 @@ function UIInput:init(frame)
   self.completionFun = nil   -- Current completion handler function
   self.completionIdx = nil   -- Current completion index
   self.completionList = nil  -- Current completion candidates
+  self.completionMenu = nil  -- Current completion menu
+  self.completion_style = options.completionStyle
   -- Prefix
   self.prefix = ""           -- Non-Editable prefix shown on the left
   -- Input
@@ -3590,7 +3612,7 @@ function UIInput:init_bindings()
   self.kbd:setSequence({'G', 'right'}, function()
     self:setCursor(self.text:ulen())
   end)
-  
+
   -- Special chars
   self.kbd:setSequence({'I'}, function(sequence)
     MenuView:present(InputView, {
@@ -3599,7 +3621,7 @@ function UIInput:init_bindings()
       {'|', '|'}, {':=', ':='}, {'@', '@'},
     })
   end)
-  
+
   -- Ans/Stack reference
   self.kbd:setSequence({'A', '%d'}, function(sequence)
     local n = tonumber(sequence[#sequence])
@@ -3614,14 +3636,16 @@ function UIInput:cancelCompletion()
   if self.completionIdx ~= nil then
     self.completionIdx = nil
     self.completionList = nil
+    if self.completionMenu then
+      self.completionMenu:close(true)
+      self.completionMenu = nil
+    end
 
     if self.cursor.size > 0 then
       self:onBackspace()
     end
     return true
   end
-
-  OmniBar:set_text()
 end
 
 -- Starts a completion with the given list
@@ -3632,6 +3656,66 @@ function UIInput:customCompletion(tab)
     self.completionList = tab
   end
   self:nextCompletion()
+end
+
+function UIInput:current_completion_style()
+  if self.completion_style == 'menu' and
+     self.completionList and
+     #self.completionList > 1 and
+     #self.completionList <= 7 then
+     return 'menu'
+  end
+  return 'inline'
+end
+
+function UIInput:onCompletionBegin(prefix, candidates)
+  if self:current_completion_style() == 'menu' then
+    local menu = UI.Menu()
+    for _, suffix in ipairs(candidates) do
+      menu:add(prefix .. suffix, suffix)
+    end
+
+    local old_on_escape = menu.onEscape
+    menu.onEscape = function(menu_self)
+      old_on_escape(menu_self)
+      self:cancelCompletion()
+    end
+
+    menu.onExec = function()
+      self:moveCursor(1)
+    end
+
+    menu.onSelect = function(_, item)
+      self:insert_completion_candidate(item['action'])
+    end
+
+    self.completionMenu = menu
+    self:open_menu(self.completionMenu)
+  end
+end
+
+function UIInput:open_menu(menu)
+  assert(getmetatable(menu) == UI.Menu)
+
+  local _, y = self:frame()
+  return menu:open_at(self:getCursorX(), y + 4)
+end
+
+-- Apply completion item as selected region
+function UIInput:insert_completion_candidate(suffix)
+
+  local tail = ""
+  if self.cursor.pos + self.cursor.size < #self.text then
+    tail = self.text:usub(self.cursor.pos + self.cursor.size + 1)
+  end
+
+  self.text = self.text:usub(1, self.cursor.pos) ..
+              suffix ..
+              tail
+
+  self.cursor.size = suffix:ulen()
+  self:scrollToPos()
+  self:invalidate()
 end
 
 function UIInput:nextCompletion(offset)
@@ -3662,10 +3746,13 @@ function UIInput:nextCompletion(offset)
       if functionInfo(prefix, false) then
         self:_insertChar('(')
       end
+
+      self:cancelCompletion()
       return
     end
 
     self.completionIdx = 1
+    self:onCompletionBegin(prefix, self.completionList)
   else
     -- Apply single entry using [tab]
     if #self.completionList <= 1 then
@@ -3685,24 +3772,9 @@ function UIInput:nextCompletion(offset)
     end
   end
 
-  -- Generate omnibar string
-  OmniBar:set_text('Completion',
-                   string.format('%d/%d', self.completionIdx, #self.completionList))
-
-  local tail = ""
-  if self.cursor.pos + self.cursor.size < #self.text then
-    tail = self.text:usub(self.cursor.pos + self.cursor.size + 1)
+  if self.completionList then
+    self:insert_completion_candidate(self.completionList[self.completionIdx])
   end
-
-  if not self.completionList[self.completionIdx] then return end
-
-  self.text = self.text:usub(1, self.cursor.pos) ..
-              self.completionList[self.completionIdx] ..
-              tail
-
-  self.cursor.size = self.completionList[self.completionIdx]:ulen()
-  self:scrollToPos()
-  self:invalidate()
 end
 
 function UIInput:moveCursor(offset)
@@ -3790,8 +3862,10 @@ function UIInput:onEscape()
   self:invalidate()
 end
 
-function UIInput:onLooseFocus()
-  self:cancelCompletion()
+function UIInput:onLooseFocus(next)
+  if next ~= self.completionMenu then
+    self:cancelCompletion()
+  end
 end
 
 function UIInput:onFocus()
@@ -3817,9 +3891,8 @@ function UIInput:onPaste()
     ctx:add(item, function() self:insertText(item) end)
   end
 
-  local _, y = self:frame()
   ctx.sel = #ctx.items
-  ctx:open_at(self:getCursorX(), y + 4)
+  self:open_menu(ctx)
 end
 
 function UIInput:onCharIn(c)
@@ -4191,7 +4264,7 @@ function RPNInput:dispatchOperator(str, ignoreInput)
     Undo.record_undo()
     if (not ignoreInput and not self:dispatchInput()) or
        not Error.assertStackN(argc) then
-      Undo.undo.pop_undo()
+      Undo.pop_undo()
       return
     end
 
@@ -4296,8 +4369,7 @@ end
 -- UI
 local main_layout = UI.RowLayout()
 StackView = main_layout:add_widget(UIStack(), 1)
-OmniBar   = main_layout:add_widget(UI.OmniBar(), 2, UI.OmniBar.height())
-InputView = main_layout:add_widget(UIInput(), 3, UIInput.height())
+InputView = main_layout:add_widget(UIInput(), 2, UIInput.height())
 
 MenuView  = UIMenu()
 RichView  = RichText()
@@ -4308,7 +4380,7 @@ focus_view = function(view)
   if view ~= nil and view ~= current_focus then
     if current_focus then
       if current_focus.onLooseFocus then
-        current_focus:onLooseFocus()
+        current_focus:onLooseFocus(view)
       end
       current_focus:invalidate()
     end
@@ -4793,8 +4865,7 @@ function on.construction()
             end
           end
 
-          local _, y = InputView:frame()
-          menu:open_at(InputView:getCursorX(), y)
+          InputView:open_menu(menu)
         else
           print('warning: Can not handle user returned type!')
         end
@@ -4846,11 +4917,13 @@ end
 
 function on.tabKey()
   on_any_key()
-  if current_focus ~= InputView then
-    UI.Menu.close_current()
-    focus_view(InputView)
+  if current_focus.onTab then
+    current_focus:onTab()
   else
-    InputView:onTab()
+    if current_focus ~= InputView then
+      UI.Menu.close_current()
+      focus_view(InputView)
+    end
   end
 end
 
