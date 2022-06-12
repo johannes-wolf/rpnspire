@@ -4758,7 +4758,7 @@ function on.construction()
 
   -- Variables
   GlobalKbd:setSequence({'V', 'clear'}, function()
-      math.evalStr('DelVar a-z')
+    math.evalStr('DelVar a-z')
   end)
   GlobalKbd:setSequence({'V', 'backspace'}, function()
     input_ask_value(InputView, function(varname)
@@ -4769,6 +4769,7 @@ function on.construction()
     end, nil, function(widget)
       widget:setText('', 'Delete Var:')
       widget.completionFun = completion_fn_variables
+      widget:onTab()
     end)
   end)
   GlobalKbd:setSequence({'V', '='}, function()
