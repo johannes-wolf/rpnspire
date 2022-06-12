@@ -147,10 +147,8 @@ end
 ---@param gc table
 function draw_rect_shadow(gc, x, y, w, h)
   gc:drawRect(x, y, w, h)
-  x = x + 1
-  y = y + 1
-  gc:drawLine(x, y + h, x + w, y + h)
-  gc:drawLine(x + w, y, x + w, y + h)
+  gc:drawRect(x + 1, y + h, w, 1)
+  gc:drawRect(x + w, y + 1, 1, h)
 end
 
 
