@@ -864,6 +864,7 @@ Sym = {
   CONVERT = "\226\150\182",
   EE      = "\239\128\128",
   POWN1   = "\239\128\133", -- ^-1
+  MICRO   = "\194\181",
 }
 
 local operators = {
@@ -1265,6 +1266,113 @@ local function functionInfo(s, builtinOnly)
 
   return nil
 end
+
+-- Units ordered by category
+local units = {
+  ['Constants'] = {
+    {'_c', 'speed of light'},
+    {'_g', 'accelleration of gravity'},
+    -- TODO
+  },
+  ['Length'] = {
+    {'_Ang', 'angstrom'},
+    {'_au', 'astronomical unit'},
+    {'_cm', 'centimetre'},
+    {'_dm', 'decimetre'},
+    {'_fath', 'fathom'},
+    {'_fm', 'fermi'},
+    {'_ft', 'foot'},
+    {'_in', 'inch'},
+    {'_km', 'kilometre'},
+    {'_ltyr', 'light year'},
+    {'_m', 'metre'},
+    {'_'..Sym.MICRO..'m', 'micron'},
+    {'_mi', 'mile'},
+    {'_mil', '1/1000 inch'},
+    {'_mm', 'millimetre'},
+    {'_nm', 'nanometre'},
+    {'_Nmi', 'nautical mile'},
+    {'_pc', 'parsec'},
+    {'_rod', 'rod'},
+    {'_yd', 'yard'}
+  },
+  ['Area'] = {
+    -- TODO
+  },
+  ['Volume'] = {
+    -- TODO
+  },
+  ['Time'] = {
+    -- TODO
+  },
+  ['Velocity'] = {
+    -- TODO
+  },
+  ['Temperature'] = {
+    -- TODO
+  },
+  ['Lumninous Intensity'] = {
+    -- TODO
+  },
+  ['Amount of Substance'] = {
+    -- TODO
+  },
+  ['Mass'] = {
+    -- TODO
+  },
+  ['Force'] = {
+    -- TODO
+  },
+  ['Energy'] = {
+    -- TODO
+  },
+  ['Power'] = {
+
+  },
+  ['Pressure'] = {
+
+  },
+  ['Viscosity, Kinematic'] = {
+
+  },
+  ['Viscosity, Dynamic'] = {
+
+  },
+  ['Frequency'] = {
+
+  },
+  ['Electric Current'] = {
+
+  },
+  ['Charge'] = {
+
+  },
+  ['Potential'] = {
+
+  },
+  ['Resistance'] = {
+
+  },
+  ['Conductance'] = {
+
+  },
+  ['Capacitance'] = {
+
+  },
+  ['Mag Field Strength'] = {
+
+  },
+  ['Mag Flux Denstiy'] = {
+
+  },
+  ['Magnetic Flux'] = {
+
+  },
+  ['Inductance'] = {
+
+  }
+}
+
 
 local errorCodes = {
   [10]  = "Function did not return a value",
