@@ -4493,8 +4493,36 @@ completion_catmatch = function(candidates, prefix, res)
   return res
 end
 
-completion_fn_variables = function(prefix)
-  return completion_catmatch(var:list(), prefix)
+completion_fn_variables = function(prefix, cat)
+  return completion_catmatch(var:list(), prefix, cat)
+end
+
+local completion_fn_functions_cache = nil
+completion_fn_functions = function(prefix, cat)
+  if not completion_fn_functions_cache then
+    completion_fn_functions_cache = {}
+    for k, v in pairs(functions) do
+      if not v.conv then
+        table.insert(completion_fn_functions_cache, k)
+      end
+    end
+  end
+
+  return completion_catmatch(completion_fn_functions_cache, prefix, cat)
+end
+
+local completion_fn_units_cache = nil
+completion_fn_units = function(prefix, cat)
+  if not completion_fn_units_cache then
+    completion_fn_units_cache = {}
+    for category, items in pairs(units) do
+      for _, unit in ipairs(items) do
+        table.insert(completion_fn_units_cache, unit[1])
+      end
+    end
+  end
+
+  return completion_catmatch(completion_fn_units_cache, prefix, cat)
 end
 
 InputView.completionFun = function(prefix)
@@ -4532,35 +4560,11 @@ InputView.completionFun = function(prefix)
     end
   end
 
-  local functionTab = {}
-  for k,v in pairs(functions) do
-    if not v.conv then
-      table.insert(functionTab, k)
-    end
-  end
-
-  -- TODO: Complete the unit table
-  --       Maybe move units to a grouped menu
-  local unitTab = {
-    "_m",                                   -- Length
-    "_kph","_m/_s",                         -- Speed
-    "_m/_s^2",                              -- Accelleration
-    "_s","_min","_hr","_day","_week","_yr", -- Time
-    "_N",                                   -- Force
-    "_J",                                   -- Energy
-    "_W",                                   -- Power
-    "_bar",                                 -- Pressure
-    "_A","_mA","_kA",                       -- Current
-    "_V","_mV","_kV",                       -- Potential
-    "_ohm",                                 -- Resistance
-    "_g","_c"                               -- Constants
-  }
-
   -- Provide semantic
   if semantic then
     local candidates = {}
     if semantic['unit'] then
-      candidates = completion_catmatch(unitTab, prefix, candidates)
+      candidates = completion_fn_units(prefix, candidates)
     end
     if semantic['conversion_op'] then
       candidates = completion_catmatch({'@>'}, prefix, candidates) -- TODO: Use unicode when input is ready
@@ -4574,25 +4578,26 @@ InputView.completionFun = function(prefix)
       }, prefix, candidates)
     end
     if semantic['function'] then
-      candidates = completion_catmatch(functionTab, prefix, candidates)
+      candidates = completion_fn_functions(prefix, candidates)
     end
     if semantic['variable'] then
-      candidates = completion_catmatch(var.list(), prefix, candidates)
+      candidates = completion_fn_variables(prefix, candidates)
     end
     if semantic['common'] then
       --candidates = completion_catmatch(commonTab, prefix, candidates) -- TODO: Add common tab
-      candidates = completion_catmatch(var.list(), prefix,
-                   completion_catmatch(functionTab, prefix,
-                   completion_catmatch(unitTab, prefix, candidates)))
+      candidates = completion_fn_variables(prefix,
+                   completion_fn_functions(prefix,
+                   completion_fn_units(prefix, candidates)))
     end
 
+    print('info: Got ' .. #candidates .. ' completion candidates for prefix ' .. prefix)
     return candidates
   end
 
   -- Provide all
-  return completion_catmatch(var.list(), prefix,
-         completion_catmatch(functionTab, prefix,
-         completion_catmatch(unitTab, prefix)))
+  return completion_fn_variables(prefix,
+         completion_fn_functions(prefix,
+         completion_fn_units(prefix)))
 end
 
 
