@@ -401,6 +401,7 @@ UI.Menu.current_menu = nil           --- Current root menu
 UI.Menu.last_focus = nil             --- Last focused non-menu
 UI.Menu.submenu_indicator_width = 8  --- Submenu indicator width (units)
 UI.Menu.hmargin = 4
+UI.Menu.font_size = 9
 UI.Menu.item_height = nil
 
 function UI.Menu.draw_current(gc)
@@ -418,15 +419,16 @@ end
 function UI.Menu:init(parent)
   UI.Widget.init(self)
   self.items = {}
-  self.sel = nil
+  self.sel = 1
 
   self.width = nil
   self.height = nil
+  self.vscroll = 0
   self.parent = parent
   self._visible = false
   self.isearch = UI.IncSearch(function(str)
     for idx, item in ipairs(self.items) do
-      if item['title'] and item['title']:find('^.*' .. str) then
+      if item['title'] and item['title']:lower():find(str:lower()) then
         self:select_item(idx)
         return
       end
@@ -435,7 +437,7 @@ function UI.Menu:init(parent)
 
   -- Lazy globals
   UI.Menu.item_height = UI.Menu.item_height or platform.withGC(function(gc)
-    gc:setFont('sansserif', 'r', 11)
+    gc:setFont('sansserif', 'r', UI.Menu.font_size)
     return gc:getStringHeight("A")
   end)
 
@@ -520,6 +522,16 @@ function UI.Menu:select_item(idx, exec)
   idx = math.max(1, idx)
   if #self.items >= idx then
     self.sel = idx
+
+    local _, y, _, h = self:frame()
+    local _, item_y, _, item_h = self:item_rect(self.sel)
+
+    if item_y < 0 then
+      self.vscroll = self.vscroll + item_y
+    elseif item_y + item_h > y + h then
+       self.vscroll = self.vscroll + (item_y + item_h) - (y + h)
+    end
+
     if self.onSelect then
       self.onSelect(self.sel, self.items[self.sel])
     end
@@ -614,13 +626,15 @@ function UI.Menu:selected_item()
 end
 
 function UI.Menu:frame()
-  return self._frame[1], self._frame[2], self.width, self.height
+  return self._frame[1], self._frame[2],
+         math.min(platform.window:width(), self.width),
+         math.min(platform.window:height(), self.height)
 end
 
 function UI.Menu:calc_size()
   platform.withGC(function(gc)
     local max_width = 1
-    gc:setFont('sansserif', 'r', 11)
+    gc:setFont('sansserif', 'r', UI.Menu.font_size)
 
     for _, item in ipairs(self.items) do
       local item_width = gc:getStringWidth(item['title'])
@@ -638,7 +652,7 @@ end
 function UI.Menu:item_rect(idx)
   local x, y, w, _ = self:frame()
   return x + UI.Menu.hmargin,
-         y + (idx - 1) * UI.Menu.item_height,
+         y + (idx - 1) * UI.Menu.item_height - self.vscroll,
          w - UI.Menu.hmargin,
          UI.Menu.item_height
 end
@@ -671,17 +685,19 @@ function UI.Menu:draw(gc)
     return
   end
 
-  --gc:clipRect('set', x, y, w+1, h+1)
+  gc:clipRect('set', x, y, w+1, h+1)
   gc:setColorRGB(theme_val('bg'))
   gc:fillRect(x, y, w, h)
   gc:setColorRGB(theme_val('border_bg'))
   draw_rect_shadow(gc, x, y, w - 1, h - 1)
+  gc:clipRect('set', x, y, w - 1, h - 1)
+  gc:setFont('sansserif', 'r', UI.Menu.font_size)
 
-  local item_y = y
+  local item_y = y - self.vscroll
   for idx, item in ipairs(self.items) do
     if self.sel == idx then
       gc:setColorRGB(theme_val('selection_bg'))
-      gc:fillRect(x + 1, item_y + 1, w - 2, h / #self.items - 2)
+      gc:fillRect(x + 1, item_y + 1, w - 2, UI.Menu.item_height)
     end
 
     self:draw_item(gc, item, self.sel == idx, x + UI.Menu.hmargin, item_y)
@@ -2672,6 +2688,7 @@ end
 
 -- Toast Widget
 UI.Toast = class(UI.Widget)
+UI.Toast.font_size = 11
 function UI.Toast:init(args)
   UI.Widget.init(self)
   args = args or {}
@@ -2691,6 +2708,7 @@ function UI.Toast:frame()
   local textW, textH = 0, 0
 
   platform.withGC(function(gc)
+    gc:setFont('sansserif', 'b', UI.Toast.font_size)
     textW = gc:getStringWidth(self.text)
     textH = gc:getStringHeight(self.text)
   end)
@@ -2726,6 +2744,7 @@ function UI.Toast:draw(gc)
   gc:setColorRGB(theme_val('border_bg'))
   gc:drawRect(x, y, w-1, h-1)
   gc:setColorRGB(theme_val(isError and 'error_fg' or 'fg'))
+  gc:setFont('sansserif', 'b', UI.Toast.font_size)
   gc:drawString(self.text, x + self.margin, y + self.margin)
   gc:clipRect("reset")
 end
@@ -3707,12 +3726,28 @@ function UIInput:init_bindings()
   end)
 
   -- Special chars
-  self.kbd:setSequence({'I'}, function(sequence)
+  self.kbd:setSequence({'I', 'c'}, function()
     MenuView:present(InputView, {
       {'{', '{'}, {'=:', '=:'}, {'}', '}'},
       {'[', '['}, {'@>', '@>'}, {']', ']'},
       {'|', '|'}, {':=', ':='}, {'@', '@'},
     })
+  end)
+
+  -- Unit table
+  self.kbd:setSequence({'I', 'u'}, function()
+    local menu = UI.Menu()
+    for category, unit_pairs in pairs(units) do
+      menu = menu:add(category)
+      for _, unit in ipairs(unit_pairs) do
+        menu:add(unit[2] or unit[1], function()
+          self:insertText(unit[1])
+        end)
+      end
+      menu = menu:add()
+    end
+
+    self:open_menu(menu)
   end)
 
   -- Ans/Stack reference
@@ -3754,8 +3789,8 @@ end
 function UIInput:current_completion_style()
   if self.completion_style == 'menu' and
      self.completionList and
-     #self.completionList > 1 and
-     #self.completionList <= 7 then
+     #self.completionList > 1 and   -- lower menu threshold
+     #self.completionList <= 10 then -- upper
      return 'menu'
   end
   return 'inline'

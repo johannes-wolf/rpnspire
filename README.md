@@ -118,22 +118,23 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>help</kbd><kbd>help</kbd>           | Show settings                  |
 
 ### Input
-| Key                              | Function                                                                |
-|----------------------------------|-------------------------------------------------------------------------|
-| <kbd>left</kbd>                  | Move cursor left                                                        |
-| <kbd>right</kbd>                 | Move cursor right                                                       |
-| <kbd>up</kbd>                    | Focus stack                                                             |
-| <kbd>down</kbd>                  | Swap stack 1 & 2                                                        |
-| <kbd>ctrl</kbd><kbd>menu</kbd>   | Show context menu (WIP)                                                 |
-| <kbd>return</kbd>                | Insert special character/operator                                       |
-| <kbd>tab</kbd>                   | Start completion for current input                                      |
-| <kbd>G</kbd><kbd>left</kbd>      | Go to beginning                                                         |
-| <kbd>G</kbd><kbd>right</kbd>     | Go to end                                                               |
-| <kbd>G</kbd><kbd>(</kbd>         | Go to previous parenthese or comma or beginning                         |
-| <kbd>G</kbd><kbd>)</kbd>         | Go to next parenthese or comma                                          |
-| <kbd>G</kbd><kbd>.</kbd>         | Select text between parentheses and or commas (select current argument) |
-| <kbd>I</kbd>                     | Insert special                                                          |
-| <kbd>A</kbd><kbd>[0-9]</kbd>     | Insert stack reference (Ans)                                            |
+| Key                            | Function                                                                |
+|--------------------------------|-------------------------------------------------------------------------|
+| <kbd>left</kbd>                | Move cursor left                                                        |
+| <kbd>right</kbd>               | Move cursor right                                                       |
+| <kbd>up</kbd>                  | Focus stack                                                             |
+| <kbd>down</kbd>                | Swap stack 1 & 2                                                        |
+| <kbd>ctrl</kbd><kbd>menu</kbd> | Show context menu (WIP)                                                 |
+| <kbd>return</kbd>              | Insert special character/operator                                       |
+| <kbd>tab</kbd>                 | Start completion for current input                                      |
+| <kbd>G</kbd><kbd>left</kbd>    | Go to beginning                                                         |
+| <kbd>G</kbd><kbd>right</kbd>   | Go to end                                                               |
+| <kbd>G</kbd><kbd>(</kbd>       | Go to previous parenthese or comma or beginning                         |
+| <kbd>G</kbd><kbd>)</kbd>       | Go to next parenthese or comma                                          |
+| <kbd>G</kbd><kbd>.</kbd>       | Select text between parentheses and or commas (select current argument) |
+| <kbd>I</kbd><kbd>c</kbd>       | Insert special                                                          |
+| <kbd>I</kbd><kbd>u</kbd>       | Insert unit                                                             |
+| <kbd>A</kbd><kbd>[0-9]</kbd>   | Insert stack reference (Ans)                                            |
 
 ### Stack
 | Key                               | Function                                                        |
