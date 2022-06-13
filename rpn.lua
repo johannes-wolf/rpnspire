@@ -280,7 +280,8 @@ function UI.Widget:visible()
 end
 
 function UI.Widget:invalidate()
-  platform.window:invalidate(self:frame())
+  local x, y, w, h = self:frame()
+  platform.window:invalidate(x, y, w + 1, h + 1)
 end
 
 function UI.Widget:draw(gc)
