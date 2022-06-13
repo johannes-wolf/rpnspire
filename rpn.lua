@@ -420,20 +420,51 @@ end
 function UI.Menu:init(parent)
   UI.Widget.init(self)
   self.items = {}
+  self.orig_items = nil
   self.sel = 1
 
   self.width = nil
   self.height = nil
+  self.max_height = nil
   self.vscroll = 0
   self.parent = parent
   self._visible = false
+  self.filtered = false
   self.isearch = UI.IncSearch(function(str)
-    for idx, item in ipairs(self.items) do
-      if item['title'] and item['title']:lower():find(str:lower()) then
-        self:select_item(idx)
-        return
+    if not self.orig_items then
+      self.orig_items = self.items
+    end
+
+    if not str or str == '' then
+      self.items = self.orig_items
+      self.filtered = false
+      self:invalidate()
+      self:calc_size(true)
+      self:invalidate()
+      return
+    end
+
+    -- Recursive search menu
+    local function add_matches(menu)
+      for idx, item in ipairs(menu.orig_items or menu.items) do
+        if item['submenu'] then
+          add_matches(item['submenu'])
+        elseif item['action'] then
+          if item['title'] and item['title']:lower():find(str:lower()) then
+            table.insert(self.items, item)
+          end
+        end
       end
     end
+
+    self.items = {}
+    self.filtered = true
+    add_matches(self)
+    self:select_item(1)
+
+    self:invalidate()
+    self:calc_size(true)
+    self:invalidate()
   end)
 
   -- Lazy globals
@@ -445,6 +476,12 @@ function UI.Menu:init(parent)
   -- Callbacks
   self.onExec = nil --- onExec(action : any) : string
   self.onSelect = nil -- onSelect(idx : number, item : table)
+end
+
+-- Returns if the menu is filtered
+---@return boolean filtered
+function UI.Menu:is_filtered()
+  return self.filtered
 end
 
 -- Add menu item
@@ -466,7 +503,7 @@ function UI.Menu:add(title, action)
   end
 end
 
-function UI.Menu:open_at(x, y, parent)
+function UI.Menu:open_at(x, y, max_height, parent)
   if not parent then
     UI.Menu.current_menu = self
     UI.Menu.last_focus = current_focus
@@ -478,6 +515,8 @@ function UI.Menu:open_at(x, y, parent)
     self:calc_size()
   end
 
+  self.max_height = max_height
+
   -- If in the lower quarter of the screen, open menus to the top
   if y > platform.window:height() * 0.75 then
     y = y - self.height
@@ -488,7 +527,7 @@ function UI.Menu:open_at(x, y, parent)
     x = x - x_offset
   end
 
-  local y_offset = y + self.height - platform.window:height()
+  local y_offset = y + self.height - (self.max_height or platform.window:height())
   if y_offset > 0 then
     y = y - y_offset
   end
@@ -548,7 +587,7 @@ function UI.Menu:exec_item(idx)
   if item then
     if item['submenu'] then
       local x, y, w = self:item_rect(self.sel)
-      item.submenu:open_at(x + w - 4, y + 4, self)
+      item.submenu:open_at(x + w - 4, y + 4, nil, self)
     end
 
     if item['action'] then
@@ -617,7 +656,11 @@ function UI.Menu:onEscape()
 end
 
 function UI.Menu:onBackspace()
-  self:onEscape()
+  if self.isearch.str:len() > 0 then
+    self.isearch:onBackspace()
+  else
+    self:onEscape()
+  end
 end
 
 function UI.Menu:selected_item()
@@ -629,10 +672,10 @@ end
 function UI.Menu:frame()
   return self._frame[1], self._frame[2],
          math.min(platform.window:width(), self.width),
-         math.min(platform.window:height(), self.height)
+         math.min(self.max_height or platform.window:height(), self.height)
 end
 
-function UI.Menu:calc_size()
+function UI.Menu:calc_size(width_only)
   platform.withGC(function(gc)
     local max_width = 1
     gc:setFont('sansserif', 'r', UI.Menu.font_size)
@@ -646,8 +689,10 @@ function UI.Menu:calc_size()
     end
 
     self.width = max_width + UI.Menu.hmargin * 2
-    self.height = UI.Menu.item_height * #self.items
-end)
+    if not width_only then
+      self.height = UI.Menu.item_height * #self.items
+    end
+  end)
 end
 
 function UI.Menu:item_rect(idx)
@@ -667,7 +712,7 @@ end
 function UI.Menu:draw_item(gc, item, sel, x, y)
   local title = item['title']
 
-  gc:setColorRGB(theme_val('fg'))
+  gc:setColorRGB(theme_val(self:is_filtered() and 'filter_fg' or 'fg'))
   gc:drawString(title, x, y)
 
   if item['submenu'] then
@@ -691,11 +736,11 @@ function UI.Menu:draw(gc)
   gc:fillRect(x, y, w, h)
   gc:setColorRGB(theme_val('border_bg'))
   draw_rect_shadow(gc, x, y, w - 1, h - 1)
-  gc:clipRect('set', x, y, w - 1, h - 1)
   gc:setFont('sansserif', 'r', UI.Menu.font_size)
 
   local item_y = y - self.vscroll
   for idx, item in ipairs(self.items) do
+    gc:clipRect('set', x, y, w - 1, h - 1)
     if self.sel == idx then
       gc:setColorRGB(theme_val('selection_bg'))
       gc:fillRect(x + 1, item_y + 1, w - 2, UI.Menu.item_height)
@@ -782,6 +827,7 @@ local themes = {
     border_bg      = 0x000000,
     omni_bg        = 0x222222,
     omni_fg        = 0xEEEEEE,
+    filter_fg      = 0x0000FF,
   }),
   ['dark'] = Theme(0x444444, 0xffffff, {
     row_bg         = 0x444444,
@@ -796,6 +842,9 @@ local themes = {
     error_bg       = 0xee0000,
     error_fg       = 0xffffff,
     border_bg      = 0x000000,
+    omni_bg        = 0x222222,
+    omni_fg        = 0xEEEEEE,
+    filter_fg      = 0x0000FF,
   })
 }
 
@@ -3666,7 +3715,6 @@ function UIInput:init(frame)
   self.completionIdx = nil   -- Current completion index
   self.completionList = nil  -- Current completion candidates
   self.completionMenu = nil  -- Current completion menu
-  self.completion_style = options.completionStyle
   -- Prefix
   self.prefix = ""           -- Non-Editable prefix shown on the left
   -- Input
@@ -3808,10 +3856,9 @@ function UIInput:customCompletion(tab)
 end
 
 function UIInput:current_completion_style()
-  if self.completion_style == 'menu' and
+  if options.completionStyle == 'menu' and
      self.completionList and
-     #self.completionList > 1 and   -- lower menu threshold
-     #self.completionList <= 10 then -- upper
+     #self.completionList > 1 then -- lower menu threshold
      return 'menu'
   end
   return 'inline'
@@ -3838,6 +3885,7 @@ function UIInput:onCompletionBegin(prefix, candidates)
       self:insert_completion_candidate(item['action'])
     end
 
+    local _, y = self:frame()
     self.completionMenu = menu
     self:open_menu(self.completionMenu)
   end
@@ -3847,7 +3895,7 @@ function UIInput:open_menu(menu)
   assert(getmetatable(menu) == UI.Menu)
 
   local _, y = self:frame()
-  return menu:open_at(self:getCursorX(), y + 4)
+  return menu:open_at(self:getCursorX(), y + 4, y + 4)
 end
 
 -- Apply completion item as selected region
@@ -4823,6 +4871,7 @@ local function make_options_menu()
     make_bool_item('Smart Complete', 'smartComplete'),
     make_bool_item('Auto Pop', 'autoPop'),
     make_bool_item('Auto ANS', 'autoAns'),
+    make_choice_item('Completion', 'completionStyle', {['inline']='inline', ['menu']='menu'}),
     make_theme_menu()}
 end
 
