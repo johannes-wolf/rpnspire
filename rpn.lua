@@ -1313,13 +1313,33 @@ local units = {
     {'_yd', 'yard'}
   },
   ['Area'] = {
-    -- TODO
+    {'_acre', 'acre'},
+    {'_ha', 'hectare'},
   },
   ['Volume'] = {
-    -- TODO
+    {'_cup', 'cup (8 ounzes)'},
+    {'_floz', 'fluid ounce'},
+    {'_flozUK', 'British fluid ounce'},
+    {'_gal', 'gallon'},
+    {'_galUK', 'British gallon'},
+    {'_flozUK', 'British fluid ounce'},
+    {'_l', 'litre'},
+    {'_ml', 'millilitre'},
+    {'_pt', 'pint (2 cups)'},
+    {'_qt', 'quart (2 pints)'},
+    {'_tbsp', 'tablespoon'},
+    {'_tsp', 'teaspoon'}
   },
   ['Time'] = {
-    -- TODO
+    {'_day', 'day'},
+    {'_hr', 'hour'},
+    {'_'..Sym.MICRO..'s', 'microsecond'},
+    {'_min', 'minute'},
+    {'_ms', 'millisecond'},
+    {'_ns', 'nanosecond'},
+    {'_s', 'second'},
+    {'_week', 'week'},
+    {'_yr', 'year'}
   },
   ['Velocity'] = {
     -- TODO
