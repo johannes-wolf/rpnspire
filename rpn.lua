@@ -3815,22 +3815,11 @@ function UIInput:nextCompletion(offset)
   if not self.completionList or #self.completionList == 0 then
     if not self.completionFun then return end
 
-    local prefixSize = 0
-    do
-      local prevb = 0xff
-      -- FIXME: This does not work with unicode chars!
-      for i=self.cursor.pos,1,-1 do
-        local b = self.text:byte(i)
-        if b >= 65 and prevb < 65 then break end
-        if b == nil or b < 64 then break end -- Stop at char < '@'
-        prefixSize = prefixSize + 1
-        prevb = b
-      end
-    end
-
     local prefix = ''
-    if prefixSize > 0 then
-      prefix = self.text:sub(self.cursor.pos + 1 - prefixSize, self.cursor.pos)
+    local left_text = self.text:usub(1, self.cursor.pos)
+    local prefix_begin = left_text:find('([_%a\128-\255][%._%w\128-\255]*)$')
+    if prefix_begin then
+      prefix = left_text:sub(prefix_begin)
     end
 
     self.completionList = self.completionFun(prefix)
