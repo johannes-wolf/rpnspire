@@ -6,7 +6,6 @@ under the terms of the GNU General Public License version 3 as published by
 the Free Software Foundation.
 ]]--
 
-
 -- Forward declarations
 local focus_view = nil
 local input_ask_value = nil
@@ -96,6 +95,8 @@ end
 ---@param transform_fn function  Transformation function (any) : string
 ---@return string
 function table.join_str(self, separator, transform_fn)
+  if not self then return '' end
+
   separator = separator or ' '
   local str = ''
   for idx, item in ipairs(self) do
@@ -162,7 +163,7 @@ end
 
 -- Draw rect with 1px shadow
 ---@param gc table
-function draw_rect_shadow(gc, x, y, w, h)
+local function draw_rect_shadow(gc, x, y, w, h)
   gc:drawRect(x, y, w, h)
   gc:drawRect(x + 1, y + h, w, 1)
   gc:drawRect(x + w, y + 1, 1, h)
@@ -463,7 +464,7 @@ function UI.Menu:init(parent)
 
     -- Recursive search menu
     local function add_matches(menu)
-      for idx, item in ipairs(menu.orig_items or menu.items) do
+      for _, item in ipairs(menu.orig_items or menu.items) do
         if item['submenu'] then
           add_matches(item['submenu'])
         elseif item['action'] then
@@ -962,7 +963,7 @@ local operators = {
   [Sym.RAD]         = {nil,     17, 1,  1},
   [Sym.GRAD]        = {nil,     17, 1,  1},
   [Sym.DEGREE]      = {nil,     17, 1,  1},
-  -- [" "]             = {nil, 17, 1,  1}, -- SUBSCRIPT
+  --["_["]            = {nil,     17, 2,  1}, -- Subscript (rpnspire custom)
   ["@t"]            = {Sym.TRANSP, 17, 1, 1},
   [Sym.TRANSP]      = {nil,     17, 1,  1},
   --
@@ -2165,10 +2166,10 @@ end
 
 -- Expression tree
 ---@class ExpressionTree
----@field nodes table  Top nodes
+---@field root table  Root node
 ExpressionTree = class()
-function ExpressionTree:init(nodes)
-  self.nodes = nodes or {}
+function ExpressionTree:init(root)
+  self.root = root
 end
 
 function ExpressionTree:debug_print()
@@ -2184,9 +2185,7 @@ function ExpressionTree:debug_print()
     end
   end
 
-  for _, node in ipairs(self.nodes) do
-    print_node_recursive(node)
-  end
+  print_node_recursive(self.root)
 end
 
 -- Converts the node tree to an infix representation
@@ -2244,11 +2243,7 @@ function ExpressionTree:infix_string()
   end
 
   local ok, res = pcall(function()
-    local str = ''
-    for _, node in ipairs(self.nodes) do
-      str = str .. node_to_infix(node)
-    end
-    return str
+    return node_to_infix(self.root)
   end)
 
   if not ok then
@@ -2260,6 +2255,9 @@ function ExpressionTree:infix_string()
 end
 
 -- Construct a node
+---@param text string
+---@param kind TokenKind
+---@param children table
 ---@return table node
 function ExpressionTree.make_node(text, kind, children)
   return {text = text, kind = kind, children = children}
@@ -2268,24 +2266,33 @@ end
 -- Construct an ExpressionTree from a list of tokens
 ---@param tokens table  List of tokens
 function ExpressionTree.from_infix(tokens)
-  local tree = ExpressionTree()
+  assert(type(tokens) == 'table')
 
   local stack = {}
-  local nodes = {}
+  local target_stack = {{}}
+  local nodes = target_stack[#target_stack]
+
+  local function begin_target(node)
+    node.children = node.children or {}
+    table.insert(target_stack, node.children)
+    nodes = target_stack[#target_stack]
+  end
+
+  local function end_target()
+    if #target_stack <= 1 then
+      error('Tried popping last stack entry')
+    end
+    table.remove(target_stack)
+    nodes = target_stack[#target_stack]
+  end
 
   local function stack_top()
     return #stack > 0 and stack[#stack] or nil
   end
 
   -- Copy node from stack to result
-  ---@param argc number  Number of arguments to consume
-  local function copy_stack_node(argc)
-    argc = argc or 0
+  local function copy_stack_node()
     local node = stack_top()
-    node.children = argc > 0 and {} or nil
-    for _=0, argc-1 do
-      table.insert(node.children, 1, table.remove(nodes))
-    end
     table.insert(nodes, node)
   end
 
@@ -2324,10 +2331,7 @@ function ExpressionTree.from_infix(tokens)
         end
       end
 
-      local rpn = _G.StackView.stack[#_G.StackView.stack - stack_n + 1].rpn
-      for _,v in ipairs(rpn) do
-        table.insert(nodes, v)
-      end
+      table.insert(nodes, _G.StackView.stack[#_G.StackView.stack - stack_n + 1].rpn)
     end
 
     if kind == 'operator' then
@@ -2348,6 +2352,7 @@ function ExpressionTree.from_infix(tokens)
 
     if kind == 'function' then
       table.insert(stack, ExpressionTree.make_node(text, kind))
+      begin_target(stack_top())
     end
 
     if kind == 'syntax' then
@@ -2355,23 +2360,20 @@ function ExpressionTree.from_infix(tokens)
         while stack_top().kind ~= 'syntax' do
           apply_stack_operator()
         end
-        stack_top().argc = (stack_top().argc or 1) + 1
-      end
-
-      if text == '(' or text == '{' or text == '[' then
-        -- Nested [] count as arguments (without a comma)
-        if text == '[' then
-          if stack_top() and stack_top().text == '[' then
-            stack_top().argc = (stack_top().argc or 0) + 1
-            stack_top().matrix = true -- HACK: Fix by separating lists/martices and subscripts
-          end
+      elseif text == '(' then
+        table.insert(stack, ExpressionTree.make_node(text, kind))
+      elseif text == '{' then
+        table.insert(stack, ExpressionTree.make_node(text, kind))
+        begin_target(stack_top())
+      elseif text == '[' then
+        -- Detect matrix row ([ inside [)
+        if stack_top() and stack_top().text == '[' then
+          stack_top().matrix = true -- HACK: Fix by separating lists/martices and subscripts
         end
-        -- TODO: Detect subscripts
 
         table.insert(stack, ExpressionTree.make_node(text, kind))
-      end
-
-      if text == ')' or text == '}' or text == ']' then
+        begin_target(stack_top())
+      elseif text == ')' or text == '}' or text == ']' then
         while stack_top().kind ~= 'syntax' do
           apply_stack_operator()
         end
@@ -2380,15 +2382,16 @@ function ExpressionTree.from_infix(tokens)
           error('Missing ' .. ParenPairs[text][1])
         end
 
-        local argc = stack_top().argc or 1
         if text == '}' or text == ']' then
-          copy_stack_node(argc)
+          end_target()
+          copy_stack_node()
         end
         table.remove(stack) -- Pop opening paren
 
         if text == ')' then
           if stack_top() and stack_top().kind == 'function' then
-            copy_stack_node(argc)
+            end_target()
+            copy_stack_node()
             table.remove(stack) -- Pop function name
           end
         end
@@ -2404,619 +2407,11 @@ function ExpressionTree.from_infix(tokens)
     error('Unprocessed tokens on stack')
   end
 
-  for _, node in ipairs(nodes) do
-    table.insert(tree.nodes, node)
+  if #nodes > 1 then
+    error('Multiple root nodes')
   end
 
-  return tree
-end
-
-
--- RPN Expression stack for transforming from and to infix notation
----@class RPNExpression
-RPNExpression = class()
-function RPNExpression:init(stack)
-  self.stack = stack or {}
-end
-
--- Sets the internal stack to the list of infix tokens, transformed
--- to postfix order
----@param tokens TokenPair[]  List of parsed token pairs
-function RPNExpression:fromInfix(tokens)
-  if not tokens then
-    self.stack = {}
-    return nil
-  end
-
-  local stack, result = {}, {}
-
-  -- Forward declarations
-  local beginFunction = nil
-  local beginList = nil
-  local beginMatrix = nil
-
-  -- State
-  local listLevel = 0
-  local matrixLevel = 0
-
-  local idx = 1
-  local function next()
-    local token = idx <= #tokens and tokens[idx] or nil
-    idx = idx + 1
-    return token
-  end
-
-  local error_message = ''
-  local function error(message)
-    error_message = message
-    return _G.error(message)
-  end
-
-  local function testTop(kind)
-    return #stack > 0 and stack[#stack][2] == kind or nil
-  end
-
-  local function popTop()
-    local top = stack[#stack]
-    if top[2] == 'operator' then
-      local argc = select(3, queryOperatorInfo(top[1]))
-      if #result < argc then
-        error('Missing operands')
-      end
-    end
-
-    table.insert(result, table.remove(stack))
-  end
-
-  local function popUntil(value)
-    while #stack > 0 do
-      if stack[#stack][1] == value then
-        return true
-      end
-      popTop()
-    end
-    return false
-  end
-
-  local function handleOperator(sym)
-    local _, prec, _, _, assoc = queryOperatorInfo(sym)
-
-    while testTop('operator') do
-      local _, top_prec, _, _, _ = queryOperatorInfo(stack[#stack][1])
-      if (assoc ~= 'r' and prec <= top_prec) or
-         (assoc == 'r' and prec < top_prec) then
-        popTop()
-      else
-        break
-      end
-    end
-    table.insert(stack, {sym, 'operator'})
-  end
-
-  local function handleAns(sym)
-    local n = tonumber(sym:sub(2))
-    if n then
-      if not Error.assertStackN(n) then
-        error('Too few arguments on stack')
-        return
-      end
-
-      local rpn = _G.StackView.stack[#_G.StackView.stack - n + 1].rpn
-      for _,v in ipairs(rpn) do
-        table.insert(result, v)
-      end
-    end
-  end
-
-  ---@param value string
-  ---@param kind TokenKind
-  local function handleDefault(value, kind)
-    assert(value)
-    assert(kind)
-
-    if kind == 'number' or kind == 'word' or kind == 'unit' or kind == 'string' then
-      table.insert(result, {value, kind})
-    elseif kind == 'function' then
-      beginFunction(value)
-    elseif kind == 'syntax' and value == '(' then
-      table.insert(stack, {value, kind})
-    elseif kind == 'syntax' and value == ')' then
-      if popUntil('(') then
-        table.remove(stack)
-      else
-        error('Missing (')
-      end
-    elseif kind == 'syntax' and value == '{' then
-      table.insert(stack, {value, kind})
-      listLevel = listLevel + 1
-      if not beginList() then return end
-      listLevel = listLevel - 1
-    elseif kind == 'syntax' and value == '[' then
-      table.insert(stack, {value, kind})
-      matrixLevel = matrixLevel + 1
-      if not beginMatrix() then return end
-      matrixLevel = matrixLevel - 1
-    elseif kind == 'operator' then
-      handleOperator(value)
-    elseif kind == 'ans' then
-      handleAns(value)
-    else
-      error('Unexpected token')
-    end
-  end
-
-  beginFunction = function(name)
-    local argc = nil
-    local parenLevel = 0
-    for token in next do
-      local value, kind = token[1], token[2]
-      if value == ',' then
-        if argc then
-          argc = argc + 1
-        else
-          error('Expected (')
-        end
-        if not popUntil('(') then
-          error('Missing (')
-          return
-        end
-      elseif value == ')' and parenLevel == 1 then
-        if popUntil('(') then
-          table.remove(stack)
-          table.insert(result, {tostring(argc or 0), 'number'})
-          table.insert(result, {name, 'function'})
-          return
-        else
-          error('Missing (')
-          return
-        end
-      else
-        -- Begin argument count at first non '(' token
-        if value ~= '(' and not argc then
-          argc = 1
-        end
-        if value == '(' then
-          parenLevel = parenLevel + 1
-        elseif value == ')' then
-          parenLevel = parenLevel - 1
-        end
-        handleDefault(value, kind)
-      end
-    end
-  end
-
-  beginList = function()
-    if listLevel > 1 then
-      error('Nested lists are not allowed')
-      return
-    end
-
-    local argc = nil
-    for token in next do
-      local value, kind = token[1], token[2]
-      if value == ',' then
-        if argc then
-          argc = argc + 1
-        else
-          error('Expected {')
-        end
-        if not popUntil('{') then
-          error('Missing {')
-          return
-        end
-      elseif value == '}' then
-        if popUntil('{') then
-          table.remove(stack)
-          table.insert(result, {tostring(argc or 0), 'number'})
-          table.insert(result, {'}', 'syntax'})
-          return
-        else
-          error('Missing {')
-          return
-        end
-      else
-        -- Begin argument count at first non '(' token
-        if value ~= '{' and not argc then
-          argc = 1
-        end
-        handleDefault(value, kind)
-      end
-    end
-  end
-
-  beginMatrix = function()
-    if matrixLevel > 1 then
-      error('Nested matrices are not allowed')
-      return
-    end
-
-    local rows, cols = 0, 1
-    local curCol = 0
-    for token in next do
-      local value, kind = token[1], token[2]
-      if value == ',' then
-        if rows <= 1 then
-          cols = cols + 1
-        else
-          curCol = curCol + 1
-          if curCol > cols then
-            error('Matrix different column lengths')
-            return
-          end
-        end
-
-        if not popUntil('[') then
-          error('Missing [')
-          return
-        end
-      elseif value == '[' then
-        curCol = 1
-        rows = rows + 1
-        if not popUntil('[') then
-          error('Missing [')
-          return
-        end
-        --handleDefault(value, kind)
-      elseif value == ']' then
-        if rows == 0 then rows = 1 end
-        if popUntil('[') then
-          if curCol == 0 then
-            table.remove(stack)
-            table.insert(result, {tostring(cols), 'number'})
-            table.insert(result, {tostring(rows), 'number'})
-            table.insert(result, {']', 'syntax'})
-            return
-          end
-        else
-          error('Missing [')
-          return
-        end
-        curCol = 0
-      else
-        handleDefault(value, kind)
-      end
-    end
-  end
-
-  local success, err = pcall(function()
-    for token in next do
-      handleDefault(token[1], token[2])
-    end
-
-    while #stack > 0 do
-      if stack[#stack][1] == '(' then
-        error('Paren missmatch')
-        break
-      end
-      popTop()
-    end
-  end)
-
-  if success then
-    self.stack = result
-    return self.stack
-  else
-    self.stack = {}
-    Error.show(tostring(error_message))
-    print(err)
-  end
-end
-
--- Returns the bottom stack index of the branch starting at index
----@param index number  Stack index to start at
-function RPNExpression:findBranch(index)
-  if index == 1 then
-    return 1
-  end
-
-  local token = self.stack[index]
-  assert(token)
-
-  local count = 0
-  local kind, value = token[2], token[1]
-  if kind == 'operator' then
-    local argc = select(3, queryOperatorInfo(value))
-    count = tonumber(argc)
-    index = index - 1
-  elseif kind == 'function' then
-    count = tonumber(self.stack[index - 1][1])
-    index = index - 2
-  elseif kind == 'syntax' then
-    if value == '}' then
-      count = tonumber(self.stack[index - 1][1])
-      index = index - 2
-    elseif value == ']' then
-      count = tonumber(self.stack[index - 1][1])
-      count = tonumber(self.stack[index - 2][1]) * count
-      index = index - 3
-    end
-  end
-
-  for i = 0, count - 1 do
-    index = self:findBranch(index)
-    if i < count - 1 then
-      index = index - 1
-    end
-  end
-
-  return index
-end
-
--- Returns a list of stack-indices (top, bottom), one per branch of the top-most
--- operator/function/list/matrix
----@return table<number, table<"top"|"bottom", number>>[]
-function RPNExpression:split()
-  local top = self.stack[#self.stack]
-  local kind, value = top[2], top[1]
-
-  local branches = {}
-  local index, count = #self.stack, 0
-
-  if kind == 'operator' then
-    local argc = select(3, queryOperatorInfo(top[1]))
-    count = tonumber(argc)
-    index = index - 1
-  elseif kind == 'function' then
-    count = tonumber(self.stack[index - 1][1])
-    index = index - 2
-  elseif kind == 'syntax' then
-    if value == '}' then
-      count = tonumber(self.stack[#self.stack - 1][1])
-      index = index - 2
-    elseif value == ']' then
-      count = tonumber(self.stack[#self.stack - 1][1])
-      count = tonumber(self.stack[#self.stack - 2][1]) * count
-      index = index - 3
-    end
-  else
-    Error.show('Unimplemented')
-    return
-  end
-
-  local top, bottom = index, nil
-  for _=0,count-1 do
-    bottom = self:findBranch(top)
-    if bottom then
-      table.insert(branches, {top = top, bottom = bottom})
-      top = bottom - 1
-    end
-  end
-
-  return branches
-end
-
-function RPNExpression:_isReverseOp(value, kind)
-  if kind == 'operator' then
-    if self.stack[#self.stack][1] == value then
-      return value == Sym.NEGATE or value == "(-)" or
-             value == "not" or value == "not "
-    end
-  end
-  return false
-end
-
--- Pops the top token, if it is a store operator.
--- As store operators must be the last operation, they must be
--- removed before pushing other operaors
-function RPNExpression:popStoreOperation()
-  if #self.stack == 0 then return end
-
-  local function pop_range(top, bottom)
-    for i=top,bottom,-1 do
-      table.remove(self.stack, i)
-    end
-  end
-
-  local value, kind = unpack(self:top())
-  if kind == 'operator' then
-    -- [value] =: [variable]
-    if value == '=:' or value == Sym.STORE then
-      local branches = self:split()
-      assert(#branches == 2)
-      pop_range(branches[1].top, branches[1].bottom)
-      self:pop()
-    elseif value == ':=' then
-      -- [variable] := [value]
-      local branches = self:split()
-      assert(#branches == 2)
-      pop_range(branches[2].top, branches[2].bottom)
-      self:pop()
-    end
-  end
-end
-
--- Removes and returns the top-most token
----@return TokenPair
-function RPNExpression:pop()
-  return table.remove(self.stack)
-end
-
--- Returns the top-most token
----@return TokenPair
-function RPNExpression:top()
-  if #self.stack > 0 then
-    return self.stack[#self.stack]
-  end
-end
-
--- Push operator
----@param name string  Operator name
-function RPNExpression:pushOperator(name)
-  assert(name)
-  self:push({name, 'operator'})
-end
-
--- Push function call
----@param name string   Function name
----@param argc integer  Number of arguments
-function RPNExpression:pushFunctionCall(name, argc)
-  assert(name and argc)
-  self:push({tostring(argc), 'number'})
-  self:push({name, 'function'})
-end
-
-function RPNExpression:push(item)
-  local value, kind = nil, nil
-  if type(item) == 'table' then
-    value, kind = unpack(item)
-  elseif type(item) == 'string' then
-    local tokens = Infix.tokenize(item)
-    if not tokens or #tokens < 1 then
-      Error.show("Could not parse input")
-      return
-    end
-    value, kind = unpack(tokens[1])
-  end
-
-  if self:_isReverseOp(value, kind) then
-    -- Remove double negation/not
-    self:pop()
-  else
-    table.insert(self.stack, {value, kind})
-  end
-end
-
--- Concats all tokens from the given RPNExpression to target
----@param o RPNExpression  Other rpn stack
-function RPNExpression:appendStack(o)
-  for _, item in ipairs(o) do
-    table.insert(self.stack, item)
-  end
-end
-
--- Converts the rpn stack to an infix expression string
----@return string
-function RPNExpression:infixString()
-  local stack = {}
-
-  local function pushOperator(name, prec, argc, pos, assoc, aggrassoc)
-    local assoc = assoc == "r" and 2 or (assoc == "l" and 1 or 0)
-
-    local args = {}
-    for i=1,argc do
-      local item = table.remove(stack)
-      table.insert(args, item)
-    end
-
-    local str = ""
-    for i,v in ipairs(args) do
-      if pos == 0 and str:len() > 0 then str = name .. str end
-
-      if v.prec and ((v.prec < prec) or ((aggrassoc or i == assoc) and v.prec < prec + (assoc ~= 0 and 1 or 0))) then
-        str = "(" .. v.expr .. ")" .. str
-      else
-        str = v.expr .. str
-      end
-    end
-    if pos < 0 then str = name .. str end
-    if pos > 0 then str = str .. name end
-
-    table.insert(stack, { expr = str, prec = prec })
-  end
-
-  local function pushFunction(name)
-    if not stack or #stack < 1 then
-      error("Missing function argument size")
-    end
-
-    local argc = tonumber(table.remove(stack).expr)
-    assert(argc)
-
-    local args = {}
-    for i=1,argc do
-      local item = table.remove(stack)
-      table.insert(args, 1, item)
-    end
-
-    local str = ""
-    for _,v in ipairs(args) do
-      if str:len() > 0 then str = str .. ',' end
-      str = str .. v.expr
-    end
-    str = name .. "(" .. str .. ")"
-
-    table.insert(stack, {expr=str, prec=99})
-  end
-
-  local function pushList()
-    if not stack or #stack < 1 then
-      error("Missing list length")
-    end
-
-    local length = tonumber(table.remove(stack).expr)
-    assert(length)
-
-    local str = ""
-    while length > 0 do
-      str = table.remove(stack).expr .. str
-      if length > 1 then str = "," .. str end
-      length = length - 1
-    end
-    str = "{" .. str .. "}"
-
-    table.insert(stack, {expr=str, prec=99})
-  end
-
-  local function pushMatrix()
-    local rows = tonumber(table.remove(stack).expr)
-    local cols = tonumber(table.remove(stack).expr)
-    assert(rows and rows >= 1)
-    assert(cols and cols >= 1)
-
-    local str = ""
-    for row=rows,1,-1 do
-      local colStr = ''
-      for col=cols,1,-1 do
-        colStr = table.remove(stack).expr .. colStr
-        if col > 1 then colStr = "," .. colStr end
-      end
-      str = '['.. colStr .. ']'..str
-    end
-
-    if rows > 1 then
-      str = "[" .. str .. "]"
-    end
-
-    table.insert(stack, {expr=str, prec=99})
-  end
-
-  local function push(value, kind)
-    if value == '}' then
-      return pushList()
-    elseif value == ']' then
-      return pushMatrix()
-    end
-
-    if kind == 'operator' then
-      local opname, opprec, opargc, oppos, opassoc, opaggrassoc = queryOperatorInfo(value)
-      assert(opname)
-      return pushOperator(opname, opprec, opargc, oppos, opassoc, opaggrassoc)
-    end
-
-    if kind == 'function' then
-      local fname = functionInfo(value, false)
-      return pushFunction(fname or value)
-    end
-
-    return table.insert(stack, {expr=value})
-  end
-
-  local success, err = pcall(function()
-    for _,v in ipairs(self.stack) do
-      push(unpack(v))
-    end
-  end)
-
-  if success then
-    local infix = nil
-    for _,v in ipairs(stack) do
-      infix = (infix or '') .. v.expr
-    end
-
-    return infix
-  else
-    Error.show(error_message)
-  end
+  return ExpressionTree(nodes[1])
 end
 
 --------------------------------------------------
@@ -3507,7 +2902,7 @@ function UIStack:initBindings()
   end)
   self.kbd:setSequence({"="}, function()
     Undo.record_undo()
-    self:pushRPNExpression(RPNExpression(self.stack[self.sel].rpn))
+    self:pushExpression(ExpressionTree(self.stack[self.sel].rpn))
     self:selectIdx()
   end)
   self.kbd:setSequence({"left"}, function()
@@ -3569,6 +2964,8 @@ function UIStack:selectionOrTop()
   return self:top()
 end
 
+-- Push an infix expression (string) to the stack
+---@param input string  Infix expression string
 function UIStack:pushInfix(input)
   print("info: UIStack.pushInfix call with '"..input.."'")
 
@@ -3578,14 +2975,13 @@ function UIStack:pushInfix(input)
     return false
   end
 
-  local rpn = RPNExpression()
-  local stack = rpn:fromInfix(tokens)
-  if not stack then
+  local expr = ExpressionTree.from_infix(tokens)
+  if not expr then
     print("error: UIStack.pushInfix rpn is nil")
     return false
   end
 
-  local infix = rpn:infixString()
+  local infix = expr:infix_string()
   if not infix then
     print("error: UIStack.pushInfix infix is nil")
     return false
@@ -3593,17 +2989,19 @@ function UIStack:pushInfix(input)
 
   local res, err = self:evalStr(infix)
   if res then
-    self:push({["rpn"]=stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
+    self:push({["rpn"]=expr.root, ["infix"]=infix, ["result"]=res or ("error: "..err)})
     return true
   end
   return false
 end
 
-function UIStack:pushRPNExpression(item)
-  local infix = item:infixString()
+function UIStack:pushExpression(expr)
+  assert(expr)
+
+  local infix = expr:infix_string()
   local res, err = self:evalStr(infix)
   if res then
-    self:push({["rpn"]=item.stack, ["infix"]=infix, ["result"]=res or ("error: "..err)})
+    self:push({["rpn"]=expr.root, ["infix"]=infix, ["result"]=res or ("error: "..err)})
     return true
   end
   return false
@@ -3651,11 +3049,11 @@ function UIStack:roll(n)
 
   n = n or 1
   if n > 0 then
-    for i=1,n do
+    for _ = 1, n do
       table.insert(self.stack, 1, table.remove(self.stack))
     end
   else
-    for i=1,math.abs(n) do
+    for _ = 1, math.abs(n) do
       table.insert(self.stack, table.remove(self.stack, 1))
     end
   end
@@ -3688,47 +3086,25 @@ function UIStack:toList(n)
   assert(type(n)=="number")
   assert(n >= 0)
 
-  local newList = {
-    rpn = RPNExpression(),
-    n = 0
-  }
-
-  function newList:join(rpn)
-    if rpn and rpn[#rpn][1] == '}' then
-      table.remove(rpn)
-
-      local size = tonumber(table.remove(rpn)[1])
-      assert(size)
-
-      self.rpn:appendStack(rpn)
-      self.n = self.n + size
-      return true
-    end
-  end
-
-  function newList:add(rpn)
-    if not self:join(rpn) then
-      self.rpn:appendStack(rpn)
-      self.n = self.n + 1
-    end
-  end
-
-  function newList:finalize()
-    self.rpn:push({tostring(self.n), 'number'})
-    self.rpn:push('}')
-  end
+  local new_list = ExpressionTree.make_node('{', 'syntax', {})
 
   local newTop = math.max(#StackView.stack - n + 1, 1)
-  for _=1,n do
-    local arg = self:pop(newTop)
-    if arg then
-      newList:add(RPNExpression():fromInfix(Infix.tokenize(arg.result)))
+  for _ = 1, n do
+    local root = self:pop(newTop)
+    if root then
+      root = root.rpn
+      if root.text == '{' then
+        -- Join existing list
+        for _, item in ipairs(root.children) do
+          table.insert(new_list.children, item)
+        end
+      else
+        table.insert(new_list.children, root)
+      end
     end
   end
 
-  newList:finalize()
-
-  self:pushRPNExpression(newList.rpn)
+  self:pushExpression(ExpressionTree(new_list))
 end
 
 function UIStack:toPostfix()
@@ -3742,9 +3118,7 @@ function UIStack:toPostfix()
   end
   str = '"' .. str .. '"'
 
-  local rpn = RPNExpression()
-  rpn:push(str)
-  self:pushRPNExpression(rpn)
+  self:pushExpression(ExpressionTree(ExpressionTree.make_node(str, 'string')))
 end
 
 function UIStack:label(text)
@@ -3762,7 +3136,7 @@ end
 function UIStack:frameAtIdx(idx)
   idx = idx or #self.stack
 
-  local x,y,w,h = 0,0,0,0
+  local _,y,_,h = 0,0,0,0
   local fx,_,fw,_ = self:frame()
 
   for i=1,idx-1 do
@@ -4681,15 +4055,27 @@ function RPNInput:isBalanced()
   return paren == 0 and brack == 0 and brace == 0 and dq % 2 == 0 and sq % 2 == 0
 end
 
+---@return table[] nodes  Returns a list of nodes
 function RPNInput:popN(num)
+  local nodes = {}
   local newTop = #StackView.stack - num + 1
-  local rpn = RPNExpression()
-  for i=1,num do
-    local stack_expr = RPNExpression(StackView:pop(newTop).rpn)
-    stack_expr:popStoreOperation()
-    rpn:appendStack(stack_expr.stack)
+  for _ = 1, num do
+    local root = StackView:pop(newTop).rpn
+    if not root then
+      error('Too few items on stack (' .. #StackView.stack .. ' of ' .. num .. ')')
+    end
+
+    if root.kind == 'operator' then
+      if root.text == '=:' or root.text == Sym.STORE then
+        root = root.children[1]
+      elseif root.text == ':=' then
+        root = root.children[2]
+      end
+    end
+
+    table.insert(nodes, root)
   end
-  return rpn
+  return nodes
 end
 
 function RPNInput:dispatchInfix(str)
@@ -4721,10 +4107,20 @@ function RPNInput:dispatchOperator(str, ignoreInput)
       return
     end
 
-    local rpn = self:popN(argc)
-    rpn:pushOperator(name)
+    local nodes = self:popN(argc)
 
-    StackView:pushRPNExpression(rpn)
+    -- TODO: Move this elsewhere
+    if nodes and #nodes == 1 then
+      if nodes[1].text == str and nodes[1].kind == 'operator' then
+        if name == Sym.NEGATE or name == 'not ' then
+          StackView:pushExpression(ExpressionTree(nodes[1].children[1]))
+          return true
+        end
+      end
+    end
+
+    local expr = ExpressionTree(ExpressionTree.make_node(str, 'operator', nodes))
+    StackView:pushExpression(expr)
     return true
   end
 end
@@ -4757,10 +4153,10 @@ function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
       return
     end
 
-    local rpn = self:popN(argc)
-    rpn:pushFunctionCall(name, argc)
+    local nodes = self:popN(argc)
+    local expr = ExpressionTree(ExpressionTree.make_node(name, 'function', nodes))
 
-    StackView:pushRPNExpression(rpn)
+    StackView:pushExpression(expr)
     return true
   end
 end
