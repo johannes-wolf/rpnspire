@@ -191,13 +191,23 @@ function test.infix_to_rpn_to_infix()
   local function expect(str, other)
     other = other or str
 
-    local rpn = RPNExpression()
-    Test.assert(rpn:fromInfix(Infix.tokenize(str)))
+    do
+      local tree = ExpressionTree.from_infix(Infix.tokenize(str))
+      Test.assert(tree)
 
-    local new = rpn:infixString()
-    if not Test.assert(new and new == other, "Expected " .. (other or 'nil') .. " got " .. (new or "nil")) then
-      debug_print_stack(rpn.stack)
+      local new = tree:infix_string()
+      Test.assert(new and new == other, "Expected " .. (other or 'nil') .. " got " .. (new or "nil"))
     end
+
+    -- REMOVE: OLD RPNExpression
+    do
+      local rpn = RPNExpression()
+      Test.assert(rpn:fromInfix(Infix.tokenize(str)))
+
+      local new = rpn:infixString()
+      Test.assert(new and new == other, "Expected " .. (other or 'nil') .. " got " .. (new or "nil"))
+    end
+    --- /REMOVE
   end
 
   local function fail(str)

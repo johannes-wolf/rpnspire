@@ -90,6 +90,23 @@ local function table_copy_fields(source, fields, target)
   return target
 end
 
+-- Join table to string
+---@param self table             Self
+---@param separator string       Separator string
+---@param transform_fn function  Transformation function (any) : string
+---@return string
+function table.join_str(self, separator, transform_fn)
+  separator = separator or ' '
+  local str = ''
+  for idx, item in ipairs(self) do
+    if idx > 1 then
+      str = str .. separator
+    end
+    str = str .. (transform_fn and transform_fn(item) or tostring(item))
+  end
+  return str
+end
+
 -- Trim quotes from string
 ---@param str string  Input string
 ---@param q? string   Quote character (defaults to ")
@@ -1026,7 +1043,7 @@ local function tiGetFnArgs(nam)
   end
 
   local argc = 0
-  local arglist = ""
+  local arglist = nil
   for _ = 0, 10 do
     res, err = math.evalStr("string("..nam.."("..arglist.."))")
     if err == nil or err == 210 then
@@ -1037,10 +1054,10 @@ local function tiGetFnArgs(nam)
       return nil
     end
 
-    if arglist:len() > 0 then
+    if arglist then
       arglist = arglist .. ",x"
     else
-      arglist = arglist .. "x"
+      arglist = "x"
     end
   end
   return nil
@@ -2082,8 +2099,14 @@ function Infix.tokenize(input)
     end
 
     -- 1(...)
-    if (token == '(' or token == '{' or token == '[') and
+    if (token == '(' or token == '{') and
        (top[2] == 'number' or top[2] == 'unit' or top[2] == 'string' or top[1] == ')') then
+      return true
+    end
+
+    -- 1[...]
+    if token == '[' and
+      top[2] == 'number' or top[2] == 'unit' then
       return true
     end
 
@@ -2138,6 +2161,256 @@ function Infix.tokenize(input)
 
   return tokens
 end
+
+
+-- Expression tree
+---@class ExpressionTree
+---@field nodes table  Top nodes
+ExpressionTree = class()
+function ExpressionTree:init(nodes)
+  self.nodes = nodes or {}
+end
+
+function ExpressionTree:debug_print()
+  local function print_node_recursive(node, level)
+    level = level or 0
+    local indent = string.rep('  ', level)
+    print(string.format('%s%s (%s)', indent, node.text, node.kind:sub(1, 1)))
+
+    if node.children then
+      for _, child in ipairs(node.children) do
+        print_node_recursive(child, level + 1)
+      end
+    end
+  end
+
+  for _, node in ipairs(self.nodes) do
+    print_node_recursive(node)
+  end
+end
+
+-- Converts the node tree to an infix representation
+---@return string infix  Infix string
+function ExpressionTree:infix_string()
+  local function node_to_infix(node)
+    if node.kind == 'operator' then
+      local name, prec, _, side, assoc, aggr_assoc = queryOperatorInfo(node.text)
+      assoc = assoc == 'r' and 2 or (assoc == 'l' and 1 or 0)
+
+      local str = nil
+      for idx, operand in ipairs(node.children) do
+        if str and side == 0 then str = str .. node.text end
+        str = str or ''
+        if operand.kind == 'operator' then
+          local _, operand_prec = queryOperatorInfo(operand.text)
+          if (operand_prec < prec) or ((aggr_assoc or idx ~= assoc) and operand_prec < prec + (assoc ~= 0 and 1 or 0)) then
+            --[[
+            print('DEBUG')
+            print('child prec: '..operand_prec)
+            print('my    prec: '..prec)
+            print('my   assoc: '..assoc)
+            print('my     idx: '..idx)
+            ]]
+            str = str .. '(' .. node_to_infix(operand) .. ')'
+          else
+            str = str .. node_to_infix(operand)
+          end
+        else
+          str = str .. node_to_infix(operand)
+        end
+      end
+
+      if side < 0 then str = name .. str end
+      if side > 0 then str = str .. name end
+      return str
+    elseif node.kind == 'function' then
+      return node.text .. '(' ..
+        table.join_str(node.children, ',', node_to_infix) ..
+        ')'
+    elseif node.kind == 'syntax' then
+      assert(node.text == '{' or node.text == '[')
+      if node.text == '{' then
+        return node.text ..
+          table.join_str(node.children, ',', node_to_infix) ..
+          ParenPairs[node.text][1]
+      elseif node.text == '[' then
+        return node.text ..
+          table.join_str(node.children, node.matrix and '' or ',', node_to_infix) ..
+          ParenPairs[node.text][1]
+      end
+    else
+      return node.text
+    end
+  end
+
+  local ok, res = pcall(function()
+    local str = ''
+    for _, node in ipairs(self.nodes) do
+      str = str .. node_to_infix(node)
+    end
+    return str
+  end)
+
+  if not ok then
+    Error.show(res)
+    return nil
+  end
+
+  return res
+end
+
+-- Construct a node
+---@return table node
+function ExpressionTree.make_node(text, kind, children)
+  return {text = text, kind = kind, children = children}
+end
+
+-- Construct an ExpressionTree from a list of tokens
+---@param tokens table  List of tokens
+function ExpressionTree.from_infix(tokens)
+  local tree = ExpressionTree()
+
+  local stack = {}
+  local nodes = {}
+
+  local function stack_top()
+    return #stack > 0 and stack[#stack] or nil
+  end
+
+  -- Copy node from stack to result
+  ---@param argc number  Number of arguments to consume
+  local function copy_stack_node(argc)
+    argc = argc or 0
+    local node = stack_top()
+    node.children = argc > 0 and {} or nil
+    for _=0, argc-1 do
+      table.insert(node.children, 1, table.remove(nodes))
+    end
+    table.insert(nodes, node)
+  end
+
+  -- Push new node to result
+  ---@param text string     Text value
+  ---@param kind TokenKind  Kind
+  ---@param argc number     Number of arguments to consume
+  local function push_node(text, kind, argc)
+    argc = argc or 0
+    local node = ExpressionTree.make_node(text, kind, argc > 0 and {} or nil)
+    for _=0, argc-1 do
+      table.insert(node.children, 1, table.remove(nodes))
+    end
+    table.insert(nodes, node)
+  end
+
+  local function apply_stack_operator()
+    assert(#stack > 0)
+    local node = table.remove(stack)
+    assert(node.kind == 'operator')
+    local _, _, argc = queryOperatorInfo(node.text)
+    push_node(node.text, node.kind, argc)
+  end
+
+  for _, token_tuple in ipairs(tokens) do
+    local text, kind = unpack(token_tuple)
+    if kind == 'number' or kind == 'word' or kind == 'string' or kind == 'unit' then
+      push_node(text, kind)
+    end
+
+    if kind == 'ans' then
+      local stack_n = tonumber(text:sub(2))
+      if stack_n then
+        if not Error.assertStackN(stack_n) then
+          error('Too few arguments on stack')
+        end
+      end
+
+      local rpn = _G.StackView.stack[#_G.StackView.stack - stack_n + 1].rpn
+      for _,v in ipairs(rpn) do
+        table.insert(nodes, v)
+      end
+    end
+
+    if kind == 'operator' then
+      local _, prec, _, _, assoc = queryOperatorInfo(text)
+
+      while stack_top() and stack_top().kind == 'operator' do
+        local _, top_prec, _, _, _ = queryOperatorInfo(stack_top().text)
+        if (assoc ~= 'r' and prec <= top_prec) or
+           (assoc == 'r' and prec < top_prec) then
+          apply_stack_operator()
+        else
+          break
+        end
+      end
+
+      table.insert(stack, ExpressionTree.make_node(text, kind))
+    end
+
+    if kind == 'function' then
+      table.insert(stack, ExpressionTree.make_node(text, kind))
+    end
+
+    if kind == 'syntax' then
+      if text == ',' then
+        while stack_top().kind ~= 'syntax' do
+          apply_stack_operator()
+        end
+        stack_top().argc = (stack_top().argc or 1) + 1
+      end
+
+      if text == '(' or text == '{' or text == '[' then
+        -- Nested [] count as arguments (without a comma)
+        if text == '[' then
+          if stack_top() and stack_top().text == '[' then
+            stack_top().argc = (stack_top().argc or 0) + 1
+            stack_top().matrix = true -- HACK: Fix by separating lists/martices and subscripts
+          end
+        end
+        -- TODO: Detect subscripts
+
+        table.insert(stack, ExpressionTree.make_node(text, kind))
+      end
+
+      if text == ')' or text == '}' or text == ']' then
+        while stack_top().kind ~= 'syntax' do
+          apply_stack_operator()
+        end
+
+        if stack_top().text ~= ParenPairs[text][1] then
+          error('Missing ' .. ParenPairs[text][1])
+        end
+
+        local argc = stack_top().argc or 1
+        if text == '}' or text == ']' then
+          copy_stack_node(argc)
+        end
+        table.remove(stack) -- Pop opening paren
+
+        if text == ')' then
+          if stack_top() and stack_top().kind == 'function' then
+            copy_stack_node(argc)
+            table.remove(stack) -- Pop function name
+          end
+        end
+      end
+    end
+  end
+
+  while stack_top() and stack_top().kind == 'operator' do
+    apply_stack_operator()
+  end
+
+  if #stack > 0 then
+    error('Unprocessed tokens on stack')
+  end
+
+  for _, node in ipairs(nodes) do
+    table.insert(tree.nodes, node)
+  end
+
+  return tree
+end
+
 
 -- RPN Expression stack for transforming from and to infix notation
 ---@class RPNExpression
@@ -2615,12 +2888,6 @@ end
 ---@return string
 function RPNExpression:infixString()
   local stack = {}
-
-  local error_message = ''
-  local function error(message)
-    error_message = message
-    _G.error(message)
-  end
 
   local function pushOperator(name, prec, argc, pos, assoc, aggrassoc)
     local assoc = assoc == "r" and 2 or (assoc == "l" and 1 or 0)
