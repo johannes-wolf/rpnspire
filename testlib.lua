@@ -1,6 +1,7 @@
 local Test = {
   last = nil,
-  failed = nil
+  failed = nil,
+  scope_info = nil,
 }
 
 function Test.fail(message)
@@ -15,9 +16,25 @@ function Test.assert(pred, message)
   return true
 end
 
+function Test.expect_fail(fn)
+  assert(type(fn) == 'function')
+  local ok, msg = pcall(fn)
+  return Test.assert(not ok, msg)
+end
+
+function Test.info(info)
+  Test.scope_info = Test.scope_info or {}
+  table.insert(Test.scope_info, tostring(info))
+end
+
+function Test.reset()
+  Test.scope_info = nil
+end
+
 function Test.run(tests)
   local ok, failed = 0, 0
   for k,v in pairs(tests) do
+    Test.scope_info = nil
     if type(v) == 'function' then
       Test.failed = nil
       print("Running test "..k)
@@ -35,9 +52,18 @@ function Test.run(tests)
       else
         failed = failed + 1
         print("[FAILED] "..(Test.failed or (err or "")))
-        for _, v in ipairs(output) do
-          if type(v) == 'string' then
-            print("> "..(v or nil))
+        if Test.scope_info then
+          if type(Test.scope_info) == 'string' then
+            print("[  info] " .. Test.scope_info)
+          elseif type(Test.scope_info) == 'table' then
+            for _, line in ipairs(Test.scope_info) do
+              print("[  info] " .. line)
+            end
+          end
+        end
+        for _, line in ipairs(output) do
+          if type(line) == 'string' then
+            print("> " .. line)
           end
         end
       end

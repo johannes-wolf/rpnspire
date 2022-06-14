@@ -192,32 +192,25 @@ function test.infix_to_rpn_to_infix()
     other = other or str
 
     do
+      print('Expression: ' .. str)
       local tree = ExpressionTree.from_infix(Infix.tokenize(str))
       Test.assert(tree)
 
       local new = tree:infix_string()
       Test.assert(new and new == other, "Expected " .. (other or 'nil') .. " got " .. (new or "nil"))
     end
-
-    -- REMOVE: OLD RPNExpression
-    do
-      local rpn = RPNExpression()
-      Test.assert(rpn:fromInfix(Infix.tokenize(str)))
-
-      local new = rpn:infixString()
-      Test.assert(new and new == other, "Expected " .. (other or 'nil') .. " got " .. (new or "nil"))
-    end
-    --- /REMOVE
   end
 
   local function fail(str)
-    local rpn = RPNExpression()
-    Test.assert(not rpn:fromInfix(Infix.tokenize(str)),
-                "Expected fromInfix to return nil (input: '" .. str .. "')\n")
+    Test.expect_fail(function()
+      local expr = ExpressionTree.from_infix(Infix.tokenize(str))
+      Test.assert(not expr,
+                  "Expected fromInfix to return nil (input: '" .. str .. "')\n")
 
-    local infix = rpn:infixString()
-    Test.assert(not infix,
-                "Expected infix string to be nil, is '" .. (infix or 'nil') .. "'")
+      local infix = expr:infix_string()
+      Test.assert(not infix,
+                  "Expected infix string to be nil, is '" .. (infix or 'nil') .. "'")
+    end)
   end
 
   expect("1+2")
@@ -257,6 +250,7 @@ function test.infix_to_rpn_to_infix()
   expect("{1}5", "{1}*5")
 
   -- Preserve function calls
+  expect("abs()")
   expect("sin(pi)")
   expect("root(x)", "root(x)")
   expect("root(x,y)", "root(x,y)")
@@ -290,15 +284,16 @@ function test.infix_to_rpn_to_infix()
   fail("(+)")
 end
 
-function test.rpn_to_infix()
+--function test.rpn_to_infix()
+function rpn_to_infix()
   local function expect(stack, str)
-    local rpn = RPNExpression()
+    local expr = ExpressionTree()
     for _,v in ipairs(stack) do
       if type(v) == 'number' then v = tostring(v) end
-      rpn:push(v)
+      --- TODO
     end
 
-    local new = rpn:infixString()
+    local new = expr:infix_string()
     Test.assert(new == str, "Expected "..(str or "nil").." got "..(new or "nil"))
   end
 
