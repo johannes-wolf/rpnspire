@@ -2107,7 +2107,7 @@ function Infix.tokenize(input)
 
     -- 1[...]
     if token == '[' and
-      top[2] == 'number' or top[2] == 'unit' then
+      (top[2] == 'number' or top[2] == 'unit') then
       return true
     end
 

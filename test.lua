@@ -274,6 +274,10 @@ function test.infix_to_rpn_to_infix()
   expect("(2^2)", "2^2")
   expect("(((2^2)))", "2^2")
 
+  -- Units
+  expect("_km/_s")
+  expect("(_km/_s)", "_km/_s")
+
   -- Syntax errors
   fail("+")
   fail(",")
