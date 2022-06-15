@@ -284,37 +284,6 @@ function test.infix_to_rpn_to_infix()
   fail("(+)")
 end
 
---function test.rpn_to_infix()
-function rpn_to_infix()
-  local function expect(stack, str)
-    local expr = ExpressionTree()
-    for _,v in ipairs(stack) do
-      if type(v) == 'number' then v = tostring(v) end
-      --- TODO
-    end
-
-    local new = expr:infix_string()
-    Test.assert(new == str, "Expected "..(str or "nil").." got "..(new or "nil"))
-  end
-
-  -- Operators
-  expect({1}, "1")
-  expect({1, 2, '+'}, "1+2")
-  expect({1, 2, 3, '+', '+'}, "1+2+3")
-  expect({1, 2, 3, 4, '+', '+', '+'}, "1+2+3+4")
-  expect({1, 2, '-'}, "1-2")
-  expect({1, 2, 3, '-', '-'}, "1-(2-3)")
-  expect({1, 2, 3, 4, '-', '-', '-'}, "1-(2-(3-4))")
-  expect({1, 2, '^'}, "1^2")
-  expect({1, 2, 3, '^', '^'}, "1^(2^3)")
-  expect({1, 2, '^', 3, '^'}, "(1^2)^3")
-
-  -- Functions
-  expect({1, 1, {'sin', 'function'}}, "sin(1)")
-  expect({1, 2, '+', 1, {'sin', 'function'}}, "sin(1+2)")
-  expect({2, 'x', '*', 10, '=', 'x', 2, {'solve', 'function'}}, "solve(2*x=10,x)")
-end
-
 function test.keybind_manager()
   local last = nil
   local kbd = KeybindManager()
@@ -394,6 +363,12 @@ function test.rpn_input()
   -- Operators
   expectStack({'1', 'ENTER', '2', 'ENTER', '+'}, '1+2')
   expectStack({'1', 'ENTER', '2', '+'}, '1+2')
+
+  -- Remove double negation/not
+  expectStack({'1', 'ENTER', Sym.NEGATE}, Sym.NEGATE..'1')
+  expectStack({'1', 'ENTER', Sym.NEGATE, Sym.NEGATE}, '1')
+  expectStack({'1', 'ENTER', 'not'}, 'not 1')
+  expectStack({'1', 'ENTER', 'not', 'not'}, '1')
 
   -- Functions
   expectStack({'1', 'ENTER', 'sin', 'ENTER'}, 'sin(1)')
