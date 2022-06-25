@@ -3136,15 +3136,12 @@ end
 function UIStack:frameAtIdx(idx)
   idx = idx or #self.stack
 
-  local _,y,_,h = 0,0,0,0
-  local fx,_,fw,_ = self:frame()
-
-  for i=1,idx-1 do
+  local x, y, w, _ = self:frame()
+  for i = 1, idx-1 do
     y = y + platform.withGC(function(gc) return self:itemHeight(gc, i) end)
   end
-  h = platform.withGC(function(gc) return self:itemHeight(gc, idx) end)
 
-  return fx,y,fw,h
+  return x, y - self.scrolly, w, platform.withGC(function(gc) return self:itemHeight(gc, idx) end)
 end
 
 --[[ Navigation ]]--
@@ -3159,20 +3156,19 @@ function UIStack:scrollToIdx(idx)
   idx = idx or #self.stack
 
   -- Get item frame
-  local _,itemY,_,itemHeight = self:frameAtIdx(idx)
-  local top, bottom = itemY, itemY + itemHeight
-  local sy = self.scrolly
-  local _,_,_,h = self:frame()
+  local _, y, _, h = self:frame()
+  local _, item_y, _, item_h = self:frameAtIdx(idx)
+  local old_scroll = self.scrolly
 
-  if top + sy < 0 then
-    sy = 0 - top
-  end
-  if bottom + sy > h then
-    sy = 0 - bottom + h
+  if item_y < 0 then
+    self.scrolly = self.scrolly + item_y
   end
 
-  if sy ~= self.scrolly then
-    self.scrolly = sy
+  if item_y + item_h > y + h then
+    self.scrolly = self.scrolly + (item_y + item_h) - (y + h)
+  end
+
+  if old_scroll ~= self.scrolly then
     self:invalidate()
   end
 end
@@ -3322,8 +3318,8 @@ function UIStack:drawItem(gc, x, y, w, idx, item)
 end
 
 function UIStack:draw(gc)
-  local x,y,w,h = self:frame()
-  local yoffset = y + self.scrolly
+  local x, y, w, h = self:frame()
+  local yoffset = y - self.scrolly
 
   gc:clipRect("set", x, y, w, h)
 
