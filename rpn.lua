@@ -3359,7 +3359,17 @@ function UIInput:init(frame)
   -- Prefix
   self.prefix = ""           -- Non-Editable prefix shown on the left
   -- Input
-  self.inputHandler = RPNInput()
+  self.inputHandler = RPNInput({
+      text = function()
+        return self.text
+      end,
+      set_text = function(text)
+        self:setText(text)
+      end,
+      split = function()
+        return self:split()
+      end
+  })
   self.kbd = KeybindManager()
   self:init_bindings()
   self:setText('', '')
@@ -3388,7 +3398,7 @@ function UIInput:init_bindings()
   local function findNearestChr(chr, origin, direction)
     local byteOrigin = self.text:sub(1, origin):len()
     local pos = direction == 'left' and 1 or byteOrigin+1
-    for i=1,self.text:len() do
+    for _ = 1, self.text:len() do
       local newPos = self.text:find(chr, pos)
       if not newPos then
         return direction == 'left' and pos - 1 or nil
@@ -3526,7 +3536,6 @@ function UIInput:onCompletionBegin(prefix, candidates)
       self:insert_completion_candidate(item['action'])
     end
 
-    local _, y = self:frame()
     self.completionMenu = menu
     self:open_menu(self.completionMenu)
   end
@@ -3541,7 +3550,6 @@ end
 
 -- Apply completion item as selected region
 function UIInput:insert_completion_candidate(suffix)
-
   local tail = ""
   if self.cursor.pos + self.cursor.size < #self.text then
     tail = self.text:usub(self.cursor.pos + self.cursor.size + 1)
@@ -3742,6 +3750,16 @@ function UIInput:onCharIn(c)
   self:scrollToPos()
 end
 
+-- Returns the views input text split into three parts.
+---@return string left   Left side of the input
+---@return string mid    Selected input
+---@return string right  Right side of the input
+function UIInput:split()
+  return string.usub(self.text, 1, self.cursor.pos),
+         string.usub(self.text, self.cursor.pos + 1, self.cursor.size + self.cursor.pos),
+         string.usub(self.text, self.cursor.pos + 1 + self.cursor.size)
+end
+
 function UIInput:_insertChar(c)
   c = c or ""
   self:cancelCompletion()
@@ -3767,9 +3785,7 @@ function UIInput:_insertChar(c)
   if self.cursor.pos == self.text:ulen() then
     self.text = self.text .. expanded
   else
-    local left, mid, right = string.usub(self.text, 1, self.cursor.pos),
-                             string.usub(self.text, self.cursor.pos + 1, self.cursor.size + self.cursor.pos),
-                             string.usub(self.text, self.cursor.pos + 1 + self.cursor.size)
+    local left, mid, right = self:split()
 
     -- Kill the matching character right to the selection
     if options.autoKillParen == true and mid:ulen() == 1 then
@@ -4030,12 +4046,50 @@ end
 -- RPN Input Handler
 ---@class RPNInput
 RPNInput = class()
+
+---@param input table  Input interface
+---                    Needs the following functions:
+---                      text() : string
+---                      split() : like text, but split into left|right cursor side
+---                      set_text(string)
+function RPNInput:init(input)
+  assert(input)
+  self.input = input
+end
+
 function RPNInput:getInput()
-  return InputView.text -- TODO: fix view access
+  return self.input.text()
+  --return InputView.text -- TODO: fix view access
 end
 
 function RPNInput:setInput(str)
-  InputView:setText(str)
+  self.input.set_text(str)
+  --InputView:setText(str)
+end
+
+-- Returns the token left to the cursor (if any)
+---@return Token token  The rightmost token (cursor)
+function RPNInput:currentToken()
+  local left = self.input.split()
+  if left then
+    local tokens = Infix.tokenize(left)
+    if tokens and #tokens >= 1 then
+      return tokens[#tokens]
+    end
+  end
+end
+
+function RPNInput:togglePrefix(prefix)
+  local text = self.input.text()
+  if text then
+    local i, j = text:find('^[ ]*' .. prefix)
+    if i then
+      text = text:usub(j - 1)
+    else
+      text = prefix .. text
+    end
+    self.input.set_text(text)
+  end
 end
 
 function RPNInput:isBalanced()
@@ -4161,6 +4215,8 @@ function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
   end
 end
 
+---@return boolean handle  Returns true if key has been handled and
+---                        should not be appended to the output.
 function RPNInput:onCharIn(key)
   if not key then
     return false
@@ -4182,10 +4238,30 @@ function RPNInput:onCharIn(key)
     return functionInfo(key, true) ~= nil
   end
 
+  local function handleNegate()
+    if key == Sym.NEGATE and self:getInput():ulen() > 0 then
+      self:togglePrefix(Sym.NEGATE)
+      return true
+    end
+  end
+
+  local function handleUnitPowerSuffix()
+    if key == '^' or key == '^2' then
+      local token = self:currentToken()
+      if token and token[2] == 'unit' then
+        return true
+      end
+    end
+  end
+
   -- Remove trailing '(' from some TI keys
   if key:ulen() > 1 and key:usub(-1) == '(' then
     key = key:sub(1, -2)
   end
+
+  -- Handle some special cases
+  if handleNegate() then return true end
+  if handleUnitPowerSuffix() then return false end
 
   if isOperator(key) then
     self:dispatchOperator(key)
