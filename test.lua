@@ -317,14 +317,11 @@ function test.rpn_input()
   UIInput.draw = function() end
 
   local text = ''
-  local rpn = RPNInput()
-  rpn.input = {}
-  rpn.setInput = function(_, str)
-    text = str
-  end
-  rpn.getInput = function(_)
-    return text
-  end
+  local rpn = RPNInput({
+      text = function() return text end,
+      split = function() return text, '', '' end,
+      set_text = function(str) text = str end
+  })
 
   local function expectStack(key, stack_infix)
     StackView.stack = {}
@@ -373,6 +370,13 @@ function test.rpn_input()
   expectStack({'1', 'ENTER', Sym.NEGATE, Sym.NEGATE}, '1')
   expectStack({'1', 'ENTER', 'not'}, 'not 1')
   expectStack({'1', 'ENTER', 'not', 'not'}, '1')
+
+  -- Inline negation
+  expectStack({'1', Sym.NEGATE, 'ENTER'}, Sym.NEGATE..'1')
+  --expectStack({'1', Sym.NEGATE, Sym.NEGATE, 'ENTER'}, '1') -- Not working because of missing usub implementation!
+
+  -- Unit power suffix
+  expectStack({'2', '_m', '^', '2', 'ENTER'}, '2*_m^2')
 
   -- Functions
   expectStack({'1', 'ENTER', 'sin', 'ENTER'}, 'sin(1)')
