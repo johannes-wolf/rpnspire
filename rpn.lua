@@ -2232,6 +2232,86 @@ function ExpressionTree:debug_print()
   print_node_recursive(self.root)
 end
 
+function ExpressionTree:matches(pattern)
+  local function match_node(node, selector)
+    if type(selector) == 'string' then
+      selector = {selector}
+    end
+
+    for _, str in ipairs(selector) do
+      if str == '<*>' then
+        return true
+      end
+      if str:find('^<.*>$') then
+        return node.kind == str:sub(2, str:len() - 2)
+      end
+      if node.text == str then
+        return true
+      end
+    end
+  end
+
+  local function recurse_match_pattern(node, selector)
+    if not node or not selector then return end
+
+    -- Match top
+    if not match_node(node, selector['match']) then
+      return false
+    end
+
+    if selector['children'] then
+      if not node.children or #node.children < #selector['children'] then
+        return false
+      end
+    else
+      return true
+    end
+
+    local function match_children_ordered()
+      for idx, sub_pattern in ipairs(selector['children']) do
+        if not recurse_match_pattern(node.children[idx], sub_pattern) then
+          return false
+        end
+      end
+
+      return true
+    end
+
+    local function match_children_unordered()
+      local matched_patterns = {}
+      for _, child in ipairs(node.children) do
+        local had_match = false
+        for idx, sub_pattern in ipairs(selector['children']) do
+          if not matched_patterns[idx] then
+            had_match = recurse_match_pattern(child, sub_pattern)
+            if had_match then
+              matched_patterns[idx] = true
+              break
+            end
+          end
+        end
+
+        if not had_match then
+          return false
+        end
+      end
+
+      return true
+    end
+
+    -- FIXME: This might be not true for matrices and/or vectors!
+    local is_commutative = node.kind == 'operator' and
+      (node.text == '+' or node.text == '*' or node.text == 'and' or node.text == 'or')
+    if is_commutative then
+      return match_children_unordered()
+    else
+      return match_children_ordered()
+    end
+  end
+
+  return recurse_match_pattern(self.root, pattern)
+end
+
 -- Converts the node tree to an infix representation
 ---@return string infix  Infix string
 function ExpressionTree:infix_string()
@@ -2285,6 +2365,9 @@ function ExpressionTree:infix_string()
           ParenPairs[node.text][1]
       end
     else
+      if node.kind == 'number' and node.text:sub(1, 1) == '-' then
+        return Sym.NEGATE .. node.text:sub(2)
+      end
       return node.text
     end
   end
@@ -2317,6 +2400,133 @@ end
 ---@return table node
 function ExpressionTree.make_node(text, kind, children)
   return {text = text, kind = kind, children = children}
+end
+
+-- Simplify an expression tree
+function ExpressionTree:canonicalize()
+  local root = nil
+
+  local function append_node(parent, text, kind)
+    if not parent then
+      root = ExpressionTree.make_node(text, kind, {})
+      return root
+    else
+      -- Order numbers first
+      if (parent.text == '+' or parent.text == '*') and
+         (kind == 'number' or text == '/') then
+
+        local new_node = ExpressionTree.make_node(text, kind, {})
+        table.insert(parent.children, 1, new_node)
+
+        return parent.children[1]
+      end
+
+      table.insert(parent.children, ExpressionTree.make_node(text, kind, {}))
+      return parent.children[#parent.children]
+    end
+  end
+
+  local simplify_node = nil
+
+  -- Transform a+(b+c) or a-(b-c) to a+b+c or a-b-c
+  local function merge_sum_or_product(input, output)
+    if not output or output.kind ~= input.kind or output.text ~= input.text then
+      output = append_node(output, input.text, input.kind)
+    end
+
+    for _, child in ipairs(input.children) do
+      if child.kind == input.kind and child.text == input.text then
+        merge_sum_or_product(child, output)
+      else
+        simplify_node(child, output)
+      end
+    end
+  end
+
+  -- Transform -a to (-1)a
+  local function negation_to_product(input, output)
+    assert(#input.children == 1)
+    if input.children[1].kind == 'number' then
+      if input.children[1].text:sub(1, 1) ~= '-' then
+        append_node(output, '-' .. input.children[1].text, 'number')
+      else
+        append_node(output, input.children[1].text:sub(2), 'number')
+      end
+      return
+    end
+
+    if not output or output.kind ~= 'operator' or output.text ~= '*' then
+      output = append_node(output, '*', 'operator')
+    end
+
+    append_node(output, '-1', 'number')
+    for _, child in ipairs(input.children or {}) do
+      simplify_node(child, output)
+    end
+  end
+
+  -- Transform a-b to a+(-1)b
+  local function difference_to_sum(input, output)
+    if not output or output.kind ~= 'operator' or output.text ~= '+' then
+      output = append_node(output, '+', 'operator')
+    end
+
+    assert(#input.children == 2)
+    simplify_node(input.children[1], output)
+    output = append_node(output, '*', 'operator')
+    append_node(output, '-1', 'number')
+    simplify_node(input.children[2], output)
+  end
+
+  -- Transform a/b to a*b^-1 or a*(1/b)
+  local function division_to_power(input, output)
+    assert(#input.children == 2)
+    if input.children[1].kind == 'number' and input.children[2].kind == 'number' then
+      output = append_node(output, '/', 'operator')
+      output.children = input.children
+      return
+    end
+
+    output = append_node(output, '*', 'operator')
+    simplify_node(input.children[1], output)
+
+    if input.children[2].kind == 'number' then
+      output = append_node(output, '/', 'operator')
+      append_node(output, '1', 'number')
+      append_node(output, input.children[2].text, input.children[2].kind)
+    else
+      output = append_node(output, '^', 'operator')
+      simplify_node(input.children[2], output)
+      append_node(output, '-1', 'number')
+    end
+  end
+
+  -- Apply simplification rules
+  simplify_node = function(input, output)
+    if input.kind == 'operator' then
+      if input.text == '+' or input.text == '*' then
+        merge_sum_or_product(input, output)
+        return
+      elseif input.text == '-' then
+        difference_to_sum(input, output)
+        return
+      elseif input.text == '/' then
+        division_to_power(input, output)
+        return
+      elseif input.text == Sym.NEGATE or input.text == '(-)' then
+        negation_to_product(input, output)
+        return
+      end
+    end
+
+    output = append_node(output, input.text, input.kind)
+    for _, child in ipairs(input.children or {}) do
+      simplify_node(child, output)
+    end
+  end
+
+  simplify_node(self.root)
+  return root
 end
 
 -- Construct an ExpressionTree from a list of tokens
@@ -2470,6 +2680,107 @@ function ExpressionTree.from_infix(tokens)
   return ExpressionTree(nodes[1])
 end
 
+-- Match node for a sub-expression
+---@param subexpr ExpressionTree   Subexpression to match against
+---@param limit? boolean           Limit to first match
+---@param meta? boolean            Make words match anything
+---@return table Matches           List of matches found
+function ExpressionTree:find_subexpr(subexpr, limit, meta)
+  local matches = {}
+  local metavars = {}
+
+  local function match_subtree_recurse(a, b)
+    if b.kind == 'word' then
+      if not metavars[b.text] then
+        metavars[b.text] = a
+        return true
+      else
+        return match_subtree_recurse(a, metavars[b.text])
+      end
+    end
+
+    if a.kind == b.kind and a.text == b.text then
+      if not a.children and not b.children then
+        return true
+      end
+
+      if (a.children ~= nil) ~= (b.children ~= nil) or #a.children ~= #b.children then
+        return false
+      end
+
+      for idx, child in ipairs(a.children or {}) do
+        if not match_subtree_recurse(child, b.children[idx]) then
+          return false
+        end
+      end
+
+      return true
+    end
+  end
+
+  local function find_subexpr_recurse(start, start_idx, a, b)
+    if match_subtree_recurse(a, b) then
+      table.insert(matches, {parent = start, index = start_idx, node = a})
+      if limit then
+        return true
+      end
+    end
+
+    for idx, child in ipairs(a.children or {}) do
+      if find_subexpr_recurse(a, idx, child, b) and limit then
+        return
+      end
+    end
+  end
+
+  find_subexpr_recurse(nil, nil, self.root, subexpr.root or subexpr)
+  if #matches > 0 then
+    return matches, metavars
+  end
+end
+
+-- Returns `true` if self does contain subexpr (at any level)
+---@param subexpr ExpressionTree  Subexpression to search for
+---@return boolean Result
+function ExpressionTree:contains_subexpr(subexpr)
+  return self:find_subexpr(subexpr, true)
+end
+
+-- Substitutes all word tokens that exist in `vars` with the
+-- node stored in vars.
+---@param vars  table  Mapping from identifier to node
+function ExpressionTree:substitute_vars(vars)
+  self:map_all(function(node)
+    if node.kind == 'word' then
+      local repl = vars[node.text]
+      if repl then
+        return table_clone(repl)
+      end
+    end
+    return nil
+  end)
+  return self
+end
+
+-- Rewrite all occurances of `subexpr` in self with `with`, replacing all variables of `subexpr`
+-- with their matched nodes.
+---@param subexpr ExpressionTree  Expression to replace
+---@param with    ExpressionTree  Expression to replace with
+function ExpressionTree:rewrite_subexpr(subexpr, with)
+  local target = self
+  local matches, metavars = target:find_subexpr(subexpr, false, true)
+
+  with = ExpressionTree(with.root or with):substitute_vars(metavars)
+  for _, match in ipairs(matches or {}) do
+    if match.parent then
+      match.parent.children[match.index] = with.root or with
+    else
+      target.root = with.root or with
+    end
+  end
+  return target
+end
+
 -- Returns the left side of the expression or the whole expression
 function ExpressionTree:left()
   if node_is_rel_operator(self.root) then
@@ -2496,7 +2807,7 @@ function ExpressionTree:apply_operator(op, arguments)
   }
 
   if node_is_rel_operator(self.root) and apply_on_both_sides[op] then
-    self:map(function(node)
+    self:map_level(function(node)
       return ExpressionTree(node):apply_operator(op, arguments).root
     end)
   else
@@ -2511,12 +2822,12 @@ end
 -- If the function returns a value, the visited node will be replaced by that.
 ---@param fn function     Callback (node, parent) : node?
 ---@param level? integer  Optional level
-function ExpressionTree:map(fn, level)
+function ExpressionTree:map_level(fn, level)
   level = level or 1
 
-  local function map_level(node, level_)
+  local function recursive_map_level(node, level_)
     if level_ == 1 then
-      for idx, child in ipairs(node.children) do
+      for idx, child in ipairs(node.children or {}) do
         local replace = fn(child, node)
         if replace then
           node.children[idx] = replace
@@ -2524,12 +2835,27 @@ function ExpressionTree:map(fn, level)
       end
     elseif node.children then
       for _, child in ipairs(node.children) do
-        map_level(child, level_ - 1)
+        recursive_map_level(child, level_ - 1)
       end
     end
   end
 
-  return map_level(self.root, level)
+  return recursive_map_level(self.root, level)
+end
+
+function ExpressionTree:map_all(fn)
+  local function map_recursive(node)
+    for idx, child in ipairs(node and node.children or {}) do
+      local replace = fn(child, node)
+      if replace then
+        node.children[idx] = replace
+      else
+        map_recursive(child)
+      end
+    end
+  end
+
+  return map_recursive(self.root)
 end
 
 --------------------------------------------------
@@ -3700,6 +4026,32 @@ function UIInput:init_bindings()
   end)
   self.kbd:setSequence({'.', 'f'}, function()
     eval_interactive('factor', nil)
+  end)
+  self.kbd:setSequence({'.', 'r'}, function()
+    if not StackView:top() then
+      Error.show("Stack empty")
+      return
+    end
+
+    local top = ExpressionTree(StackView:top().rpn)
+    interactive_input_ask_value(InputView, function(search)
+      interactive_input_ask_value(InputView, function(replace)
+        local search_expr = ExpressionTree.from_infix(Infix.tokenize(search))
+        local replace_expr = ExpressionTree.from_infix(Infix.tokenize(replace))
+        if search_expr and replace_expr then
+          Undo.record_undo()
+          top:rewrite_subexpr(search_expr.root, replace_expr.root)
+          StackView:pop()
+          StackView:pushExpression(top)
+        else
+          Error.show("Error parsing expressions")
+        end
+      end, nil, function(widget)
+        widget:setText('', 'Rewrite ' .. (search or '?') .. ' with:')
+      end)
+    end, nil, function(widget)
+      widget:setText('', 'Rewrite rule:')
+    end)
   end)
   self.kbd:setSequence({'.', '='}, function()
     StackView:dup()
