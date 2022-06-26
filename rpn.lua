@@ -2188,6 +2188,86 @@ function ExpressionTree:debug_print()
   print_node_recursive(self.root)
 end
 
+function ExpressionTree:matches(pattern)
+  local function match_node(node, selector)
+    if type(selector) == 'string' then
+      selector = {selector}
+    end
+
+    for _, str in ipairs(selector) do
+      if str == '<*>' then
+        return true
+      end
+      if str:find('^<.*>$') then
+        return node.kind == str:sub(2, str:len() - 2)
+      end
+      if node.text == str then
+        return true
+      end
+    end
+  end
+
+  local function recurse_match_pattern(node, selector)
+    if not node or not selector then return end
+
+    -- Match top
+    if not match_node(node, selector['match']) then
+      return false
+    end
+
+    if selector['children'] then
+      if not node.children or #node.children < #selector['children'] then
+        return false
+      end
+    else
+      return true
+    end
+
+    local function match_children_ordered()
+      for idx, sub_pattern in ipairs(selector['children']) do
+        if not recurse_match_pattern(node.children[idx], sub_pattern) then
+          return false
+        end
+      end
+
+      return true
+    end
+
+    local function match_children_unordered()
+      local matched_patterns = {}
+      for _, child in ipairs(node.children) do
+        local had_match = false
+        for idx, sub_pattern in ipairs(selector['children']) do
+          if not matched_patterns[idx] then
+            had_match = recurse_match_pattern(child, sub_pattern)
+            if had_match then
+              matched_patterns[idx] = true
+              break
+            end
+          end
+        end
+
+        if not had_match then
+          return false
+        end
+      end
+
+      return true
+    end
+
+    -- FIXME: This might be not true for matrices and/or vectors!
+    local is_commutative = node.kind == 'operator' and
+      (node.text == '+' or node.text == '*' or node.text == 'and' or node.text == 'or')
+    if is_commutative then
+      return match_children_unordered()
+    else
+      return match_children_ordered()
+    end
+  end
+
+  return recurse_match_pattern(self.root, pattern)
+end
+
 -- Converts the node tree to an infix representation
 ---@return string infix  Infix string
 function ExpressionTree:infix_string()
@@ -2238,6 +2318,9 @@ function ExpressionTree:infix_string()
           ParenPairs[node.text][1]
       end
     else
+      if node.kind == 'number' and node.text:sub(1, 1) == '-' then
+        return Sym.NEGATE .. node.text:sub(2)
+      end
       return node.text
     end
   end
@@ -2261,6 +2344,134 @@ end
 ---@return table node
 function ExpressionTree.make_node(text, kind, children)
   return {text = text, kind = kind, children = children}
+end
+
+
+-- Simplify an expression tree
+function ExpressionTree:simplify()
+  local root = nil
+
+  local function append_node(parent, text, kind)
+    if not parent then
+      root = ExpressionTree.make_node(text, kind, {})
+      return root
+    else
+      -- Order numbers first
+      if (parent.text == '+' or parent.text == '*') and
+         (kind == 'number' or text == '/') then
+
+        local new_node = ExpressionTree.make_node(text, kind, {})
+        table.insert(parent.children, 1, new_node)
+
+        return parent.children[1]
+      end
+
+      table.insert(parent.children, ExpressionTree.make_node(text, kind, {}))
+      return parent.children[#parent.children]
+    end
+  end
+
+  local simplify_node = nil
+
+  -- Transform a+(b+c) or a-(b-c) to a+b+c or a-b-c
+  local function merge_sum_or_product(input, output)
+    if not output or output.kind ~= input.kind or output.text ~= input.text then
+      output = append_node(output, input.text, input.kind)
+    end
+
+    for _, child in ipairs(input.children) do
+      if child.kind == input.kind and child.text == input.text then
+        merge_sum_or_product(child, output)
+      else
+        simplify_node(child, output)
+      end
+    end
+  end
+
+  -- Transform -a to (-1)a
+  local function negation_to_product(input, output)
+    assert(#input.children == 1)
+    if input.children[1].kind == 'number' then
+      if input.children[1].text:sub(1, 1) ~= '-' then
+        append_node(output, '-' .. input.children[1].text, 'number')
+      else
+        append_node(output, input.children[1].text:sub(2), 'number')
+      end
+      return
+    end
+
+    if not output or output.kind ~= 'operator' or output.text ~= '*' then
+      output = append_node(output, '*', 'operator')
+    end
+
+    append_node(output, '-1', 'number')
+    for _, child in ipairs(input.children or {}) do
+      simplify_node(child, output)
+    end
+  end
+
+  -- Transform a-b to a+(-1)b
+  local function difference_to_sum(input, output)
+    if not output or output.kind ~= 'operator' or output.text ~= '+' then
+      output = append_node(output, '+', 'operator')
+    end
+
+    assert(#input.children == 2)
+    simplify_node(input.children[1], output)
+    output = append_node(output, '*', 'operator')
+    append_node(output, '-1', 'number')
+    simplify_node(input.children[2], output)
+  end
+
+  -- Transform a/b to a*b^-1 or a*(1/b)
+  local function division_to_power(input, output)
+    assert(#input.children == 2)
+    if input.children[1].kind == 'number' and input.children[2].kind == 'number' then
+      output = append_node(output, '/', 'operator')
+      output.children = input.children
+      return
+    end
+
+    output = append_node(output, '*', 'operator')
+    simplify_node(input.children[1], output)
+
+    if input.children[2].kind == 'number' then
+      output = append_node(output, '/', 'operator')
+      append_node(output, '1', 'number')
+      append_node(output, input.children[2].text, input.children[2].kind)
+    else
+      output = append_node(output, '^', 'operator')
+      simplify_node(input.children[2], output)
+      append_node(output, '-1', 'number')
+    end
+  end
+
+  -- Apply simplification rules
+  simplify_node = function(input, output)
+    if input.kind == 'operator' then
+      if input.text == '+' or input.text == '*' then
+        merge_sum_or_product(input, output)
+        return
+      elseif input.text == '-' then
+        difference_to_sum(input, output)
+        return
+      elseif input.text == '/' then
+        division_to_power(input, output)
+        return
+      elseif input.text == Sym.NEGATE or input.text == '(-)' then
+        negation_to_product(input, output)
+        return
+      end
+    end
+
+    output = append_node(output, input.text, input.kind)
+    for _, child in ipairs(input.children or {}) do
+      simplify_node(child, output)
+    end
+  end
+
+  simplify_node(self.root)
+  return root
 end
 
 -- Construct an ExpressionTree from a list of tokens
