@@ -392,6 +392,11 @@ function test.rpn_input()
   expectStack({'1', 'ENTER', 'a', Sym.STORE, 'b', 'ENTER', '2', ':=', '+'}, '1+2')
   expectStack({'a', 'ENTER', '1', ':=', 'b', 'ENTER', '2', ':=', '+'}, '1+2')
 
+  -- Modify both sides
+  expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/'}, 'x*2/2=10/2')
+  expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/', '1', 'and'}, 'x*2/2=10/2 and 1') -- Do not logical op
+  expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/', 'sin'}, 'sin(x*2/2=10/2)') -- Do not apply function on both sides (yet!)
+
   -- Unbalanced (ALG) input
   ---@diagnostic disable-next-line: duplicate-set-field
   rpn.isBalanced = function() return false end

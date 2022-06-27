@@ -2254,6 +2254,15 @@ function ExpressionTree:infix_string()
   return res
 end
 
+-- Helper function returning true if `node` is a relational operator
+local function node_is_rel_operator(node)
+  if node.kind == 'operator' then
+    return node.text == '=' or node.text == '<' or node.text == '>' or
+           node.text == '/=' or node.text == Sym.NEQ or node.text == Sym.LEQ or
+           node.text == Sym.GEQ
+  end
+end
+
 -- Construct a node
 ---@param text string
 ---@param kind TokenKind
@@ -2412,6 +2421,68 @@ function ExpressionTree.from_infix(tokens)
   end
 
   return ExpressionTree(nodes[1])
+end
+
+-- Returns the left side of the expression or the whole expression
+function ExpressionTree:left()
+  if node_is_rel_operator(self.root) then
+    return ExpressionTree(self.root.children[1])
+  else
+    return self
+  end
+end
+
+-- Returns the right side of the expression or the whole expression
+function ExpressionTree:right()
+  if node_is_rel_operator(self.root) then
+    return ExpressionTree(self.root.children[2])
+  end
+end
+
+-- Applies operator `op` to the expression, with arguments `arguments`.
+---@param op string          Operator symbol
+---@param arguments table[]  List of additional operator arguments (nodes) (besides self)
+---@return ExpressionTree Self
+function ExpressionTree:apply_operator(op, arguments)
+  local apply_on_both_sides = {
+    ['+'] = true, ['-'] = true, ['*'] = true, ['/'] = true, ['^'] = true, ['!'] = true, ['%'] = true, [Sym.NEGATE] = true
+  }
+
+  if node_is_rel_operator(self.root) and apply_on_both_sides[op] then
+    self:map(function(node)
+      return ExpressionTree(node):apply_operator(op, arguments).root
+    end)
+  else
+    local operator = ExpressionTree.make_node(op, 'operator', table_clone(arguments))
+    table.insert(operator.children, 1, self.root)
+    self.root = operator
+  end
+  return self
+end
+
+-- Calls function for each argument at optional level `level`.
+-- If the function returns a value, the visited node will be replaced by that.
+---@param fn function     Callback (node, parent) : node?
+---@param level? integer  Optional level
+function ExpressionTree:map(fn, level)
+  level = level or 1
+
+  local function map_level(node, level_)
+    if level_ == 1 then
+      for idx, child in ipairs(node.children) do
+        local replace = fn(child, node)
+        if replace then
+          node.children[idx] = replace
+        end
+      end
+    elseif node.children then
+      for _, child in ipairs(node.children) do
+        map_level(child, level_ - 1)
+      end
+    end
+  end
+
+  return map_level(self.root, level)
 end
 
 --------------------------------------------------
@@ -4169,8 +4240,9 @@ function RPNInput:dispatchOperator(str, ignoreInput)
       end
     end
 
-    local expr = ExpressionTree(ExpressionTree.make_node(str, 'operator', nodes))
-    StackView:pushExpression(expr)
+    local expr = ExpressionTree(nodes[1])
+    table.remove(nodes, 1)
+    StackView:pushExpression(expr:apply_operator(str, nodes))
     return true
   end
 end
