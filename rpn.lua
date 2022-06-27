@@ -2198,7 +2198,7 @@ function ExpressionTree:infix_string()
 
       local str = nil
       for idx, operand in ipairs(node.children) do
-        if str and side == 0 then str = str .. node.text end
+        if str and side == 0 then str = str .. name end
         str = str or ''
         if operand.kind == 'operator' then
           local _, operand_prec = queryOperatorInfo(operand.text)

@@ -395,7 +395,6 @@ function test.rpn_input()
   -- Modify both sides
   expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/'}, 'x*2/2=10/2')
   expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/', '1', 'and'}, 'x*2/2=10/2 and 1') -- Do not logical op
-  expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/', 'sin'}, 'sin(x*2/2=10/2)') -- Do not apply function on both sides (yet!)
 
   -- Unbalanced (ALG) input
   ---@diagnostic disable-next-line: duplicate-set-field
