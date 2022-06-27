@@ -2163,13 +2163,20 @@ function Infix.tokenize(input)
   return tokens
 end
 
-
 -- Expression tree
 ---@class ExpressionTree
 ---@field root table  Root node
 ExpressionTree = class()
 function ExpressionTree:init(root)
   self.root = root
+end
+
+---@class ExpressionTree.Node
+ExpressionTree.Node = class()
+function ExpressionTree.Node:init(text, kind, children)
+  self.text = text
+  self.kind = kind
+  self.children = children
 end
 
 function ExpressionTree:debug_print()
@@ -2186,6 +2193,106 @@ function ExpressionTree:debug_print()
   end
 
   print_node_recursive(self.root)
+end
+
+-- Match node for a sub-exrpession
+---@param subexpr ExpressionTree   Subexpression to match against
+---@param limit? boolean           Limit to first match
+---@return table Matches           List of matches found
+function ExpressionTree:find_subexpr(subexpr, limit)
+  local matches = {}
+
+  local function match_subtree_recurse(a, b)
+    if a.kind == b.kind and a.text == b.text then
+      if not a.children and not b.children then
+        return true
+      end
+
+      if (a.children ~= nil) ~= (b.children ~= nil) or #a.children ~= #b.children then
+        return false
+      end
+
+      for idx, child in ipairs(a.children or {}) do
+        if not match_subtree_recurse(child, b.children[idx]) then
+          return false
+        end
+      end
+
+      return true
+    end
+  end
+
+  local function find_subexpr_recurse(start, start_idx, a, b)
+    if match_subtree_recurse(a, b) then
+      table.insert(matches, {parent = start, index = start_idx, node = a})
+      if limit then
+        return true
+      end
+    end
+
+    for idx, child in ipairs(a.children or {}) do
+      if find_subexpr_recurse(a, idx, child, b) and limit then
+        return
+      end
+    end
+  end
+
+  find_subexpr_recurse(nil, nil, self.root, subexpr.root or subexpr)
+  if #matches > 0 then
+    return matches
+  end
+end
+
+-- Returns `true` if self does contain subexpr (at any level)
+---@param subexpr ExpressionTree  Subexpression to search for
+---@return boolean Result
+function ExpressionTree:contains_subexpr(subexpr)
+  return self:find_subexpr(subexpr, true)
+end
+
+-- Replaces all occurances of `subexpr` in self with `with`
+---@param subexpr ExpressionTree  Expression to replace
+---@param with    ExpressionTree  Expression to replace with
+function ExpressionTree:substitute_subexpr(subexpr, with)
+  local target = self
+  for _, match in ipairs(target:find_subexpr(subexpr) or {}) do
+    if match.parent then
+      match.parent.children[match.index] = with.root or with
+    else
+      target.root = with.root or with
+    end
+  end
+  return target
+end
+
+-- Calls function for each argument at optional level `level`.
+-- If the function returns a value, the visited node will be replaced by that.
+---@param fn function     Callback (node, parent) : node?
+---@param level? integer  Optional level
+function ExpressionTree:map(fn, level)
+  level = level or 1
+
+  local function map_level(node, level_)
+    if level_ == 1 then
+      for idx, child in ipairs(node.children) do
+        local replace = fn(child, node)
+        if replace then
+          node.children[idx] = replace
+        end
+      end
+    elseif node.children then
+      for _, child in ipairs(node.children) do
+        map_level(child, level_ - 1)
+      end
+    end
+  end
+
+  return map_level(self.root, level)
+end
+
+-- Transform the expression into an canonical form
+function ExpressionTree:canonicalize()
+  -- TODO:
 end
 
 -- Converts the node tree to an infix representation
@@ -2258,9 +2365,23 @@ end
 ---@param text string
 ---@param kind TokenKind
 ---@param children table
----@return table node
+---@return ExpressionTree.Node node
 function ExpressionTree.make_node(text, kind, children)
-  return {text = text, kind = kind, children = children}
+  if type(text) == 'integer' then
+    --kind = kind or 'integer' TODO
+    kind = kind or 'number'
+  elseif type(text) == 'number' then
+    kind = kind or 'number'
+  end
+
+  return ExpressionTree.Node(text, kind, children)
+end
+
+function ExpressionTree.make_fraction(n, d)
+  return ExpressionTree.make_node('', 'fraction', {
+    ExpressionTree.make_node(n),
+    ExpressionTree.make_node(d)
+  })
 end
 
 -- Construct an ExpressionTree from a list of tokens
@@ -2413,6 +2534,11 @@ function ExpressionTree.from_infix(tokens)
 
   return ExpressionTree(nodes[1])
 end
+
+function ExpressionTree:canonicalize()
+
+end
+
 
 --------------------------------------------------
 --                     UI                       --

@@ -449,4 +449,52 @@ function test.rect()
   Test.assert(Rect.intersection(a, 15, 15, 5, 5))
 end
 
+function test.expressiontree_node_contains_subexpr()
+  local function test_contains(sbase, smatch, expect)
+    local base   = ExpressionTree.from_infix(Infix.tokenize(sbase))
+    local match  = ExpressionTree.from_infix(Infix.tokenize(smatch))
+    local result = base:contains_subexpr(match)
+
+    Test.assert(result and expect or (not result and not expect),
+                string.format('Expected expression %s to contain %s (%s)',
+                              sbase, smatch, result))
+  end
+
+  test_contains('x', 'x', true)
+  test_contains('x', 'y', false)
+  test_contains('(a+b)*c', 'a+b', true)
+end
+
+function test.expressiontree_node_subs_subexpression()
+  local function test_subs(sbase, smatch, ssubs, expect)
+    local base   = ExpressionTree.from_infix(Infix.tokenize(sbase))
+    local match  = ExpressionTree.from_infix(Infix.tokenize(smatch))
+    local subs   = ExpressionTree.from_infix(Infix.tokenize(ssubs))
+    local result = base:substitute_subexpr(match, subs):infix_string()
+
+    Test.assert(result == expect,
+                string.format('Expected substitutiton of %s in %s with %s to result in %s but got %s',
+                              smatch, sbase, ssubs, expect, result))
+  end
+
+  test_subs('x', 'x', 'y', 'y')
+  test_subs('(a+b)*c', 'a+b', 'x', 'x*c')
+  test_subs('(a+b)/(a+b)*2', 'a+b', 'x', 'x/x*2')
+  test_subs('(a+b)/(a+(a+b))*2', 'a+b', 'x', 'x/(a+x)*2')
+end
+
+function test.expressiontree_map()
+  local base = ExpressionTree.from_infix(Infix.tokenize('{1,2,3,4}'))
+
+  base:map(function()
+      -- Do nothing
+  end)
+  Test.assert(base:infix_string() == '{1,2,3,4}')
+
+  base:map(function(node)
+      return ExpressionTree.make_node('f', 'function', {node})
+  end)
+  Test.assert(base:infix_string() == '{f(1),f(2),f(3),f(4)}')
+end
+
 Test.run(test)
