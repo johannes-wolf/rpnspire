@@ -1038,15 +1038,15 @@ end
 ---@param nam string   Function name
 ---@return number | nil
 local function tiGetFnArgs(nam)
-  local res, err = math.evalStr("getType("..nam..")")
-  if err ~= nil or res ~= "\"FUNC\"" then
+  local res, err = math.evalStr('getType('..nam..')')
+  if err ~= nil or res ~= '"FUNC"' then
     return nil
   end
 
   local argc = 0
   local arglist = nil
   for _ = 0, 10 do
-    res, err = math.evalStr("string("..nam.."("..arglist.."))")
+    res, err = math.evalStr("string("..nam.."("..(arglist or '').."))")
     if err == nil or err == 210 then
       return argc
     elseif err == 930 then
