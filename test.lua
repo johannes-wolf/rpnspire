@@ -445,6 +445,32 @@ function test.stack_to_list()
   expect({'{x,y,z}', '1', '{2,3,4}'}, 3, '{x,y,z,1,2,3,4}')
 end
 
+function test.expression_tree_canonicalize()
+  local function expect(str, expectation)
+    do
+      str = str:gsub('N', Sym.NEGATE)
+      expectation = expectation:gsub('N', Sym.NEGATE)
+
+      local tree = ExpressionTree.from_infix(Infix.tokenize(str))
+      tree:canonicalize()
+      Test.assert(tree:prefix_string() == expectation,
+                  string.format('Expected "%s" got "%s"', expectation, tree:prefix_string()))
+    end
+  end
+
+  expect('1+2',         '(+ 1 2)')
+  expect('1+2+3',       '(+ 1 2 3)')
+  expect('(1+2)+(3+4)', '(+ 1 2 3 4)')
+
+  expect('1*2',         '(* 1 2)')
+  expect('1*2*3',       '(* 1 2 3)')
+  expect('(1*2)*(3*4)', '(* 1 2 3 4)')
+
+  expect('N1',    '(N 1)')
+  --expect('NN1',   '1') -- BUG
+  expect('N(N1)', '1')
+end
+
 function test.rect()
   local a = {x = 10, y = 10, width = 10, height = 10}
 

@@ -2034,6 +2034,26 @@ function ExpressionTree:debug_print()
   print_node_recursive(self.root)
 end
 
+-- Converts the node tree to a lisp like prefix representation
+---@return string Prefix
+function ExpressionTree:prefix_string()
+  local function to_prefix(node)
+    local s = node.text
+
+    if node.children then
+      s = '(' .. s
+      for _, child in ipairs(node.children) do
+        s = s .. ' ' .. to_prefix(child)
+      end
+      s = s .. ')'
+    end
+
+    return s
+  end
+
+  return to_prefix(self.root)
+end
+
 -- Converts the node tree to an infix representation
 ---@return string infix  Infix string
 function ExpressionTree:infix_string()
@@ -2644,6 +2664,66 @@ function ExpressionTree:rewrite_subexpr(subexpr, with)
   end
 
   self.root = target.root
+  return self
+end
+
+function ExpressionTree:canonicalize()
+  local function move_children(offset, old, new)
+    new.children = new.children or {}
+    for idx, child in ipairs(old.children or {}) do
+      table.insert(new.children, offset + idx - 1, child)
+    end
+    old.children = {}
+  end
+
+  local function merge_sums(node)
+    for idx, child in ipairs(node.children) do
+      if child.kind == 'operator' and child.text == '+' then
+        table.remove(node.children, idx)
+        move_children(idx, child, node)
+      end
+    end
+  end
+
+  local function merge_products(node)
+    for idx, child in ipairs(node.children) do
+      if child.kind == 'operator' and child.text == '*' then
+        table.remove(node.children, idx)
+        move_children(idx, child, node)
+      end
+    end
+  end
+
+  local function kill_double_negation(node)
+    local child = node.children[1]
+    if not child then return end
+    if child.kind == 'operator' and child.text == Sym.NEGATE then
+      local nd_child = child.children[1]
+      node.kind = nd_child.kind
+      node.text = nd_child.text
+      node.children = nd_child.children
+    end
+  end
+
+  local function canonicalize_recursive(node)
+    if node.children then
+      for _, child in ipairs(node.children) do
+        canonicalize_recursive(child)
+      end
+    end
+
+    if node.kind == 'operator' then
+      if node.text == '+' then
+        merge_sums(node)
+      elseif node.text == '*' then
+        merge_products(node)
+      elseif node.text == Sym.NEGATE then
+        kill_double_negation(node)
+      end
+    end
+  end
+
+  canonicalize_recursive(self.root)
   return self
 end
 
