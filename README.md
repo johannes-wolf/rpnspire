@@ -65,12 +65,14 @@ The equation-library is currently WIP and contains only a few formulas.
 You can start the formula solver by pressing <kbd>F</kbd>, selecting a category and select the "Solve for ..." item.
 The solver asks you for the variables to solve for (comma separated) and the set of given variables. If you have entered all the variables enter an empty variable name. The solver should output all equations needed.
 
-Note that the solver sets variables in the current document, as each step is set to the resulting variable.
+*Note:* The solver sets variables in the current document, as each step is set to the resulting variable.
 
-## Options
+**The Formula Solver is Work in Progress** 
 
-You can access rpnsprires option dialog by pressing <kbd>menu</kbd> and select `Options>Show...`.
-The option menu is navigated using the number keys.
+## Settings
+
+You can access rpnsprires option dialog by pressing <kbd>help</kbd><kbd>help</kbd>.
+The option menu is navigated using the num-pad keys.
 
 ## Bindings
 
