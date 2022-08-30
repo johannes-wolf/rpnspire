@@ -1300,6 +1300,10 @@ local functions = {
   ["warncodes"]       = {n = 2},
   ["when"]            = {n = 4, min = 2},
   ["zeros"]           = {n = 2},
+  -- Stat Functions
+  ["linregmx"]        = {n = 2, statfn = true},
+  ["quadreg"]         = {n = 2, statfn = true},
+  ["quartreg"]        = {n = 2, statfn = true},
 }
 
 -- Returns information about the function with the name given
@@ -1337,7 +1341,7 @@ local function functionInfo(s, builtinOnly)
       end
     end
 
-    return info.pretty or name, argc
+    return info.pretty or name, argc, info.statfn
   end
 
   -- User function
@@ -2226,6 +2230,9 @@ function ExpressionTree:infix_string()
       return node.text .. '(' ..
         table.join_str(node.children, ',', node_to_infix) ..
         ')'
+    elseif node.kind == 'stat_function' then
+      return node.text .. ' ' ..
+        table.join_str(node.children, ',', node_to_infix)
     elseif node.kind == 'syntax' then
       assert(node.text == '{' or node.text == '[')
       if node.text == '{' then
@@ -4266,7 +4273,7 @@ function RPNInput:dispatchOperatorSpecial(key)
 end
 
 function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
-  local name, argc = functionInfo(str, builtinOnly)
+  local name, argc, is_stat = functionInfo(str, builtinOnly)
   if name then
     Undo.record_undo()
     if (not ignoreInput and not self:dispatchInput()) or
@@ -4276,9 +4283,15 @@ function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
     end
 
     local nodes = self:popN(argc)
-    local expr = ExpressionTree(ExpressionTree.make_node(name, 'function', nodes))
+    local expr = ExpressionTree(ExpressionTree.make_node(name, is_stat and 'stat_function' or 'function', nodes))
 
     StackView:pushExpression(expr)
+    if is_stat then
+      -- TODO: Parse result
+      StackView:pushExpression(
+        ExpressionTree(ExpressionTree.make_node('stat.results', 'word', {}))
+      )
+    end
     return true
   end
 end
