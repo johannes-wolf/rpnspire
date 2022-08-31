@@ -1722,8 +1722,8 @@ function Formula:solve_symbolic(for_var)
 end
 
 local formulas = (function()
-  local function v(name, unit)
-    return {name, unit = unit}
+  local function v(name, unit, default)
+    return {name, unit = unit, default = default}
   end
 
   local categories = {}
@@ -1745,6 +1745,41 @@ local formulas = (function()
       Formula('p=w/t',     {'w', 'p', 't'}),
       Formula('g=1/r',     {'r', 'g'}),
       Formula('w=u*i*t',   {'w', 'u', 'i', 't'})
+    }
+  }
+  categories["Mechanik (Kräfte)"] = {
+    variables = {
+      ['epot'] = v('Potentielle Energie', 'J'),
+      ['ekin'] = v('Kinetische Energie', 'J'),
+      ['f']  = v('Kraft F',        'N'),
+      ['fn'] = v('Normalkraft Fn', 'N'),
+      ['m']  = v('Masse m',        'kg'),
+      ['m2'] = v('Masse 2 M',      'kg'),
+      ['u']  = v('Reibungszahl u'),
+      ['p']  = v('Dichte p',       'g*cm^3'),
+      ['v']  = v('Volumen V',      'm^3'),
+      ['pr'] = v('Druck pr',       ''),
+      ['ar'] = v('Fläche A',       'm^2'),
+      ['g']  = v('Fallbeschleunigung g', 'm/_s^2', '9.81'),
+      ['d']  = v('Federkonstante D'),
+      ['s']  = v('Federdehnung s', 'm'),
+      ['a']  = v('Beschleunigung', 'm/_s^2'),
+      ['h']  = v('Fallhöhe h',     'm'),
+    },
+    formulas = {
+      Formula('f=m*a',             {'f', 'm', 'a'}),
+      Formula('f=m*g',             {'f', 'm', 'g'}),
+      Formula('f=u*fn',            {'f', 'u', 'fn'}),
+      Formula('f=m*v^2/r',         {'f', 'm', 'v', 'r'}),
+      Formula('f=d*s',             {'f', 'd', 's'}),
+      Formula('f=p*v*g',           {'f', 'p', 'v', 'g'}),
+      Formula('f=pr*ar',           {'f', 'pr', 'ar'}),
+      Formula('f=9.81*(m*m2)/r^2', {'f', 'm', 'm2', 'r'}),
+
+      Formula('epot=m*g*h',        {'epot', 'm', 'g', 'h'}),
+      Formula('epot=f*h',          {'epot', 'f', 'h'}),
+      Formula('ekin=1/2*d*s^2',    {'ekin', 'd', 's'}),
+      --Formula('ekin=1/2*j*w^2',    {'ekin', 'j', 'w'}),
     }
   }
   categories["Triangles"] = {
@@ -1949,9 +1984,9 @@ local function solve_formula_interactive(category)
         table.insert(solve_with, {set_var, value})
       end, nil, function(widget)
         -- Auto append the matching base unit for convenience
-        local template = ''
+        local template = var_info.default or ''
         if var_info.unit then
-          template = '*_' .. var_info.unit
+          template = template .. '*_' .. var_info.unit
         end
         widget:setText(template, var_info[1] .. '=')
         widget:setCursor(0)
@@ -1981,6 +2016,9 @@ local function solve_formula_interactive(category)
 
       Undo.record_undo()
       for _,step in ipairs(infix_steps) do
+        if step.var then
+          math.evalStr('DelVar '..step.var)
+        end
         if not StackView:pushInfix(step.infix) then
           Undo.undo()
           break
@@ -3226,7 +3264,7 @@ end
 function UIStack:selectIdx(idx)
   idx = idx or #self.stack
   self.sel = math.min(math.max(1, idx), #self.stack)
-  self:scrollToIdx(idx)
+  self:scrollToIdx(self.sel)
   self:invalidate()
 end
 
@@ -3242,7 +3280,7 @@ function UIStack:scrollToIdx(idx)
     self.scrolly = self.scrolly + item_y
   end
 
-  if item_y + item_h > y + h then
+  if item_y + item_h >= y + h then
     self.scrolly = self.scrolly + (item_y + item_h) - (y + h)
   end
 
