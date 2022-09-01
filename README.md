@@ -137,6 +137,12 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>I</kbd><kbd>c</kbd>       | Insert special                                                          |
 | <kbd>I</kbd><kbd>u</kbd>       | Insert unit                                                             |
 | <kbd>A</kbd><kbd>[0-9]</kbd>   | Insert stack reference (Ans)                                            |
+| <kbd>.</kbd><kbd>s</kbd>       | Solve interactive                                                       |
+| <kbd>.</kbd><kbd>z</kbd>       | Zeros interactive                                                       |
+| <kbd>.</kbd><kbd>e</kbd>       | Expand                                                                  |
+| <kbd>.</kbd><kbd>f</kbd>       | Factor                                                                  |
+| <kbd>.</kbd><kbd>.</kbd>       | Insert '.'                                                              |
+| <kbd>.</kbd><kbd>[0-9]</kbd>   | Insert '.' & 0-9                                                        |
 
 ### Stack
 | Key                               | Function                                                        |

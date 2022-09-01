@@ -3220,7 +3220,7 @@ function UIStack:toList(n)
     end
   end
 
-  self:pushExpression(ExpressionTree(new_list))
+  return self:pushExpression(ExpressionTree(new_list))
 end
 
 function UIStack:toPostfix()
@@ -3234,7 +3234,7 @@ function UIStack:toPostfix()
   end
   str = '"' .. str .. '"'
 
-  self:pushExpression(ExpressionTree(ExpressionTree.make_node(str, 'string')))
+  return self:pushExpression(ExpressionTree(ExpressionTree.make_node(str, 'string')))
 end
 
 function UIStack:label(text)
@@ -3588,6 +3588,80 @@ function UIInput:init_bindings()
     if Error.assertStackN(n) then
       self:insertText('@'..sequence[#sequence])
     end
+  end)
+
+  local function eval_interactive(fn, args)
+    local i = 1
+    Undo.record_undo()
+
+    local function handle_cancel()
+      Undo.undo()
+    end
+
+    local function setup_arg(widget)
+      local arg = args[i]
+      if arg then
+        widget:setText(arg.default, arg.prompt)
+        widget:selAll()
+      end
+    end
+
+    local function handle_arg(value)
+      local arg = args[i]
+      if arg then
+        if value:find(',') then value = '{'..value..'}' end
+        StackView:pushInfix(value)
+
+        if i < #args then
+          i = i + 1
+          interactive_input_ask_value(InputView, handle_arg, handle_cancel, setup_arg)
+          return
+        elseif i == #args then
+          if not self.inputHandler:dispatchFunction(fn) then
+            handle_cancel()
+          end
+          self:clear()
+        end
+      end
+
+      interactive_resume()
+    end
+
+    if args and #args >= 1 then
+      interactive_input_ask_value(InputView, handle_arg, handle_cancel, setup_arg)
+    else
+      self.inputHandler:dispatchFunction(fn)
+    end
+  end
+
+  self.kbd:setSequence({'.', '%d'}, function(sequence)
+    local n = tonumber(sequence[#sequence])
+    self:insertText('.' .. n)
+  end)
+  self.kbd:setSequence({'.', '.'}, function(sequence)
+    local n = tonumber(sequence[#sequence])
+    self:insertText('.')
+  end)
+  self.kbd:setSequence({'.', 's'}, function()
+    eval_interactive('solve', {{
+      prompt = 'Solve for:', default = 'x'
+    }})
+  end)
+  self.kbd:setSequence({'.', 'z'}, function()
+    eval_interactive('zeros', {{
+      prompt = 'Zeros for:', default = 'x'
+    }})
+  end)
+  self.kbd:setSequence({'.', 'd'}, function()
+    eval_interactive('derivative', {{
+      prompt = 'Derivative for:', default = 'x'
+    }})
+  end)
+  self.kbd:setSequence({'.', 'x'}, function()
+    eval_interactive('expand', nil)
+  end)
+  self.kbd:setSequence({'.', 'f'}, function()
+    eval_interactive('factor', nil)
   end)
 end
 
@@ -4323,14 +4397,14 @@ function RPNInput:dispatchFunction(str, ignoreInput, builtinOnly)
     local nodes = self:popN(argc)
     local expr = ExpressionTree(ExpressionTree.make_node(name, is_stat and 'stat_function' or 'function', nodes))
 
-    StackView:pushExpression(expr)
+    local res = StackView:pushExpression(expr)
     if is_stat then
       -- TODO: Parse result
       StackView:pushExpression(
         ExpressionTree(ExpressionTree.make_node('stat.results', 'word', {}))
       )
     end
-    return true
+    return res
   end
 end
 
