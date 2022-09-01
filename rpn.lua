@@ -3664,6 +3664,10 @@ function UIInput:init_bindings()
   self.kbd:setSequence({'.', 'f'}, function()
     eval_interactive('factor', nil)
   end)
+  self.kbd:setSequence({'.', '='}, function()
+    StackView:dup()
+    StackView:invalidate()
+  end)
 end
 
 -- Reset the completion state, canceling pending completions
