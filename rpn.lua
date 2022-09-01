@@ -1779,6 +1779,7 @@ local formulas = (function()
       Formula('epot=m*g*h',        {'epot', 'm', 'g', 'h'}),
       Formula('epot=f*h',          {'epot', 'f', 'h'}),
       Formula('ekin=1/2*d*s^2',    {'ekin', 'd', 's'}),
+      Formula('ekin=1/2*m*v^2',    {'ekin', 'm', 'v'}),
       --Formula('ekin=1/2*j*w^2',    {'ekin', 'j', 'w'}),
     }
   }
