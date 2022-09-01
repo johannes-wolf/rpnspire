@@ -3342,9 +3342,9 @@ function UIStack:itemHeight(gc, idx)
   local rightSize = {w = gc:getStringWidth(item.result or ""), h = gc:getStringHeight(item.result or "")}
 
   local leftPos = {x = x + fringeMargin + margin,
-                   y = y}
+                   y = 0}
   local rightPos = {x = x + w - margin - rightSize.w,
-                    y = y}
+                    y = 0}
 
    if options.showExpr then
      if rightPos.x < leftPos.x + leftSize.w + minDistance then
@@ -3352,7 +3352,7 @@ function UIStack:itemHeight(gc, idx)
      end
    end
 
-   return rightPos.y - leftPos.y + rightSize.h + margin
+   return rightPos.y + rightSize.h + margin
 end
 
 function UIStack:drawItem(gc, x, y, w, idx, item)
