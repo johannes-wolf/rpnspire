@@ -949,6 +949,7 @@ Sym = {
   EE      = "\239\128\128",
   POWN1   = "\239\128\133", -- ^-1
   MICRO   = "\194\181",
+  INFTY   = "\226\136\158",
 }
 
 local operators = {
@@ -3639,9 +3640,11 @@ function UIInput:init_bindings()
     local n = tonumber(sequence[#sequence])
     self:insertText('.' .. n)
   end)
-  self.kbd:setSequence({'.', '.'}, function(sequence)
-    local n = tonumber(sequence[#sequence])
+  self.kbd:setSequence({'.', '.'}, function()
     self:insertText('.')
+  end)
+  self.kbd:setSequence({'.', Sym.NEGATE}, function()
+    self:insertText(Sym.INFTY)
   end)
   self.kbd:setSequence({'.', 's'}, function()
     eval_interactive('solve', {{
@@ -3656,6 +3659,40 @@ function UIInput:init_bindings()
   self.kbd:setSequence({'.', 'd'}, function()
     eval_interactive('derivative', {{
       prompt = 'Derivative for:', default = 'x'
+    }})
+  end)
+  self.kbd:setSequence({'.', 'l'}, function()
+    eval_interactive('limit', {{
+      prompt = 'Limit for:', default = 'x'
+    }, {
+      prompt = 'To:'
+    }})
+  end)
+  self.kbd:setSequence({'.', 'q'}, function()
+    eval_interactive('seq', {{
+      prompt = 'Index var:', default = 'x'
+    }, {
+      prompt = 'From:'
+    }, {
+      prompt = 'To:'
+    }})
+  end)
+  self.kbd:setSequence({'.', '+'}, function()
+    eval_interactive('sumseq', {{
+      prompt = 'Summation var:', default = 'x'
+    }, {
+      prompt = 'From:'
+    }, {
+      prompt = 'To:'
+    }})
+  end)
+  self.kbd:setSequence({'.', '*'}, function()
+    eval_interactive('prodseq', {{
+      prompt = 'Index var:', default = 'x'
+    }, {
+      prompt = 'From:'
+    }, {
+      prompt = 'To:'
     }})
   end)
   self.kbd:setSequence({'.', 'x'}, function()

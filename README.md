@@ -126,7 +126,6 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>right</kbd>               | Move cursor right                                                       |
 | <kbd>up</kbd>                  | Focus stack                                                             |
 | <kbd>down</kbd>                | Swap stack 1 & 2                                                        |
-| <kbd>ctrl</kbd><kbd>menu</kbd> | Show context menu (WIP)                                                 |
 | <kbd>return</kbd>              | Insert special character/operator                                       |
 | <kbd>tab</kbd>                 | Start completion for current input                                      |
 | <kbd>G</kbd><kbd>left</kbd>    | Go to beginning                                                         |
@@ -137,11 +136,18 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>I</kbd><kbd>c</kbd>       | Insert special                                                          |
 | <kbd>I</kbd><kbd>u</kbd>       | Insert unit                                                             |
 | <kbd>A</kbd><kbd>[0-9]</kbd>   | Insert stack reference (Ans)                                            |
-| <kbd>.</kbd><kbd>s</kbd>       | Solve interactive                                                       |
-| <kbd>.</kbd><kbd>z</kbd>       | Zeros interactive                                                       |
+|--------------------------------|-------------------------------------------------------------------------|
+| <kbd>.</kbd><kbd>s</kbd>       | Solve                                                                   |
+| <kbd>.</kbd><kbd>z</kbd>       | Zeros                                                                   |
 | <kbd>.</kbd><kbd>e</kbd>       | Expand                                                                  |
 | <kbd>.</kbd><kbd>f</kbd>       | Factor                                                                  |
+| <kbd>.</kbd><kbd>l</kbd>       | Limit                                                                   |
+| <kbd>.</kbd><kbd>d</kbd>       | Derivative                                                              |
+| <kbd>.</kbd><kbd>+</kbd>       | Calc summation                                                          |
+| <kbd>.</kbd><kbd>*</kbd>       | Calc product                                                            |
+| <kbd>.</kbd><kbd>q</kbd>       | Generate sequence                                                       |
 | <kbd>.</kbd><kbd>.</kbd>       | Insert '.'                                                              |
+| <kbd>.</kbd><kbd>(-)</kbd>     | Insert infinity symbol                                                  |
 | <kbd>.</kbd><kbd>[0-9]</kbd>   | Insert '.' & 0-9                                                        |
 
 ### Stack
