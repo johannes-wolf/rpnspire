@@ -2648,7 +2648,7 @@ function ExpressionTree:map_all(fn)
     end
   end
 
-  return map_recursive(self.root)
+  map_recursive(self.root)
 end
 
 --------------------------------------------------
@@ -3755,39 +3755,36 @@ function UIInput:init_bindings()
     end
   end
 
-  self.kbd:setSequence({'.', '%d'}, function(sequence)
-    local n = tonumber(sequence[#sequence])
-    self:insertText('.' .. n)
-  end)
-  self.kbd:setSequence({'.', '.'}, function()
-    self:insertText('.')
-  end)
-  self.kbd:setSequence({'.', Sym.NEGATE}, function()
-    self:insertText(Sym.INFTY)
-  end)
-  self.kbd:setSequence({'.', 's'}, function()
+  ------------------------
+  -- Interactive helper --
+  ------------------------
+  local function ia_solve()
     eval_interactive('solve', {{
       prompt = 'Solve for:', default = 'x'
     }})
-  end)
-  self.kbd:setSequence({'.', 'z'}, function()
+  end
+
+  local function ia_zeros()
     eval_interactive('zeros', {{
       prompt = 'Zeros for:', default = 'x'
     }})
-  end)
-  self.kbd:setSequence({'.', 'd'}, function()
+  end
+
+  local function ia_derivative()
     eval_interactive('derivative', {{
       prompt = 'Derivative for:', default = 'x'
     }})
-  end)
-  self.kbd:setSequence({'.', 'l'}, function()
+  end
+
+  local function ia_limit()
     eval_interactive('limit', {{
       prompt = 'Limit for:', default = 'x'
     }, {
       prompt = 'To:'
     }})
-  end)
-  self.kbd:setSequence({'.', 'q'}, function()
+  end
+
+  local function ia_seq()
     eval_interactive('seq', {{
       prompt = 'Index var:', default = 'x'
     }, {
@@ -3795,8 +3792,9 @@ function UIInput:init_bindings()
     }, {
       prompt = 'To:'
     }})
-  end)
-  self.kbd:setSequence({'.', '+'}, function()
+  end
+
+  local function ia_sumseq()
     eval_interactive('sumseq', {{
       prompt = 'Summation var:', default = 'x'
     }, {
@@ -3804,8 +3802,9 @@ function UIInput:init_bindings()
     }, {
       prompt = 'To:'
     }})
-  end)
-  self.kbd:setSequence({'.', '*'}, function()
+  end
+
+  local function ia_prodseq()
     eval_interactive('prodseq', {{
       prompt = 'Index var:', default = 'x'
     }, {
@@ -3813,14 +3812,9 @@ function UIInput:init_bindings()
     }, {
       prompt = 'To:'
     }})
-  end)
-  self.kbd:setSequence({'.', 'x'}, function()
-    eval_interactive('expand', nil)
-  end)
-  self.kbd:setSequence({'.', 'f'}, function()
-    eval_interactive('factor', nil)
-  end)
-  self.kbd:setSequence({'.', 'r'}, function()
+  end
+
+  local function ia_rewrite()
     if not StackView:top() then
       Error.show("Stack empty")
       return
@@ -3845,10 +3839,67 @@ function UIInput:init_bindings()
     end, nil, function(widget)
       widget:setText('', 'Rewrite rule:')
     end)
+  end
+
+  self.kbd:setSequence({'.', '%d'}, function(sequence)
+    local n = tonumber(sequence[#sequence])
+    self:insertText('.' .. n)
+  end)
+  self.kbd:setSequence({'.', '.'}, function()
+    self:insertText('.')
+  end)
+  self.kbd:setSequence({'.', Sym.NEGATE}, function()
+    self:insertText(Sym.INFTY)
+  end)
+  self.kbd:setSequence({'.', 's'}, function()
+    ia_solve()
+  end)
+  self.kbd:setSequence({'.', 'z'}, function()
+    ia_zeros()
+  end)
+  self.kbd:setSequence({'.', 'd'}, function()
+    ia_derivative()
+  end)
+  self.kbd:setSequence({'.', 'l'}, function()
+    ia_limit()
+  end)
+  self.kbd:setSequence({'.', 'q'}, function()
+    ia_seq()
+  end)
+  self.kbd:setSequence({'.', '+'}, function()
+    ia_sumseq()
+  end)
+  self.kbd:setSequence({'.', '*'}, function()
+    ia_prodseq()
+  end)
+  self.kbd:setSequence({'.', 'r'}, function()
+    ia_rewrite()
+  end)
+  self.kbd:setSequence({'.', 'x'}, function()
+    eval_interactive('expand', nil)
+  end)
+  self.kbd:setSequence({'.', 'f'}, function()
+    eval_interactive('factor', nil)
   end)
   self.kbd:setSequence({'.', '='}, function()
     StackView:dup()
     StackView:invalidate()
+  end)
+
+  self.kbd:setSequence({'ctx'}, function()
+    local menu = UI.Menu()
+
+    local iamenu = menu:add('Interactive')
+    iamenu:add('Solve', ia_solve)
+    iamenu:add('Zeros', ia_zeros)
+    iamenu:add('Derivative', ia_derivative)
+    iamenu:add('Limit', ia_limit)
+    iamenu:add('Seq', ia_seq)
+    iamenu:add('Summation', ia_sumseq)
+    iamenu:add('Product', ia_prodseq)
+    iamenu:add('Rewrite', ia_rewrite)
+
+    self:open_menu(menu)
   end)
 end
 
