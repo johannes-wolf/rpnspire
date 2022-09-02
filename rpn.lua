@@ -2648,7 +2648,14 @@ function ExpressionTree:map_all(fn)
     end
   end
 
-  map_recursive(self.root)
+
+  local replace = fn(self.root, nil)
+  if replace then
+    self.root = replace
+  else
+    map_recursive(self.root)
+  end
+  return self
 end
 
 --------------------------------------------------
