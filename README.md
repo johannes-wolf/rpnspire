@@ -69,6 +69,14 @@ The solver asks you for the variables to solve for (comma separated) and the set
 
 **The Formula Solver is Work in Progress** 
 
+## Expression Rewriting
+
+You can rewrite the top expression using the interactive expression rewrite functionality (<kbd>.</kbd><kbd>r</kbd> when focus is on input). First, a rule must be defined. All variables in such rules match against any (sub-)expression. Second, a replacement
+expression is entered. All variables in that expression are replaced by the (sub-)expression captured via the rule.
+
+One useless example to show how rewriting expression works:
+Top=`(2+4)^2` Rule=`(x+y)^2` Replacement=`x^2 + 2xy + y^2` Result=`2^2 + 2*2*4 + 4^2`
+
 ## Settings
 
 You can access rpnsprires option dialog by pressing <kbd>help</kbd><kbd>help</kbd>.
@@ -120,35 +128,37 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>help</kbd><kbd>help</kbd>           | Show settings                  |
 
 ### Input
-| Key                            | Function                                                                |
-|--------------------------------|-------------------------------------------------------------------------|
-| <kbd>left</kbd>                | Move cursor left                                                        |
-| <kbd>right</kbd>               | Move cursor right                                                       |
-| <kbd>up</kbd>                  | Focus stack                                                             |
-| <kbd>down</kbd>                | Swap stack 1 & 2                                                        |
-| <kbd>return</kbd>              | Insert special character/operator                                       |
-| <kbd>tab</kbd>                 | Start completion for current input                                      |
-| <kbd>G</kbd><kbd>left</kbd>    | Go to beginning                                                         |
-| <kbd>G</kbd><kbd>right</kbd>   | Go to end                                                               |
-| <kbd>G</kbd><kbd>(</kbd>       | Go to previous parenthese or comma or beginning                         |
-| <kbd>G</kbd><kbd>)</kbd>       | Go to next parenthese or comma                                          |
-| <kbd>G</kbd><kbd>.</kbd>       | Select text between parentheses and or commas (select current argument) |
-| <kbd>I</kbd><kbd>c</kbd>       | Insert special                                                          |
-| <kbd>I</kbd><kbd>u</kbd>       | Insert unit                                                             |
-| <kbd>A</kbd><kbd>[0-9]</kbd>   | Insert stack reference (Ans)                                            |
-|--------------------------------|-------------------------------------------------------------------------|
-| <kbd>.</kbd><kbd>s</kbd>       | Solve                                                                   |
-| <kbd>.</kbd><kbd>z</kbd>       | Zeros                                                                   |
-| <kbd>.</kbd><kbd>e</kbd>       | Expand                                                                  |
-| <kbd>.</kbd><kbd>f</kbd>       | Factor                                                                  |
-| <kbd>.</kbd><kbd>l</kbd>       | Limit                                                                   |
-| <kbd>.</kbd><kbd>d</kbd>       | Derivative                                                              |
-| <kbd>.</kbd><kbd>+</kbd>       | Calc summation                                                          |
-| <kbd>.</kbd><kbd>*</kbd>       | Calc product                                                            |
-| <kbd>.</kbd><kbd>q</kbd>       | Generate sequence                                                       |
-| <kbd>.</kbd><kbd>.</kbd>       | Insert '.'                                                              |
-| <kbd>.</kbd><kbd>(-)</kbd>     | Insert infinity symbol                                                  |
-| <kbd>.</kbd><kbd>[0-9]</kbd>   | Insert '.' & 0-9                                                        |
+| Key                          | Function                                                                |
+|------------------------------|-------------------------------------------------------------------------|
+| <kbd>left</kbd>              | Move cursor left                                                        |
+| <kbd>right</kbd>             | Move cursor right                                                       |
+| <kbd>up</kbd>                | Focus stack                                                             |
+| <kbd>down</kbd>              | Swap stack 1 & 2                                                        |
+| <kbd>return</kbd>            | Insert special character/operator                                       |
+| <kbd>tab</kbd>               | Start completion for current input                                      |
+| <kbd>G</kbd><kbd>left</kbd>  | Go to beginning                                                         |
+| <kbd>G</kbd><kbd>right</kbd> | Go to end                                                               |
+| <kbd>G</kbd><kbd>(</kbd>     | Go to previous parenthese or comma or beginning                         |
+| <kbd>G</kbd><kbd>)</kbd>     | Go to next parenthese or comma                                          |
+| <kbd>G</kbd><kbd>.</kbd>     | Select text between parentheses and or commas (select current argument) |
+| <kbd>I</kbd><kbd>c</kbd>     | Insert special                                                          |
+| <kbd>I</kbd><kbd>u</kbd>     | Insert unit                                                             |
+| <kbd>A</kbd><kbd>[0-9]</kbd> | Insert stack reference (Ans)                                            |
+| <kbd>ctx</kbd>               | Show context menu                                                       |
+|------------------------------|-------------------------------------------------------------------------|
+| <kbd>.</kbd><kbd>s</kbd>     | Solve                                                                   |
+| <kbd>.</kbd><kbd>z</kbd>     | Zeros                                                                   |
+| <kbd>.</kbd><kbd>e</kbd>     | Expand                                                                  |
+| <kbd>.</kbd><kbd>f</kbd>     | Factor                                                                  |
+| <kbd>.</kbd><kbd>l</kbd>     | Limit                                                                   |
+| <kbd>.</kbd><kbd>d</kbd>     | Derivative                                                              |
+| <kbd>.</kbd><kbd>+</kbd>     | Calc summation                                                          |
+| <kbd>.</kbd><kbd>*</kbd>     | Calc product                                                            |
+| <kbd>.</kbd><kbd>q</kbd>     | Generate sequence                                                       |
+| <kbd>.</kbd><kbd>r</kbd>     | Rewrite expression                                                      |
+| <kbd>.</kbd><kbd>.</kbd>     | Insert '.'                                                              |
+| <kbd>.</kbd><kbd>(-)</kbd>   | Insert infinity symbol                                                  |
+| <kbd>.</kbd><kbd>[0-9]</kbd> | Insert '.' & 0-9                                                        |
 
 ### Stack
 | Key                               | Function                                                        |
