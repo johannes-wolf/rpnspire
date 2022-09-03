@@ -127,6 +127,11 @@ function string.ulen(str)
   return select(2, str:gsub('[^\128-\193]', ''))
 end
 
+-- Function is missing from TIs lua table table
+function table.unpack(t, i, j)
+  return unpack(t, i, j)
+end
+
 -- Draw string aligned
 ---@param gc table        GC
 ---@param text string     Text
