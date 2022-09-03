@@ -130,7 +130,7 @@ function test.tokenize_infix()
   -- Number bases
   expect("0b10", {{'0b10', 'n'}})
   expect("0hf0", {{'0hf0', 'n'}})
-  expect("0hfx", {{'0hf', 'n'}, {'*', 'o'}, {'x', 'w'}}) -- As allowed by TI
+  expect("0hfx", {{'0hf', 'n'}, {'x', 'w'}}) -- As allowed by TI
   fail("0b12",   'Non binary digit in binary number')
 
   -- Operators
@@ -152,10 +152,7 @@ function test.tokenize_infix()
   -- Matrix
   expect('[1,2]', {{'[', 'sy'}, {'1', 'n'}, {',', 'sy'}, {'2', 'n'}, {']', 'sy'}})
 
-  -- Implicit multiplication
-  expect("2x",   {{'2', 'n'}, {'*', 'o'}, {'x', 'w'}})
-  expect("2(1)", {{'2', 'n'}, {'*', 'o'}, {'(', 'sy'}, {'1', 'n'}, {')', 'sy'}})
-  expect("(1)2", {{'(', 'sy'}, {'1', 'n'}, {')', 'sy'}, {'*', 'o'}, {'2', 'n'}})
+  -- Function
   expect("f(1)", {{'f', 'f'}, {'(', 'sy'}, {'1', 'n'}, {')', 'sy'}})
 
   -- Expressions
@@ -163,7 +160,6 @@ function test.tokenize_infix()
            {'solve', 'f'},
            {'(',     'sy'},
            {'0.5',   'n'},
-           {'*',     'o'},
            {'(',     'sy'},
            {'(',     'sy'},
            {'x',     'w'},

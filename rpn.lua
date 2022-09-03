@@ -1849,35 +1849,6 @@ function Infix.tokenize(input)
     return input:find('^%s+', i)
   end
 
-  -- TODO: Move this elsewhere!
-  local function isImplicitMultiplication(token, kind, top)
-    if not top then return false end
-
-    if kind == 'operator' or
-       top[2] == 'operator' then
-       return false
-    end
-
-    -- 1(...)
-    if (token == '(' or token == '{') and
-       (top[2] == 'number' or top[2] == 'unit' or top[2] == 'string' or top[1] == ')') then
-      return true
-    end
-
-    -- 1[...]
-    if token == '[' and
-      (top[2] == 'number' or top[2] == 'unit') then
-      return true
-    end
-
-    -- (...)1
-    if kind ~= 'syntax' then
-      if top[2] ~= 'syntax' or top[1] == ')' or top[1] == '}' or top[1] == ']' then
-        return true
-      end
-    end
-  end
-
   ---@alias TokenKind "number"|"word"|"function"|"syntax"|"operator"|"string"|"ans"|"ws"|"unit"
   ---@alias TokenPair table<string, TokenKind>
   local matcher = {
@@ -1900,12 +1871,10 @@ function Infix.tokenize(input)
       local i, j, token = m.fn(input, pos)
       if i then
         if token then
-          if isImplicitMultiplication(token, m.kind, tokens[#tokens]) then
-            table.insert(tokens, {'*', 'operator'})
-          end
           if token == '(' and #tokens > 0 and tokens[#tokens][2] == 'word' then
             tokens[#tokens][2] = 'function'
           end
+
           table.insert(tokens, {token, m.kind})
         end
         pos = j+1
@@ -1935,7 +1904,7 @@ function ExpressionTree:debug_print()
   local function print_node_recursive(node, level)
     level = level or 0
     local indent = string.rep('  ', level)
-    print(string.format('%s%s (%s)', indent, node.text, node.kind:sub(1, 1)))
+    print(string.format('%s%s (%s)', indent, node.text, (node.kind or '?'):sub(1, 1)))
 
     if node.children then
       for _, child in ipairs(node.children) do
@@ -1989,15 +1958,24 @@ function ExpressionTree:infix_string()
       return node.text .. ' ' ..
         table.join_str(node.children, ',', node_to_infix)
     elseif node.kind == 'syntax' then
-      assert(node.text == '{' or node.text == '[')
       if node.text == '{' then
         return node.text ..
           table.join_str(node.children, ',', node_to_infix) ..
           ParenPairs[node.text][1]
       elseif node.text == '[' then
+        local is_matrix = false
+        if node.children and #node.children >= 1 and node.children[1].text == '[' then
+          is_matrix = true
+        end
+
         return node.text ..
-          table.join_str(node.children, node.matrix and '' or ',', node_to_infix) ..
+          table.join_str(node.children, is_matrix and '' or ',', node_to_infix) ..
           ParenPairs[node.text][1]
+      elseif node.text == '_[' then
+        assert(node.children and #node.children >= 2)
+
+        return node_to_infix(node.children[1]) ..
+          '[' .. table.join_str({table.unpack(node.children, 2)}, ',', node_to_infix) .. ']'
       end
     else
       if node.kind == 'number' and node.text:sub(1, 1) == '-' then
@@ -2042,150 +2020,299 @@ end
 function ExpressionTree.from_infix(tokens)
   assert(type(tokens) == 'table')
 
-  local stack = {}
-  local target_stack = {{}}
-  local nodes = target_stack[#target_stack]
+  -- PRATT Parser
+  local parser = {
+    idx = 1,
+    infix = {},
+    prefix = {},
 
-  local function begin_target(node)
-    node.children = node.children or {}
-    table.insert(target_stack, node.children)
-    nodes = target_stack[#target_stack]
-  end
+    make_node = function(kind, text, children)
+      return {kind = kind, text = text, children = children}
+    end,
 
-  local function end_target()
-    if #target_stack <= 1 then
-      error('Tried popping last stack entry')
-    end
-    table.remove(target_stack)
-    nodes = target_stack[#target_stack]
-  end
+    eof = function(self)
+      return self.idx > #tokens
+    end,
 
-  local function stack_top()
-    return #stack > 0 and stack[#stack] or nil
-  end
-
-  -- Copy node from stack to result
-  local function copy_stack_node()
-    local node = stack_top()
-    table.insert(nodes, node)
-  end
-
-  -- Push new node to result
-  ---@param text string     Text value
-  ---@param kind TokenKind  Kind
-  ---@param argc number     Number of arguments to consume
-  local function push_node(text, kind, argc)
-    argc = argc or 0
-    local node = ExpressionTree.make_node(text, kind, argc > 0 and {} or nil)
-    for _=0, argc-1 do
-      table.insert(node.children, 1, table.remove(nodes))
-    end
-    table.insert(nodes, node)
-  end
-
-  local function apply_stack_operator()
-    assert(#stack > 0)
-    local node = table.remove(stack)
-    assert(node.kind == 'operator')
-    local _, _, argc = queryOperatorInfo(node.text)
-    push_node(node.text, node.kind, argc)
-  end
-
-  for _, token_tuple in ipairs(tokens) do
-    local text, kind = unpack(token_tuple)
-    if kind == 'number' or kind == 'word' or kind == 'string' or kind == 'unit' then
-      push_node(text, kind)
-    end
-
-    if kind == 'ans' then
-      local stack_n = tonumber(text:sub(2))
-      if stack_n then
-        if not Error.assertStackN(stack_n) then
-          error('Too few arguments on stack')
+    lookahead = function(self, offset)
+      offset = self.idx + (offset or 0)
+      if offset <= #tokens then
+        local text, kind = table.unpack(tokens[offset])
+        if kind == 'operator' or kind == 'syntax' then
+          return {kind = text, text = text}
         end
+        return {kind = kind, text = text}
+      end
+    end,
+
+    match = function(self, token)
+      local t = self:current()
+      if t then
+        return t.kind == token.kind and (not token.text or t.text == token.text)
+      end
+      return false
+    end,
+
+    current = function(self)
+      return self:lookahead(0)
+    end,
+
+    consume = function(self)
+      if not self:eof() then
+        local t = self:lookahead(0)
+        self.idx = self.idx + 1
+        return t
+      end
+    end,
+
+    precedence = function(self, token)
+      local p = self.infix[token.kind]
+      return p and p.precedence or 0
+    end,
+
+    assoc = function(self, token)
+      local p = self.infix[token.kind]
+      return p and p.assoc or 'left'
+    end,
+
+    parse_infix = function(self, left, prec)
+      while not self:eof() and
+        (prec < self:precedence(self:current()) or
+         (self:assoc(self:current()) == 'right' and prec <= self:precedence(self:current()))) do
+        local t = self:consume()
+        local p = self.infix[t.kind]
+        if not p then
+          error('No infix parser for '..t.kind)
+        end
+        left = p:parse(self, left, t)
+      end
+      return left
+    end,
+
+    parse_precedence = function(self, prec)
+      local t = self:current()
+      if not t then
+        error('Token is nil')
       end
 
-      table.insert(nodes, _G.StackView.stack[#_G.StackView.stack - stack_n + 1].rpn)
-    end
+      local p = self.prefix[t.kind]
+      if not p then
+        error('No prefix parser for '..t.kind)
+      end
+      self:consume()
+      local left = p:parse(self, t)
+      return self:parse_infix(left, prec)
+    end,
 
-    if kind == 'operator' then
-      local _, prec, _, _, assoc = queryOperatorInfo(text)
+    parse = function(self)
+      return self:parse_precedence(0)
+    end,
 
-      while stack_top() and stack_top().kind == 'operator' do
-        local _, top_prec, _, _, _ = queryOperatorInfo(stack_top().text)
-        if (assoc ~= 'r' and prec <= top_prec) or
-           (assoc == 'r' and prec < top_prec) then
-          apply_stack_operator()
+    parse_up_to = function(self, kind)
+      local e = self:parse()
+      if not e then
+        error('Expected expression')
+      end
+
+      if not self:match({kind = kind}) then
+        error('Expected '..kind..' got '..self:current().kind)
+      end
+      self:consume()
+      return e
+    end,
+
+    parse_list = function(self, stop_token, delim_token)
+      local e = {}
+      if self:match(stop_token) then
+        self:consume()
+        return e
+      end
+
+      while true do
+        table.insert(e, self:parse())
+
+        if not self:match(stop_token) then
+          if self:match(delim_token) then
+            self:consume()
+          elseif self:eof() then
+            error('Expected token got EOF')
+          else
+            error('Expected '..delim_token.kind..' got '..self:current().kind)
+          end
         else
+          self:consume()
           break
         end
       end
 
-      table.insert(stack, ExpressionTree.make_node(text, kind))
-    end
+      return e
+    end,
 
-    if kind == 'function' then
-      table.insert(stack, ExpressionTree.make_node(text, kind))
-      begin_target(stack_top())
-    end
-
-    if kind == 'syntax' then
-      if text == ',' then
-        while stack_top().kind ~= 'syntax' do
-          apply_stack_operator()
-        end
-      elseif text == '(' then
-        table.insert(stack, ExpressionTree.make_node(text, kind))
-      elseif text == '{' then
-        table.insert(stack, ExpressionTree.make_node(text, kind))
-        begin_target(stack_top())
-      elseif text == '[' then
-        -- Detect matrix row ([ inside [)
-        if stack_top() and stack_top().text == '[' then
-          stack_top().matrix = true -- HACK: Fix by separating lists/martices and subscripts
-        end
-
-        table.insert(stack, ExpressionTree.make_node(text, kind))
-        begin_target(stack_top())
-      elseif text == ')' or text == '}' or text == ']' then
-        while stack_top().kind ~= 'syntax' do
-          apply_stack_operator()
-        end
-
-        if stack_top().text ~= ParenPairs[text][1] then
-          error('Missing ' .. ParenPairs[text][1])
-        end
-
-        if text == '}' or text == ']' then
-          end_target()
-          copy_stack_node()
-        end
-        table.remove(stack) -- Pop opening paren
-
-        if text == ')' then
-          if stack_top() and stack_top().kind == 'function' then
-            end_target()
-            copy_stack_node()
-            table.remove(stack) -- Pop function name
-          end
-        end
+    add_prefix = function(self, kind, parselet)
+      if type(kind) ~= 'table' then kind = {kind} end
+      for _, kind in ipairs(kind) do
+        self.prefix[kind] = parselet
       end
+    end,
+
+    add_infix = function(self, kind, parselet)
+      if type(kind) ~= 'table' then kind = {kind} end
+      for _, kind in ipairs(kind) do
+        self.infix[kind] = parselet
+      end
+    end,
+
+    add_prefix_op = function(self, kind, prec)
+      self:add_prefix(kind, {
+        parse = function(self, p, t)
+          return p.make_node('operator', t.text, {p:parse_precedence(prec)})
+        end
+      })
+    end,
+
+    add_infix_op = function(self, kind, prec, assoc)
+      self:add_infix(kind, {
+        precedence = prec,
+        assoc = assoc or 'left',
+        parse = function(self, p, left, t)
+          return p.make_node('operator', t.text, {left, p:parse_precedence(self.precedence)})
+        end
+      })
+    end,
+
+    add_suffix_op = function(self, kind, prec)
+      self:add_infix(kind, {
+        precedence = prec,
+        parse = function(self, p, left, t)
+          return p:parse_infix(left, 0)
+        end
+      })
+    end,
+  }
+
+  -- Number/Word
+  parser:add_prefix({'number', 'word', 'unit', 'string'}, {
+    parse = function(self, p, t)
+      return p.make_node(t.kind, t.text)
     end
-  end
+  })
 
-  while stack_top() and stack_top().kind == 'operator' do
-    apply_stack_operator()
-  end
+  -- Function
+  parser:add_prefix('function', {
+    parse = function(self, p, t)
+      local ident = t.text
+      if not p:match({kind = '('}) then
+        error('Expected ( got '..p:current().text)
+      end
 
-  if #stack > 0 then
-    error('Unprocessed tokens on stack')
-  end
+      p:consume()
+      local args = p:parse_list({kind = ')'}, {kind = ','})
+      return p.make_node('function', ident, args)
+    end
+  })
 
-  if #nodes > 1 then
-    error('Multiple root nodes')
-  end
+  parser:add_prefix('ans', {
+    parse = function(self, p, t)
+      local n = tonumber(text:sub(2))
+      if not Error.assertStackN(n or 0) then
+        error('Too few arguments on stack')
+      end
 
-  return ExpressionTree(nodes[1])
+      local e = table_clone(_G.StackView.stack[#_G.StackView.stack - n + 1].rpn)
+      return p.make_node(e.kind, e.text, e.children)
+    end
+  })
+
+  parser:add_prefix('(', {
+    parse = function(self, p, t)
+      return p:parse_up_to(')')
+    end
+  })
+
+  -- Lists
+  parser:add_prefix('{', {
+    parse = function(self, p, t)
+      return p.make_node('syntax', '{', p:parse_list({kind = '}'}, {kind = ','}))
+    end
+  })
+
+  -- Vectors/Matrices
+  parser:add_prefix('[', {
+    parse = function(self, p, t)
+      -- Matrix
+      if p:current() and p:current().kind == '[' then
+        local rows = {}
+        while p:current() and p:current().kind == '[' do
+          p:consume()
+          local row = p:parse_list({kind = ']'}, {kind = ','})
+          if not row then
+            error('Expected matrix row')
+          end
+          table.insert(rows, p.make_node('syntax', '[', row))
+        end
+        if not p:match({kind = ']'}) then
+          error('Expected ] got '..p:current().kind)
+        end
+        p:consume()
+
+        return p.make_node('syntax', '[', rows)
+      end
+
+      -- Vector
+      return p.make_node('syntax', '[', p:parse_list({kind = ']'}, {kind = ','}))
+    end
+  })
+
+  -- Handle implicit multiplication
+  parser:add_infix({'(', '{', 'number', 'word', 'function', 'unit'}, {
+    precedence = 13,
+    parse = function(self, p, left, t)
+      local right = p:parse_infix(p.prefix[t.kind]:parse(p, t), self.precedence)
+      return p.make_node('operator', '*', {left, right})
+    end
+  })
+
+  -- Handle Subscripts
+  parser:add_infix({'['}, {
+    precedence = 17,
+    parse = function(self, p, left, t)
+      -- Implicit matrix multiplication
+      if p:current() and p:current().kind == '[' then
+        return p.make_node('operator', '*', {left, parser.prefix['[']:parse(p, t)})
+      end
+
+      local indices = p:parse_list({kind = ']'}, {kind = ','})
+      return p.make_node('syntax', '_[', {left, table.unpack(indices)})
+    end
+  })
+
+  -- Operators
+  parser:add_prefix_op({'#'}, 18)
+  parser:add_suffix_op({'!', '%', '@t', Sym.RAD, Sym.GRAD, Sym.DEGREE, Sym.TRANSP}, 17)
+  parser:add_infix_op({'^'}, 16, 'right')
+  parser:add_prefix({'-', '(-)', Sym.NEGATE}, {
+    parse = function(self, p, t)
+      return p.make_node('operator', Sym.NEGATE, {p:parse_precedence(15)})
+    end
+  })
+  parser:add_infix_op({'&'}, 14)
+  parser:add_infix_op({'*', '/'}, 13)
+  parser:add_infix_op({'+', '-'}, 12)
+  parser:add_infix_op({'=', '/=', '<', '>', '<=', '>=', Sym.NEQ, Sym.LEQ, Sym.GEQ}, 11)
+  parser:add_prefix_op({'not'}, 10)
+  parser:add_infix_op({'and', 'or'}, 10)
+  parser:add_infix_op({'xor', 'nor', 'nand'}, 9)
+  parser:add_infix_op({'=>', Sym.LIMP}, 8)
+  parser:add_infix_op({'<=>', Sym.DLIMP}, 7)
+  parser:add_infix_op({'|'}, 6)
+  parser:add_infix_op({':=', ':=', Sym.STORE}, 5)
+  parser:add_infix_op({'@>', Sym.CONVERT}, 1)
+
+  local t = ExpressionTree(parser:parse())
+  if not parser:eof() then
+    error('Error parsing expression at '..parser:current().kind)
+  end
+  return t
 end
 
 -- Match node for a sub-expression
