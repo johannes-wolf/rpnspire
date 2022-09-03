@@ -332,9 +332,15 @@ function test.rpn_input()
       end
     end
 
+    local key_str = ''
+    for _, k in ipairs(key) do
+      key_str = key_str .. ' ' .. k
+    end
+    Test.info(key_str)
+
     if type(stack_infix) == 'string' then
       if not Test.assert(#StackView.stack > 0,
-                         "Expected stack to be not empty!") then
+                         "Expected stack to be "..stack_infix) then
         return
       end
 
