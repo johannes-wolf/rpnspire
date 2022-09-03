@@ -3699,6 +3699,27 @@ function UIInput:init_bindings()
     end)
   end
 
+  local function ia_with()
+    if not StackView:top() then
+      Error.show("Stack empty")
+      return
+    end
+
+    local top = ExpressionTree(StackView:top().rpn)
+    interactive_input_ask_value(InputView, function(with)
+      local with_expr = ExpressionTree.from_infix(Infix.tokenize(with))
+      if with_expr then
+        Undo.record_undo()
+        StackView:pushExpression(with_expr)
+        self.inputHandler:dispatchOperator('|', true)
+      else
+        Error.show("Error parsing expressions")
+      end
+    end, nil, function(widget)
+      widget:setText('', 'With:')
+    end)
+  end
+
   self.kbd:setSequence({'.', '%d'}, function(sequence)
     local n = tonumber(sequence[#sequence])
     self:insertText('.' .. n)
@@ -3738,6 +3759,12 @@ function UIInput:init_bindings()
   end)
   self.kbd:setSequence({'.', 'f'}, function()
     eval_interactive('factor', nil)
+  end)
+  self.kbd:setSequence({'.', 'w'}, function()
+    ia_with()
+  end)
+  self.kbd:setSequence({'.', 'W'}, function()
+    self.inputHandler:dispatchOperator('|')
   end)
   self.kbd:setSequence({'.', '='}, function()
     StackView:dup()
