@@ -98,6 +98,15 @@ expression is entered. All variables in that expression are replaced by the (sub
     Result: a+b*0.01+c
     ```
 
+**NOTE: The target and the rule expression are canonicalized before rewrite!** This means, substractions are converted to
+additions with negated argument(s), sums and products are joined (n-args) and divisions are transformed to products with
+power to -1.
+
+Examples:
+- `a+b` (2 args) will not match `a+b+c` (3 args).
+- `a+b` matches `a-b` (`a+(-b)`)
+- `a*b` matches `a/b` (`a*(b^(-1))`)
+
 ## Settings
 
 You can access rpnspires option dialog by pressing <kbd>help</kbd><kbd>help</kbd>.

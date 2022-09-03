@@ -2320,6 +2320,97 @@ function ExpressionTree.from_infix(tokens)
   return t
 end
 
+function ExpressionTree:canonicalize()
+  local root = nil
+
+  local function append_node(parent, text, kind)
+    if not parent then
+      root = ExpressionTree.make_node(text, kind, {})
+      return root
+    else
+      table.insert(parent.children, ExpressionTree.make_node(text, kind, {}))
+      return parent.children[#parent.children]
+    end
+  end
+
+  local simplify_node = nil
+
+  -- Transform a+(b+c) or a*(b*c) to a+b+c or a*b*c
+  local function merge_sum_or_product(input, output)
+    if not output or output.kind ~= input.kind or output.text ~= input.text then
+      output = append_node(output, input.text, input.kind)
+    end
+
+    for _, child in ipairs(input.children) do
+      if child.kind == input.kind and child.text == input.text then
+        merge_sum_or_product(child, output)
+      else
+        simplify_node(child, output)
+      end
+    end
+  end
+
+  -- Transform a-b to a+-b
+  local function difference_to_sum(input, output)
+    if not output or output.kind ~= 'operator' or output.text ~= '+' then
+      output = append_node(output, '+', 'operator')
+    end
+
+    assert(#input.children == 2)
+    simplify_node(input.children[1], output)
+    output = append_node(output, Sym.NEGATE, 'operator')
+    simplify_node(input.children[2], output)
+  end
+
+  -- Transform a/b to a*b^-1 or a*(1/b)
+  local function division_to_power(input, output)
+    assert(#input.children == 2)
+    if input.children[1].kind == 'number' and input.children[2].kind == 'number' then
+      output = append_node(output, '/', 'operator')
+      output.children = input.children
+      return
+    end
+
+    output = append_node(output, '*', 'operator')
+    simplify_node(input.children[1], output)
+
+    if input.children[2].kind == 'number' then
+      output = append_node(output, '/', 'operator')
+      append_node(output, '1', 'number')
+      append_node(output, input.children[2].text, input.children[2].kind)
+    else
+      output = append_node(output, '^', 'operator')
+      simplify_node(input.children[2], output)
+      output = append_node(output, Sym.NEGATE, 'operator')
+      append_node(output, '1', 'number')
+    end
+  end
+
+  -- Apply simplification rules
+  simplify_node = function(input, output)
+    if input.kind == 'operator' then
+      if input.text == '+' or input.text == '*' then
+        merge_sum_or_product(input, output)
+        return
+      elseif input.text == '-' then
+        difference_to_sum(input, output)
+        return
+      elseif input.text == '/' then
+        division_to_power(input, output)
+        return
+      end
+    end
+
+    output = append_node(output, input.text, input.kind)
+    for _, child in ipairs(input.children or {}) do
+      simplify_node(child, output)
+    end
+  end
+
+  simplify_node(self.root)
+  return root
+end
+
 -- Match node for a sub-expression
 ---@param subexpr ExpressionTree   Subexpression to match against
 ---@param limit? boolean           Limit to first match
@@ -2407,14 +2498,15 @@ end
 ---@param subexpr ExpressionTree  Expression to replace
 ---@param with    ExpressionTree  Expression to replace with
 function ExpressionTree:rewrite_subexpr(subexpr, with)
-  local target = self
+  if not subexpr.root then subexrp = ExpressionTree(subexpr) end
+  if not with.root then with = ExpressionTree(with) end
+
+  subexpr = ExpressionTree(subexpr:canonicalize())
+
+  local target = ExpressionTree(self:canonicalize())
   local matches, metavars = target:find_subexpr(subexpr, false, true)
 
-  -- TODO: Call :canonicalize() on all exprs
-  --         - Merge additions and multiplications
-  --       - Rewrite on _all_ children members
-
-  with = ExpressionTree(with.root or with):substitute_vars(metavars)
+  with = with:substitute_vars(metavars or {})
   for _, match in ipairs(matches or {}) do
     if match.parent then
       match.parent.children[match.index] = with.root or with
@@ -2422,7 +2514,9 @@ function ExpressionTree:rewrite_subexpr(subexpr, with)
       target.root = with.root or with
     end
   end
-  return target
+
+  self.root = target.root
+  return self
 end
 
 -- Returns the left side of the expression or the whole expression
@@ -3689,7 +3783,7 @@ function UIInput:init_bindings()
         local replace_expr = ExpressionTree.from_infix(Infix.tokenize(replace))
         if search_expr and replace_expr then
           Undo.record_undo()
-          top:rewrite_subexpr(search_expr.root, replace_expr.root)
+          top:rewrite_subexpr(search_expr, replace_expr)
           StackView:pop()
           StackView:pushExpression(top)
         else
@@ -3788,6 +3882,13 @@ function UIInput:init_bindings()
     iamenu:add('Product', ia_prodseq)
     iamenu:add('Rewrite', ia_rewrite)
     iamenu:add('With', ia_with)
+
+    local dmenu = menu:add('Debug')
+    dmenu:add('Canonicalize', function()
+      local top = ExpressionTree(StackView:top().rpn)
+      top = ExpressionTree(top:canonicalize())
+      StackView:pushExpression(top)
+    end)
 
     self:open_menu(menu)
   end)
