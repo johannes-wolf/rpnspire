@@ -15,7 +15,7 @@ cat rpn.lua >> "$FULL"
 
 if ! [[ -f "$ROOT/.luna/luna" ]]; then
     echo "Cloning luna..."
-    git clone 'https://github.com/adriweb/Luna.git' .luna
+    git clone 'https://github.com/ndless-nspire/Luna.git' .luna
 
     echo "Building luna..."
     (
