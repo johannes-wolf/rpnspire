@@ -4445,11 +4445,23 @@ function RPNInput:dispatchOperator(str, ignoreInput)
 
     local nodes = self:popN(argc)
 
-    -- TODO: Move this elsewhere
+    -- TODO: Move this to ExpressionTree:canonicalize
     if nodes and #nodes == 1 then
       if nodes[1].text == str and nodes[1].kind == 'operator' then
         if name == Sym.NEGATE or name == 'not ' then
-          StackView:pushExpression(ExpressionTree(nodes[1].children[1]))
+          StackView:pushExpression(ExpressionTree())
+          return true
+        end
+
+      end
+    elseif nodes and #nodes == 2 then
+      if nodes[1].text == str and nodes[1].kind == 'operator' then
+        if name == '|' then
+          local left = nodes[1].children[1]
+          local right = nodes[1].children[2]
+
+          nodes[1].children[2] = ExpressionTree.make_node('and', 'operator', {right, nodes[2]})
+          StackView:pushExpression(ExpressionTree(nodes[1]))
           return true
         end
       end
