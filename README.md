@@ -100,7 +100,7 @@ expression is entered. All variables in that expression are replaced by the (sub
 
 ## Settings
 
-You can access rpnsprires option dialog by pressing <kbd>help</kbd><kbd>help</kbd>.
+You can access rpnspires option dialog by pressing <kbd>help</kbd><kbd>help</kbd>.
 The option menu is navigated using the num-pad keys.
 
 ## Bindings
