@@ -2410,6 +2410,10 @@ function ExpressionTree:rewrite_subexpr(subexpr, with)
   local target = self
   local matches, metavars = target:find_subexpr(subexpr, false, true)
 
+  -- TODO: Call :canonicalize() on all exprs
+  --         - Merge additions and multiplications
+  --       - Rewrite on _all_ children members
+
   with = ExpressionTree(with.root or with):substitute_vars(metavars)
   for _, match in ipairs(matches or {}) do
     if match.parent then
@@ -3783,6 +3787,7 @@ function UIInput:init_bindings()
     iamenu:add('Summation', ia_sumseq)
     iamenu:add('Product', ia_prodseq)
     iamenu:add('Rewrite', ia_rewrite)
+    iamenu:add('With', ia_with)
 
     self:open_menu(menu)
   end)
@@ -3954,7 +3959,7 @@ end
 function UIInput:getCursorX(pos)
   local x = platform.withGC(function(gc)
     local offset = 0
-    if self.prefix then
+    if self.prefix and self.prefix:len() > 0 then
       offset = gc:getStringWidth(self.prefix) + 2*self.margin
     end
     return offset + gc:getStringWidth(string.usub(self.text, 1, pos or self.cursor.pos))
@@ -4220,6 +4225,7 @@ function UIInput:drawText(gc)
     gc:drawString(self.prefix, x + margin, y)
 
     x = x + prefixWidth
+    w = w - prefixWidth
     cursorx = cursorx + prefixWidth
     gc:clipRect("set", x, y, w, h)
   end
