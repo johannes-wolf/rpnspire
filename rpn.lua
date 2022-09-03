@@ -2213,7 +2213,7 @@ function ExpressionTree.from_infix(tokens)
 
   parser:add_prefix('ans', {
     parse = function(self, p, t)
-      local n = tonumber(text:sub(2))
+      local n = tonumber(t.text:sub(2))
       if not Error.assertStackN(n or 0) then
         error('Too few arguments on stack')
       end

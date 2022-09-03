@@ -392,6 +392,9 @@ function test.rpn_input()
   expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/'}, 'x*2/2=10/2')
   expectStack({'x', 'ENTER', '2', '*', '10', '=', '2', '/', '1', 'and'}, 'x*2/2=10/2 and 1') -- Do not logical op
 
+  -- ANS
+  expectStack({'123', 'ENTER', '2', 'ENTER', '@2*@1', 'ENTER'}, '123*2')
+
   -- Unbalanced (ALG) input
   ---@diagnostic disable-next-line: duplicate-set-field
   rpn.isBalanced = function() return false end
