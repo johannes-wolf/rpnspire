@@ -128,8 +128,10 @@ function string.ulen(str)
 end
 
 -- Function is missing from TIs lua table table
-function table.unpack(t, i, j)
-  return unpack(t, i, j)
+if not table.unpack then
+  function table.unpack(t, i, j)
+    return unpack(t, i, j)
+  end
 end
 
 -- Draw string aligned
@@ -290,7 +292,7 @@ end
 ---@return number  width
 ---@return number  height
 function UI.Widget:frame()
-  return unpack(self._frame)
+  return table.unpack(self._frame)
 end
 
 function UI.Widget:set_frame(x, y, w, h)
@@ -817,7 +819,7 @@ function Trie.find(str, tab, pos)
   end
 
   if match and match[1] then
-    return unpack(match)
+    return table.unpack(match)
   end
   return nil
 end
@@ -1033,7 +1035,7 @@ local function queryOperatorInfo(s)
   local tab = operators[s]
   if tab == nil then return nil end
 
-  local str, lvl, args, side, assoc, aggro = unpack(tab)
+  local str, lvl, args, side, assoc, aggro = table.unpack(tab)
   return (str or s), lvl, args, side, assoc, aggro
 end
 
@@ -1510,7 +1512,7 @@ function Macro:execute()
     if step:find('^@%a+') then
       step = step:usub(2)
       local tokens = step:split(':')
-      local cmd = tokens[1]
+      local cmd = tokens and tokens[1] or ''
 
       local function numarg(n, def)
         n = n + 1
@@ -1529,11 +1531,10 @@ function Macro:execute()
           StackView:top().label = tokens[2]
         end
       elseif cmd == 'input' then
-        local prefix = tokens[2] or ''
+        local prefix = tokens and tokens[2] or ''
 
         interactive_input_ask_value(InputView, function(value)
           StackView:pushInfix(value)
-          interactive_resume()
         end, function()
           Undo.undo()
         end, function(widget)
@@ -1541,7 +1542,8 @@ function Macro:execute()
         end)
       end
     else
-      StackView:pushInfix(step)
+      InputView:onCharIn(step)
+      InputView:onEnter()
     end
 
     return true
@@ -1573,7 +1575,7 @@ local function build_formula_solve_queue(category, want_var, have_vars)
 
   -- Insert all given arguments as pseudo formulas
   for _,v in ipairs(have_vars) do
-    local name, value = unpack(v)
+    local name, value = table.unpack(v)
     var_to_formula[name:lower()] = Formula(name .. '=' .. value, {})
   end
 
@@ -1637,7 +1639,7 @@ local function build_formula_solve_queue(category, want_var, have_vars)
 
   print('info: formula solve queue:')
   for idx,v in ipairs(solve_queue) do
-    local solve_for, formula = unpack(v)
+    local solve_for, formula = table.unpack(v)
     print(string.format('  %02d %s', idx, solve_for ..  ' = ' .. formula:solve_symbolic(solve_for)))
   end
 
@@ -1723,7 +1725,7 @@ local function solve_formula_interactive(category)
     if solve_queue then
       local infix_steps = {}
       for _,v in ipairs(solve_queue) do
-        local var, formula = unpack(v)
+        local var, formula = table.unpack(v)
         table.insert(infix_steps, {
           var = var,
           infix = tostring(formula:solve_symbolic(var):gsub('=', ':='))
@@ -3653,6 +3655,30 @@ function UIInput:init_bindings()
         menu = menu:add()
       end
     else
+      menu:add("No Macros")
+    end
+
+    self:open_menu(menu)
+  end)
+
+  -- Macros
+  self.kbd:setSequence({'I', 'm'}, function()
+    local menu = UI.Menu()
+    if macros then
+      local function add_cat(table)
+        for name, macro in pairs(table) do
+          if type(macro) == 'string' then
+            menu:add(name, function() Macro(macro:split(';')):execute() end)
+          elseif type(macro) == 'table' then
+            menu = menu:add(name)
+            add_cat(macro)
+            menu = menu:add()
+          end
+        end
+      end
+
+      add_cat(macros)
+    else
       menu:add("No Units")
     end
 
@@ -3957,7 +3983,7 @@ function UIInput:onCompletionBegin(prefix, candidates)
 end
 
 function UIInput:open_menu(menu)
-  assert(getmetatable(menu) == UI.Menu)
+  --assert(getmetatable(menu) == UI.Menu)
 
   local _, y = self:frame()
   return menu:open_at(self:getCursorX(), y + 4, y + 4)
@@ -4039,7 +4065,7 @@ function UIInput:moveCursor(offset)
 end
 
 function UIInput:setCursor(pos, scroll)
-  local oldPos, oldSize = unpack(self.cursor)
+  local oldPos, oldSize = table.unpack(self.cursor)
 
   self.cursor.pos = math.min(math.max(0, pos or self.text:ulen()), self.text:ulen())
   self.cursor.size = 0
@@ -4182,7 +4208,7 @@ function UIInput:_insertChar(c)
   local expanded = c
   if options.autoClose == true then
     -- Add closing paren
-    local matchingParen, isOpening = unpack(ParenPairs[c:usub(-1)] or {})
+    local matchingParen, isOpening = table.unpack(ParenPairs[c:usub(-1)] or {})
     if matchingParen and isOpening then
       expanded = c..matchingParen
     end
@@ -4792,7 +4818,7 @@ local completion_fn_units_cache = nil
 completion_fn_units = function(prefix, cat)
   if not completion_fn_units_cache then
     completion_fn_units_cache = {}
-    for category, items in pairs(units) do
+    for category, items in pairs(units or {}) do
       for _, unit in ipairs(items) do
         table.insert(completion_fn_units_cache, unit[1])
       end
@@ -4810,7 +4836,7 @@ InputView.completionFun = function(prefix)
 
     local tokens = Infix.tokenize(InputView.text:usub(1, InputView.cursor.pos + 1 - (prefix and prefix:ulen() + 1 or 0)))
     if tokens and #tokens > 0 then
-      semanticValue, semanticKind = unpack(tokens[#tokens])
+      semanticValue, semanticKind = table.unpack(tokens[#tokens])
       semantic = {}
     end
 
@@ -5487,11 +5513,14 @@ function on.save()
 end
 
 function on.restore(state)
-  Undo.undo_stack, Undo.redo_stack = unpack(state.undo)
-  StackView.stack = state['stack'] or {}
-  options = state.options
-  Clipboard.stack = state['clip'] or {}
-  InputView:setText(state.input)
+  print('on.restore')
+  if state then
+    Undo.undo_stack, Undo.redo_stack = table.unpack(state.undo or {})
+    StackView.stack = state.stack or {}
+    options = state.rpn_options
+    Clipboard.stack = state.clip or {}
+    InputView:setText(state.input)
+  end
 end
 
 if platform.registerErrorHandler then
