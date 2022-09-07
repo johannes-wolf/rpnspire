@@ -128,9 +128,9 @@ function string.ulen(str)
 end
 
 -- Function is missing from TIs lua table table
-if not table.unpack then
-  function table.unpack(t, i, j)
-    return unpack(t, i, j)
+if not table.unpack and _G.unpack then
+  function table.unpack(...)
+    return _G.unpack(...)
   end
 end
 
@@ -5513,11 +5513,10 @@ function on.save()
 end
 
 function on.restore(state)
-  print('on.restore')
   if state then
     Undo.undo_stack, Undo.redo_stack = table.unpack(state.undo or {})
     StackView.stack = state.stack or {}
-    options = state.rpn_options
+    options = state.options
     Clipboard.stack = state.clip or {}
     InputView:setText(state.input)
   end
