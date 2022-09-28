@@ -1492,70 +1492,157 @@ end
 ---@class Macro
 ---@field steps string[]
 Macro = class()
-function Macro:init(steps)
-  self.steps = steps or {}
+Macro.state = {}
+
+-- Macro functions
+Macro.Fn = {}
+
+-- Simulate keypress
+---@param key string  Key name
+function Macro.Fn.key(key)
+  local t = {
+    ['enter'] = on.enterKey,
+    ['esc'] = on.escapeKey,
+    ['up'] = on.arrowUp,
+    ['down'] = on.arrowDown,
+    ['left'] = on.arrowLeft,
+    ['right'] = on.arrowRight,
+  }
+  if t[key] then
+    t[key]()
+  else
+    on.charIn(key)
+  end
+end
+
+-- Label top expression
+---@param text string  Label text
+function Macro.Fn.label(text)
+  if StackView:size() > 0 then
+    StackView:top().label = text
+  end
+end
+
+-- Evaluate infix expression on the stack
+---@param expr string  Expression
+function Macro.Fn.push(expr)
+  StackView:pushInfix(expr)
+end
+
+-- Evaluate expression but do _not_ push it to the stack
+---@param input string  Expression
+function Macro.Fn.eval(input)
+  local res, err = math.evalStr(input)
+  if err and err ~= 750 then
+    Error.show(err)
+    return nil
+  end
+  return res
+end
+
+-- Returns if input is true
+---@return boolean
+function Macro.Fn.is_true(input)
+  local res = math.evalStr(input)
+  return res == 'true'
+end
+
+-- Returns if input is 0
+---@return boolean
+function Macro.Fn.is_zero(input)
+  return Macro.Fn.is_true(input .. '=0')
+end
+
+-- Returns if input is > 0 or < 0
+---@return number|nil  Returns 1 if positive, -1 if negative and nil if 0
+function Macro.Fn.get_sign(input)
+  return Macro.Fn.is_true(input .. '>0') and  1 or
+         Macro.Fn.is_true(input .. '<0') and -1 or nil
+end
+
+-- Returns if input is infinity
+---@return number|nil  Returns 1 if positive infinity, -1 if negative infinity or nil
+function Macro.Fn.is_infty(input)
+  return Macro.Fn.is_true(input..'='..Sym.INFTY) and 1 or
+         Macro.Fn.is_true(input..'='..Sym.NEGATE..Sym.INFTY) and -1 or nil
+end
+
+-- Delete one or more TI variables
+---@param vars table|string  Variable name(s)
+function Macro.Fn.delvar(vars)
+  if type(vars) == 'string' then
+    math.evalStr(string.format('delvar(%s)', vars))
+  elseif type(vars) == 'table' then
+    for _, var in ipairs(vars) do
+      math.evalStr(string.format('delvar(%s)', var))
+    end
+  end
+end
+
+-- Prompt input
+---@param prompt string  User prompt text
+---@param init? string   Initial value
+---@param fn? function   Callback function (defaults to Macro.Fn.infix)
+function Macro.Fn.input(prompt, init, fn)
+  interactive_input_ask_value(InputView, function(value)
+    if fn then fn(value) else Macro.Fn.infix(value) end
+  end, function()
+    if not fn then Undo.undo() end
+  end, function(widget)
+    widget:setText(init or '', prompt or '?')
+  end)
+end
+
+-- Get result expression-tree
+---@return ExpressionTree
+function Macro.Fn.result(input)
+  local t = Infix.tokenize(input or StackView:top().result)
+  return ExpressionTree.from_infix(t)
+end
+
+-- Iterate result values of lists or 'or' expressions
+function Macro.Fn.each_result(input, fn)
+  local r = ''
+  if not input or input == 'top' then
+    r = Macro.Fn.result()
+  else
+    r = ExpressionTree.from_infix(Infix.tokenize(Macro.Fn.eval(input)))
+  end
+  if r then
+    if r.root.text == '{' or r.root.text == 'or' then
+      for _, arg in ipairs(r:split_arguments()) do
+        fn(arg)
+      end
+    else
+      fn(r)
+    end
+  end
+end
+
+-- Returns right side of a binary expression
+---@return ExpressionTree
+function Macro.Fn.get_right(expr)
+  local op = expr.root.kind == 'operator' and expr.root.text or ''
+  if op == '=' or op == '>' or op == '<' or op == Sym.NEQ or op == Sym.LEQ or op == Sym.GEQ then
+    return ExpressionTree(expr.root.children[2])
+  end
+  return expr
+end
+
+function Macro:init(fn)
+  self.fn = fn
 end
 
 function Macro:execute()
-  Undo.record_undo()
+  interactive_start(function()
+    Undo.record_undo()
+    Macro.state = {}
 
-  local stackTop = StackView:size()
+    print('Macro starting')
+    self.fn()
+    print('Macro finished')
 
-  local function clrbot(n)
-    n = tonumber(n)
-    for i=StackView:size() -n,stackTop+1,-1 do
-      StackView:pop(i)
-    end
-  end
-
-  local function exec_step(step)
-    if step:find('^@%a+') then
-      step = step:usub(2)
-      local tokens = step:split(':')
-      local cmd = tokens and tokens[1] or ''
-
-      local function numarg(n, def)
-        n = n + 1
-        return tokens >= n and tonumber(tokens[n]) or def
-      end
-
-      if cmd == 'clrbot' then
-        -- Clear all but top n args
-        clrbot(tokens[2] or 1)
-      elseif cmd == 'dup' then
-        StackView:dup(numarg(1, 1))
-      elseif cmd == 'simp' then
-        StackView:pushInfix(StackView:pop().result)
-      elseif cmd == 'label' then
-        if StackView:size() > 0 then
-          StackView:top().label = tokens[2]
-        end
-      elseif cmd == 'input' then
-        local prefix = tokens and tokens[2] or ''
-
-        interactive_input_ask_value(InputView, function(value)
-          StackView:pushInfix(value)
-        end, function()
-          Undo.undo()
-        end, function(widget)
-          widget:setText('', prefix)
-        end)
-      end
-    else
-      InputView:onCharIn(step)
-      InputView:onEnter()
-    end
-
-    return true
-  end
-
-  return interactive_start(function()
-    for _,v in ipairs(self.steps) do
-      if not exec_step(v) then
-        Undo.undo()
-        break
-      end
-    end
+    Macro.state = {}
     platform.window:invalidate()
   end)
 end
@@ -3674,7 +3761,7 @@ function UIInput:init_bindings()
         menu = menu:add()
       end
     else
-      menu:add("No Macros")
+      menu:add("No Units")
     end
 
     self:open_menu(menu)
@@ -3686,8 +3773,11 @@ function UIInput:init_bindings()
     if macros then
       local function add_cat(table)
         for name, macro in pairs(table) do
-          if type(macro) == 'string' then
-            menu:add(name, function() Macro(macro:split(';')):execute() end)
+          if type(macro) == 'function' then
+            menu:add(name, function()
+              menu:close(true)
+              Macro(macro):execute()
+            end)
           elseif type(macro) == 'table' then
             menu = menu:add(name)
             add_cat(macro)
@@ -3698,7 +3788,7 @@ function UIInput:init_bindings()
 
       add_cat(macros)
     else
-      menu:add("No Units")
+      menu:add("No Macros", '')
     end
 
     self:open_menu(menu)
@@ -5130,7 +5220,7 @@ end
 
 
 -- Called for _any_ keypress
-local function on_any_key()
+local function on_any_key(key)
   Error.hide()
 end
 
@@ -5351,7 +5441,7 @@ function on.paste()
 end
 
 function on.escapeKey()
-  on_any_key()
+  on_any_key('escape')
   GlobalKbd:resetSequence()
   if current_focus.kbd then
     current_focus.kbd:resetSequence()
@@ -5362,7 +5452,7 @@ function on.escapeKey()
 end
 
 function on.tabKey()
-  on_any_key()
+  on_any_key('tab')
   if current_focus.onTab then
     current_focus:onTab()
   else
@@ -5374,14 +5464,14 @@ function on.tabKey()
 end
 
 function on.backtabKey()
-  on_any_key()
+  on_any_key('backtab')
   if current_focus.onBackTab then
     current_focus:onBackTab()
   end
 end
 
 function on.returnKey()
-  on_any_key()
+  on_any_key('return')
   if GlobalKbd:dispatchKey('return') then
     return
   end
@@ -5397,7 +5487,7 @@ function on.returnKey()
 end
 
 function on.arrowRight()
-  on_any_key()
+  on_any_key('right')
   if GlobalKbd:dispatchKey('right') then
     return
   end
@@ -5410,7 +5500,7 @@ function on.arrowRight()
 end
 
 function on.arrowLeft()
-  on_any_key()
+  on_any_key('left')
   if GlobalKbd:dispatchKey('left') then
     return
   end
@@ -5423,7 +5513,7 @@ function on.arrowLeft()
 end
 
 function on.arrowUp()
-  on_any_key()
+  on_any_key('up')
   if GlobalKbd:dispatchKey('up') then
     return
   end
@@ -5436,7 +5526,7 @@ function on.arrowUp()
 end
 
 function on.arrowDown()
-  on_any_key()
+  on_any_key('down')
   if GlobalKbd:dispatchKey('down') then
     return
   end
@@ -5449,7 +5539,7 @@ function on.arrowDown()
 end
 
 function on.charIn(c)
-  on_any_key()
+  on_any_key(c)
   if GlobalKbd:dispatchKey(c) then
     return
   end
@@ -5467,7 +5557,7 @@ function on.charIn(c)
 end
 
 function on.enterKey()
-  on_any_key()
+  on_any_key('enter')
   GlobalKbd:resetSequence()
   if current_focus.kbd and current_focus.kbd:dispatchKey('enter') then
     return
@@ -5481,7 +5571,7 @@ function on.enterKey()
 end
 
 function on.backspaceKey()
-  on_any_key()
+  on_any_key('backspace')
   if GlobalKbd:dispatchKey('backspace') then
     return
   end
@@ -5494,7 +5584,7 @@ function on.backspaceKey()
 end
 
 function on.clearKey()
-  on_any_key()
+  on_any_key('clear')
   if GlobalKbd:dispatchKey('clear') then
     return
   end
@@ -5506,8 +5596,12 @@ function on.clearKey()
   end
 end
 
+function on.contextMenuKey()
+  return on.contextMenu()
+end
+
 function on.contextMenu()
-  on_any_key()
+  on_any_key('contexMenu')
   if GlobalKbd:dispatchKey('ctx') then
     return
   end
@@ -5520,16 +5614,7 @@ function on.contextMenu()
 end
 
 function on.help()
-  --[[ -- TEST CODE
-  RPNExpression(stack:top().rpn):split()
-  Macro({'@input:f1(x)', 'f1(x):=@1',
-         'f1(0)', 'derivative(f1(x),x)|x=0', '@simp', '(f1(x)-@2-@1)|x=1', '@simp',
-         'string(@1)&"((x+"&string((@2/@1)/2)&")^2+"&string((@3/@1)-(((@2/@1)/2)^2))&")"', '@label:f1(x)', '@clrbot:1',
-         '{zeros(derivative(f1(x),x),x)}[1,1]', '@simp', '@label:SP x=',
-         'f1(@1)', '@simp', '@label:SP y=',
-         'zeros(f1(x),x)', '@simp', '@label:Zeros'}):execute()
-  ]]--
-  on_any_key()
+  on_any_key('help')
   if GlobalKbd:dispatchKey('help') then
     return
   end
@@ -5558,7 +5643,8 @@ function on.save()
     ['stack'] = StackView.stack,
     ['input'] = InputView.text,
     ['undo'] = {Undo.undo_stack, Undo.redo_stack},
-    ['clip'] = Clipboard.stack
+    ['clip'] = Clipboard.stack,
+    --['macros'] = macros
   }
 end
 
@@ -5568,6 +5654,7 @@ function on.restore(state)
     StackView.stack = state.stack or {}
     options = state.options
     Clipboard.stack = state.clip or {}
+    --macros = state.marcos
     InputView:setText(state.input)
   end
 end
