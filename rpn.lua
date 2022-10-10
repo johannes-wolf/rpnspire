@@ -2742,8 +2742,12 @@ function KeybindManager:dispatchKey(key)
 
   -- Call binding
   if type(self.currentTab) == 'function' then
-    if self.currentTab(self.currentSequence) == 'repeat' then
+    local action = self.currentTab(self.currentSequence)
+    if action == 'repeat' then
       self.currentTab = {[key] = self.currentTab}
+    elseif action == 'none' then
+      self:resetSequence()
+      return false
     else
       self:resetSequence()
     end
@@ -3844,6 +3848,22 @@ function UIInput:init_bindings()
     end)
   end
 
+  self.kbd:setSequence({'enter'}, function()
+    if self.text:ulen() > 0 then return 'none' end
+    StackView:dup()
+  end)
+  self.kbd:setSequence({'left'}, function()
+    if self.text:ulen() > 0 then return 'none' end
+    StackView:roll(-1)
+  end)
+  self.kbd:setSequence({'right'}, function()
+    if self.text:ulen() > 0 then return 'none' end
+    StackView:roll(1)
+  end)
+  self.kbd:setSequence({'down'}, function()
+    StackView:swap()
+  end)
+
   self.kbd:setSequence({'.', '%d'}, function(sequence)
     local n = tonumber(sequence[#sequence])
     self:insertText('.' .. n)
@@ -4124,10 +4144,6 @@ function UIInput:onArrowRight()
   self:invalidate()
 end
 
-function UIInput:onArrowDown()
-  StackView:swap()
-end
-
 function UIInput:onArrowUp()
   focus_view(StackView)
 end
@@ -4270,7 +4286,6 @@ function UIInput:onEnter()
   if self.text:ulen() == 0 then return end
 
   self.inputHandler:onEnter()
-
   self.tempMode = nil
 end
 
