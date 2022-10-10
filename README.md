@@ -160,10 +160,11 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 ### Input
 | Key                          | Function                                                                |
 |------------------------------|-------------------------------------------------------------------------|
-| <kbd>left</kbd>              | Move cursor left                                                        |
-| <kbd>right</kbd>             | Move cursor right                                                       |
+| <kbd>left</kbd>              | Move cursor left; if empty: roll up                                     |
+| <kbd>right</kbd>             | Move cursor right; if empty: roll down                                  |
 | <kbd>up</kbd>                | Focus stack                                                             |
 | <kbd>down</kbd>              | Swap stack 1 & 2                                                        |
+| <kbd>enter</kbd>             | Submit input; if empty: dup 1                                           |
 | <kbd>return</kbd>            | Insert special character/operator                                       |
 | <kbd>tab</kbd>               | Start completion for current input                                      |
 | <kbd>G</kbd><kbd>left</kbd>  | Go to beginning                                                         |
