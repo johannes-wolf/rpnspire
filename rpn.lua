@@ -2391,7 +2391,8 @@ function ExpressionTree:canonicalize()
   -- Apply simplification rules
   simplify_node = function(input, output)
     if input.kind == 'operator' then
-      if input.text == '+' or input.text == '*' then
+      if input.text == '+' or input.text == '*' or
+         input.text == 'or' or input.text == 'and' or input.text == 'xor' or input.text == 'nor' then
         merge_sum_or_product(input, output)
         return
       elseif input.text == '-' then
@@ -2413,6 +2414,18 @@ function ExpressionTree:canonicalize()
   return root
 end
 
+-- Split expression arguments
+function ExpressionTree:split_arguments()
+  local subexpr = {}
+  local source = ExpressionTree(self:canonicalize())
+
+  for _, child in ipairs(source.root.children or {}) do
+    table.insert(subexpr, ExpressionTree(child))
+  end
+
+  return subexpr
+end
+
 -- Match node for a sub-expression
 ---@param subexpr ExpressionTree   Subexpression to match against
 ---@param limit? boolean           Limit to first match
@@ -2422,6 +2435,8 @@ function ExpressionTree:find_subexpr(subexpr, limit, meta)
   local matches = {}
   local metavars = {}
 
+  -- a Haystack
+  -- b Needle
   local function match_subtree_recurse(a, b)
     if b.kind == 'word' then
       if not metavars[b.text] then
@@ -2500,7 +2515,7 @@ end
 ---@param subexpr ExpressionTree  Expression to replace
 ---@param with    ExpressionTree  Expression to replace with
 function ExpressionTree:rewrite_subexpr(subexpr, with)
-  if not subexpr.root then subexrp = ExpressionTree(subexpr) end
+  if not subexpr.root then subexpr = ExpressionTree(subexpr) end
   if not with.root then with = ExpressionTree(with) end
 
   subexpr = ExpressionTree(subexpr:canonicalize())
@@ -3848,6 +3863,17 @@ function UIInput:init_bindings()
     end)
   end
 
+  local function ia_split()
+    local sub = ExpressionTree(StackView:top().rpn):split_arguments()
+    if #sub > 0 then
+      StackView:pop()
+      for _, child in ipairs(sub) do
+        StackView:pushExpression(child)
+      end
+      return #sub
+    end
+  end
+
   self.kbd:setSequence({'enter'}, function()
     if self.text:ulen() > 0 then return 'none' end
     StackView:dup()
@@ -3913,6 +3939,15 @@ function UIInput:init_bindings()
   self.kbd:setSequence({'.', '='}, function()
     StackView:dup()
     StackView:invalidate()
+  end)
+  self.kbd:setSequence({'.', ','}, function()
+    ia_split()
+  end)
+  self.kbd:setSequence({'.', '{'}, function()
+    local n = ia_split()
+    if n then
+      StackView:toList(tonumber(n))
+    end
   end)
 
   self.kbd:setSequence({'ctx'}, function()

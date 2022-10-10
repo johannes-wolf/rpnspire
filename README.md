@@ -189,6 +189,8 @@ The global shortcuts work from everywhere, regardless of the currently focused v
 | <kbd>.</kbd><kbd>r</kbd>     | Rewrite expression                                                      |
 | <kbd>.</kbd><kbd>w</kbd>     | Interactive with (\|)                                                   |
 | <kbd>.</kbd><kbd>W</kbd>     | Insert '\|'                                                             |
+| <kbd>.</kbd><kbd>,</kbd>     | Split top expression                                                    |
+| <kbd>.</kbd><kbd>{</kbd>     | Split top expression and join to list                                   |
 | <kbd>.</kbd><kbd>.</kbd>     | Insert '.'                                                              |
 | <kbd>.</kbd><kbd>(-)</kbd>   | Insert infinity symbol                                                  |
 | <kbd>.</kbd><kbd>[0-9]</kbd> | Insert '.' & 0-9                                                        |
