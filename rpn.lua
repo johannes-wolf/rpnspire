@@ -1487,7 +1487,6 @@ local function interactive_input_ask_value(widget, onEnter, onCancel, onSetup)
   interactive_yield()
 end
 
-
 -- Macro
 ---@class Macro
 ---@field steps string[]
@@ -1519,20 +1518,55 @@ end
 ---@param text string  Label text
 function Macro.Fn.label(text)
   if StackView:size() > 0 then
+    text = text:gsub('{([^}]+)}', function(e)
+      return tostring(Macro.Fn.eval(e) or '?')
+    end)
     StackView:top().label = text
   end
+end
+
+-- Concat arguments as list '{...}'
+---@return string
+function Macro.Fn.list(...)
+  return '{'..table.concat({...}, ',')..'}'
+end
+
+-- Concat arguments as function call 'fn(...)'
+function Macro.Fn.call(fn, ...)
+  return fn..'('..table.concat({...}, ',')..')'
+end
+
+function Macro.Fn.format(expr)
+  local function format(list)
+    if type(list) == 'table' then
+      if getmetatable(list) == getmetatable(ExpressionTree) then
+        return list:infix_string()
+      end
+
+      local r = nil
+      for _, item in ipairs(list) do
+        if r then r = r..',' end
+        r = (r or '')..format(item)
+      end
+      return '{'..r..'}'
+    end
+
+    return tostring(list)
+  end
+
+  return format(expr)
 end
 
 -- Evaluate infix expression on the stack
 ---@param expr string  Expression
 function Macro.Fn.push(expr)
-  StackView:pushInfix(expr)
+  StackView:pushInfix(Macro.Fn.format(expr))
 end
 
 -- Evaluate expression but do _not_ push it to the stack
 ---@param input string  Expression
 function Macro.Fn.eval(input)
-  local res, err = math.evalStr(input)
+  local res, err = math.evalStr(Macro.Fn.format(input))
   if err and err ~= 750 then
     Error.show(err)
     return nil
@@ -1554,10 +1588,10 @@ function Macro.Fn.is_zero(input)
 end
 
 -- Returns if input is > 0 or < 0
----@return number|nil  Returns 1 if positive, -1 if negative and nil if 0
+---@return number|nil  Returns 1 if positive, -1 if negative, otherwise 0
 function Macro.Fn.get_sign(input)
   return Macro.Fn.is_true(input .. '>0') and  1 or
-         Macro.Fn.is_true(input .. '<0') and -1 or nil
+         Macro.Fn.is_true(input .. '<0') and -1 or 0
 end
 
 -- Returns if input is infinity
@@ -1590,6 +1624,7 @@ function Macro.Fn.input(prompt, init, fn)
     if not fn then Undo.undo() end
   end, function(widget)
     widget:setText(init or '', prompt or '?')
+    if init then widget:selAll() end
   end)
 end
 
@@ -1638,9 +1673,7 @@ function Macro:execute()
     Undo.record_undo()
     Macro.state = {}
 
-    print('Macro starting')
     self.fn()
-    print('Macro finished')
 
     Macro.state = {}
     platform.window:invalidate()
