@@ -5376,17 +5376,12 @@ function on.construction()
   end)
 
   -- Mode
-  GlobalKbd:setSequence({'M', 'r'}, function()
-    -- Set mode to RPN
-    options.mode = 'RPN'
-  end)
-  GlobalKbd:setSequence({'M', 'a'}, function()
-    -- Set mode to ALG
-    options.mode = 'ALG'
-  end)
-  GlobalKbd:setSequence({'M', 'm'}, function()
-    -- Toggle mode
-    options.mode = options.mode == 'RPN' and 'ALG' or 'RPN'
+  GlobalKbd:setSequence({'M'}, function()
+    local m = UI.Menu()
+    m:add("&rRPN", function() options.mode = 'RPN' end)
+    m:add("&aALG", function() options.mode = 'ALG' end)
+    m:add("&mToggle", function() options.mode = options.mode == 'ALG' and 'RPN' or 'ALG' end)
+    InputView:open_menu(m)
   end)
 
   -- Settings
