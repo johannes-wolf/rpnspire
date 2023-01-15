@@ -1605,6 +1605,15 @@ function Macro.Fn.input(prompt, init, fn)
   end)
 end
 
+-- Prompt for true/false answer
+---@param prompt string   User prompt text
+---@param init   boolean  default value
+function Macro.Fn.ask(prompt, init)
+   local r = init or false
+   Macro.Fn.input(prompt, init and 'true' or 'false', function(v) r = Macro.Fn.is_true(v) or false end)
+   return r
+end
+
 -- Get result expression-tree
 ---@return ExpressionTree
 function Macro.Fn.result(input)
@@ -1621,7 +1630,7 @@ function Macro.Fn.each_result(input, fn)
     r = ExpressionTree.from_infix(Infix.tokenize(Macro.Fn.eval(input)))
   end
   if r then
-    if r.root.text == '{' or r.root.text == 'or' then
+    if r.root.text == '{' or r.root.text == 'or' or r.root.text == 'and' then
       for _, arg in ipairs(r:split_arguments()) do
         fn(arg)
       end
@@ -5551,10 +5560,6 @@ function on.charIn(c)
   if current_focus.kbd and current_focus.kbd:dispatchKey(c) then
     return
   end
-
-  --for i=1,#c do
-  --  print(c:byte(i))
-  --end
 
   if current_focus.onCharIn then
     current_focus:onCharIn(c)
