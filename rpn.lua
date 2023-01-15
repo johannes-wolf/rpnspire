@@ -1,5 +1,5 @@
 --[[
-Copyright (c) 2022 Johannes Wolf <mail@johannes-wolf.com>
+Copyright (c) 2023 Johannes Wolf <mail@johannes-wolf.com>
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License version 3 as published by
@@ -373,51 +373,6 @@ function UI.RowLayout:draw(gc, x, y, w, h)
   end
 end
 
--- Bar for text
----@class UI.OmniBar : UI.Widget
-UI.OmniBar = class(UI.Widget)
-function UI.OmniBar:init()
-  UI.Widget.init(self)
-  self.text_left = nil
-  self.text_right = nil
-end
-
-function UI.OmniBar:draw(gc)
-  local x, y, w, h = self:frame()
-
-  local old_f, old_s, old_size = gc:setFont('sansserif', 'r', 6)
-  gc:clipRect('set', x, y, w, h)
-  gc:setColorRGB(theme_val('omni_bg'))
-  gc:fillRect(x, y, w, h)
-
-  gc:setColorRGB(theme_val('omni_fg'))
-  if self.text_right then
-    w = draw_string_aligned(gc, self.text_right, x, y, w, h, 1, 0) - x - 2
-  end
-
-  if self.text_left then
-    gc:clipRect('set', x, y, w, h)
-    draw_string_aligned(gc, self.text_left, x, y, w, h, -1, 0)
-  end
-  gc:setFont(old_f, old_s, old_size)
-end
-
-function UI.OmniBar:visible()
-  return self.text_left or self.text_right
-end
-
-function UI.OmniBar:set_text(left, right)
-  self.text_left = left
-  self.text_right = right
-end
-
-function UI.OmniBar.height()
-  return platform.withGC(function(gc)
-    gc:setFont('sansserif', 'r', 6)
-    return gc:getStringHeight('A')
-  end)
-end
-
 ---@class UI.Menu : UI.Widget
 ---@field items table  List of items
 ---@field sel number   Selected item
@@ -509,7 +464,7 @@ function UI.Menu:is_filtered()
 end
 
 -- Add menu item
----@param title string   Title
+---@param title string   Title (format '...' or '&m...' where m is a mnemonic)
 ---@param action? any    Value; set nil for opening a submenu
 ---@return UI.Menu menu  Returs self or sub-menu
 function UI.Menu:add(title, action)
@@ -517,12 +472,16 @@ function UI.Menu:add(title, action)
     return self.parent
   end
 
+  local mnemonic = title:sub(1, 1) == '&' and title:sub(2, 2)
+  if mnemonic then
+     title = title:sub(3)
+  end
   if not action then
     local sub = UI.Menu(self)
-    table.insert(self.items, {title=title, submenu=sub})
+    table.insert(self.items, {title=title, mnemonic = mnemonic, submenu=sub})
     return sub
   else
-    table.insert(self.items, {title=title, action=action})
+    table.insert(self.items, {title=title, mnemonic = mnemonic, action=action})
     return self
   end
 end
@@ -630,7 +589,14 @@ end
 function UI.Menu:onCharIn(c)
   if c:find('^%d+$') then
     self:select_item(tonumber(c), true)
-  else
+  elseif c then
+    for idx, i in ipairs(self.items) do
+       if i.mnemonic == c then
+	  self:select_item(idx, true)
+	  return
+       end
+    end
+
     self.isearch:onCharIn(c)
   end
 end
@@ -706,6 +672,9 @@ function UI.Menu:calc_size(width_only)
 
     for _, item in ipairs(self.items) do
       local item_width = gc:getStringWidth(item['title'])
+      if item['mnemonic'] then
+	 item_width = item_width + gc:getStringWidth('__') + 1
+      end
       if item['submenu'] then
         item_width = item_width + UI.Menu.submenu_indicator_width
       end
@@ -735,9 +704,17 @@ end
 ---@return number height
 function UI.Menu:draw_item(gc, item, sel, x, y)
   local title = item['title']
+  local mnemonic = item['mnemonic']
+
+  local textx = x
+  if mnemonic then
+     gc:setColorRGB(theme_val('fringe_fg'))
+     gc:drawString(mnemonic, textx, y)
+     textx = textx + gc:getStringWidth('__') + 1
+  end
 
   gc:setColorRGB(theme_val(self:is_filtered() and 'filter_fg' or 'fg'))
-  gc:drawString(title, x, y)
+  gc:drawString(title, textx, y)
 
   if item['submenu'] then
     local _, _, w = self:frame()
