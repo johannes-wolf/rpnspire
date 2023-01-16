@@ -55,8 +55,12 @@ local units = {
     {'_week', 'week'},
     {'_yr',   'year'}
   },
+  ['accelleration'] = {
+    {'_m/_s^2', 'meter per second squared'},
+  },
   ['Velocity'] = {
-
+    {'_kph',  'kilometre per hour'},
+    {'_m/_s', 'meter per second'},
   },
   ['Temperature'] = {
 
@@ -68,6 +72,10 @@ local units = {
     -- TODO
   },
   ['Mass'] = {
+    {'_mg',    'milligram'},
+    {'_gm',    'gram'},
+    {'_kg',    'killogram'},
+    {'_tonne', 'thousand killogram'},
     -- TODO
   },
   ['Force'] = {
