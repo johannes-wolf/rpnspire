@@ -1804,8 +1804,8 @@ local function solve_formula_interactive(category)
     end
 
     while true do
-      local set_var = interactive_ask_variable('Set [empty if done]:')
-      if not set_var then
+      local set_var = interactive_ask_variable('Set [0 to solve]:')
+      if not set_var or set_var == '0' then
         break
       end
 
@@ -1814,13 +1814,16 @@ local function solve_formula_interactive(category)
         table.insert(solve_with, {set_var, value})
       end, nil, function(widget)
         -- Auto append the matching base unit for convenience
-        local template = var_info.default or ''
-        if var_info.unit then
-          template = template .. '*_' .. var_info.unit
-        end
+        local template = select(1, math.evalStr(set_var))
+	if not template then
+          template = var_info.default or ''
+          if var_info.unit then
+            template = template .. '*_' .. var_info.unit
+          end
+	end
+
         widget:setText(template, var_info[1] .. '=')
         widget:setCursor(0)
-        --widget:selAll()
       end)
 
       -- Mark as set
@@ -1830,11 +1833,12 @@ local function solve_formula_interactive(category)
     local solve_queue = build_formula_solve_queue(category, solve_for, solve_with)
     if solve_queue then
       local infix_steps = {}
-      for _,v in ipairs(solve_queue) do
+      for _, v in ipairs(solve_queue) do
         local var, formula = table.unpack(v)
         table.insert(infix_steps, {
           var = var,
-          infix = tostring(formula:solve_symbolic(var):gsub('=', ':='))
+          infix = tostring(formula:solve_symbolic(var):gsub('=', ':=')),
+	  formula = formula,
         })
       end
 
@@ -1849,17 +1853,18 @@ local function solve_formula_interactive(category)
         if step.var then
           math.evalStr('DelVar '..step.var)
         end
-        if not StackView:pushInfix(step.infix) then
-          Undo.undo()
-          break
-        end
 
-        local var_info = category.variables[step.var]
-        if var_info then
-          -- Label expression with variable info and asterisk, if it is a solved expression
-          StackView:top().label = var_info[1] .. ' (' .. step.var .. ')' ..
-            (user_provided[step.var] and '' or '*')
-        end
+	if not StackView:pushInfix(step.infix) then
+	  Undo.undo()
+	  break
+	end
+
+	local var_info = category.variables[step.var]
+	if var_info then
+	  -- Label expression with variable info and asterisk, if it is a solved expression
+	  StackView:top().label = var_info[1] .. ' (' .. step.var .. ')' ..
+	    (user_provided[step.var] and '' or '*')
+	end
       end
     else
       Error.show('Can not solve')
