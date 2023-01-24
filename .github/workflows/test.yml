@@ -10,4 +10,23 @@ jobs:
     - uses: leafo/gh-actions-lua@v9
     - name: test
       run: |
-        make
+        make test
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@master
+    - uses: leafo/gh-actions-lua@v9
+    - uses: actions/setup-node@v3
+
+    - name: build tns
+      run: |
+        npm install -g luabundler
+        npm install -g luabundle
+        make tns
+    - name: Archive code coverage results
+      uses: actions/upload-artifact@v3
+      with:
+        name: rpn.tns
+        path: rpn.tns
