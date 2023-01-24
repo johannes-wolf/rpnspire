@@ -2443,7 +2443,7 @@ function ExpressionTree.from_infix(tokens)
   parser:add_infix_op({'=>', Sym.LIMP}, 8)
   parser:add_infix_op({'<=>', Sym.DLIMP}, 7)
   parser:add_infix_op({'|'}, 6)
-  parser:add_infix_op({':=', ':=', Sym.STORE}, 5)
+  parser:add_infix_op({':=', '=:', Sym.STORE}, 5)
   parser:add_infix_op({'@>', Sym.CONVERT}, 1)
 
   local t = ExpressionTree(parser:parse())
