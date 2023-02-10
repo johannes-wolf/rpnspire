@@ -113,9 +113,9 @@ end
 ---@return string
 function string.unquote(str, q)
   q = q or '"'
-  if str:sub(1, 1) == q and
-     str:sub(-1)   == q then
-    return str:sub(2, -2)
+  if str:usub(1, 1) == q and
+     str:usub(-1)   == q then
+    return str:usub(2, -1)
   end
   return str
 end
@@ -3338,16 +3338,18 @@ function UIStack:initBindings()
 end
 
 function UIStack:evalStr(str)
-  local res, err = math.evalStr(str)
-  -- Ignore unknown-function errors (for allowing to define functions in RPN mode)
-  if err and err == 750 then
-    return str, nil
-  end
-  if err and err ~= 750 then
-    Error.show(err)
-    return nil
-  end
-  return res, err
+   local res, err
+   res, err = math.evalStr(string.unquote('string('..str..')')
+
+   -- Ignore unknown-function errors (for allowing to define functions in RPN mode)
+   if err and err == 750 then
+      return str, nil
+   end
+   if err and err ~= 750 then
+      Error.show(err)
+      return nil
+   end
+   return res, err
 end
 
 function UIStack:size()
