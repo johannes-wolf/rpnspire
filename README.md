@@ -13,7 +13,7 @@ Releases <= alpha-20 are of an old version of rpn-spire.
 
 ## Build
 
-Building rpnspire depends on `luabudler` (install from `npm`).
+Building rpnspire depends on `luabundler` (install from `npm`) and `luna`.
 
     make tns
 
@@ -21,7 +21,7 @@ Building rpnspire depends on `luabudler` (install from `npm`).
 
 The input field of rpnspire supports autocompletion for functions, variables and units. To trigger completion,
 press <kbd>tab</kbd>. Completion uses characters left to the cursor as compeltions prefix. Typing `so<tab>` will
-present you the first entry of a list of completion candidates starting with `so`. Pressing <kbd>tab</kbd> multiple times loops through all candidates. To accept a completion press a cursor key (<kbd>left</kbd> or <kbd>right</kbd>) or hit <kbd>enter</kbd> to directly evaluate. Completions are sorted by use (see [config/stats.lua]).
+present you the first entry of a list of completion candidates starting with `so`. Pressing <kbd>tab</kbd> multiple times loops through all candidates. To accept a completion press a cursor key (<kbd>left</kbd> or <kbd>right</kbd>) or hit <kbd>enter</kbd> to directly evaluate. Completions are sorted by use (see [config/stats.lua](config/stats.lua)).
 
 <p align="center">
 <img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-completion.gif" width="300px"></img>
@@ -41,11 +41,11 @@ To set the argument for variable argument functions, use parentheses.
 
 ## Settings
 
-See [config/config.lua].
+See [config/config.lua](config/config.lua).
 
 ## Bindings
 
-See [config/bindings.lua].
+See [config/bindings.lua](config/bindings.lua).
 
 rpnspire uses key-sequences for its bindings. <kbd>.</kbd><kbd>e</kbd> means: Press `.` and then press `e`.
 The current sequence of keys pressed (that are part of a binding) is displayed by a dialog at the
