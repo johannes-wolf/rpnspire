@@ -1,3 +1,5 @@
+platform.apiLevel = '2.4'
+
 local ui = require 'ui'
 require 'views.menu'
 require 'views.edit'
@@ -28,8 +30,6 @@ local function build_main_view()
 end
 
 function on.construction()
-   platform.apiLevel = '2.4'
-
    toolpalette.enableCopy(true)
    toolpalette.enableCut(true)
    toolpalette.enablePaste(true)
