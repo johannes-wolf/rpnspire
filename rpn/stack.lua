@@ -366,7 +366,7 @@ function rpn_stack:push_function(str, argc, builtin_only)
 
    self:assert_size(argc or fn_argc, fn_name)
    local args = self:pop_n(argc or fn_argc)
-   local e = expr.node(str, fn_is_stat and 'stat_function' or 'function', args)
+   local e = expr.node(str, fn_is_stat and expr.FUNCTION_STAT or expr.FUNCTION, args)
    return self:push_expr(e)
    --if fn_is_stat then
    --   self:push_expr(expr.node('stat.results', 'word', {}))
