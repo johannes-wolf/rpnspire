@@ -1,7 +1,7 @@
+platform.apiLevel = '2.4'
 -- luacheck: ignore class
 -- luacheck: ignore platform
 -- luacheck: ignore on
-platform.apiLevel = '2.4'
 
 local ui = require 'ui'
 require 'views.menu'
