@@ -4,9 +4,9 @@ local trie = {}
 ---@param tab table  Input table
 ---@return table     Prefix tree
 function trie.build(tab)
-  local trie = {}
+  local t = {}
   for key, _ in pairs(tab) do
-    local root = trie
+    local root = t
     for i=1,#key do
       local k = string.sub(key, i, i)
       root[k] = root[k] or {}
@@ -14,7 +14,7 @@ function trie.build(tab)
     end
     root['@LEAF@'] = true
   end
-  return trie
+  return t
 end
 
 -- Search for string in prefix table

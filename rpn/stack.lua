@@ -40,11 +40,10 @@ function rpn_stack_node:clone()
 end
 
 -- Reevaluate nodes expr and update infix and result
----@param stack rpn_stack Owning stack
-function rpn_stack_node:eval(stack)
-   local expr = self.rpn
-   local infix = expr:infix_string()
-   local res, _ = stack:eval_str(infix)
+---@param s rpn_stack Owning stack
+function rpn_stack_node:eval(s)
+   local infix = self.rpn:infix_string()
+   local res, _ = s:eval_str(infix)
    if res then
       self.infix = infix
       self.result = res
@@ -62,6 +61,16 @@ rpn_stack.__index = rpn_stack
 ---@return rpn_stack
 function stack.new()
    return setmetatable({ stack = {} }, rpn_stack)
+end
+
+-- Deep clone self
+---@return rpn_stack
+function rpn_stack:clone()
+   local nodes = {}
+   for _, v in ipairs(self.stack) do
+      table.insert(nodes, v:clone())
+   end
+   return setmetatable({stack = nodes, on_change = self.on_change}, rpn_stack)
 end
 
 -- Evaluate (infix) string

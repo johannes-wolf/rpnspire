@@ -262,15 +262,18 @@ function ui.edit:on_tab()
 end
 
 function ui.edit:on_cut()
+   -- luacheck: ignore clipboard
    clipboard.addText(self.text)
    self:set_text('')
 end
 
 function ui.edit:on_copy()
+   -- luacheck: ignore clipboard
    clipboard.addText(self.text)
 end
 
 function ui.edit:on_paste()
+   -- luacheck: ignore clipboard
    self:insert_text(clipboard.getText(), true)
 end
 

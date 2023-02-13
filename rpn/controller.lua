@@ -335,7 +335,7 @@ end
 ---@return table
 function meta:undo_make_state(text)
    return {
-      stack = table_clone(self.stack.stack),
+      stack = self.stack:clone(),
       input = text or self.edit.text,
    }
 end
@@ -358,7 +358,7 @@ end
 -- Apply undo state
 ---@param state table
 function meta:undo_apply_state(state)
-   self.stack.stack = state.stack
+   self.stack = state.stack
    self.stack:on_change()
    if state.input ~= nil then
       self.edit:set_text(state.input)

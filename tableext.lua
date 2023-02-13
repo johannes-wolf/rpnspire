@@ -30,41 +30,6 @@ function table.dump(self)
    end
 end
 
--- Deep copy table
----@param t table  Input table
----@return table
-function table_clone(t)
-   if type(t) ~= 'table' then return t end
-   local meta = getmetatable(t)
-   local target = {}
-   for k, v in pairs(t) do
-      if type(v) == 'table' then
-         target[k] = table_clone(v)
-      else
-         target[k] = v
-      end
-   end
-   setmetatable(target, meta)
-   return target
-end
-
--- Copy certain table fields
----@param source table   Source table
----@param fields table   List of field names to copy
----@param target? table  Target table
----@return table
-function table_copy_fields(source, fields, target)
-   target = target or {}
-   for _, v in ipairs(fields) do
-      if type(source[v]) == 'table' then
-         target[v] = table_clone(source[v])
-      else
-         target[v] = source[v]
-      end
-   end
-   return target
-end
-
 if not table.unpack then
    table.unpack = unpack
 end

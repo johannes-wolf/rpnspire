@@ -214,7 +214,7 @@ function m.from_infix(tokens)
          offset = self.idx + (offset or 0)
          if offset <= #tokens then
             local text, kind = table.unpack(tokens[offset])
-            if kind == k_op or kind == k_lst or kind == k_mat or kind == k_sub then
+            if kind == 'operator' or kind == 'syntax' then
                return { kind = text, text = text }
             end
             return { kind = kind, text = text }
@@ -273,7 +273,7 @@ function m.from_infix(tokens)
 
          local p = self.prefix[t.kind]
          if not p then
-            error({ desc = 'No prefix parser for ' .. t.kind })
+            error({ desc = 'No prefix parser for '..t.kind..': '..t.text })
          end
          self:consume()
          local left = p:parse(self, t)
@@ -327,15 +327,15 @@ function m.from_infix(tokens)
 
       add_prefix = function(self, kind, parselet)
          if type(kind) ~= 'table' then kind = { kind } end
-         for _, kind in ipairs(kind) do
-            self.prefix[kind] = parselet
+         for _, v in ipairs(kind) do
+            self.prefix[v] = parselet
          end
       end,
 
       add_infix = function(self, kind, parselet)
          if type(kind) ~= 'table' then kind = { kind } end
-         for _, kind in ipairs(kind) do
-            self.infix[kind] = parselet
+         for _, v in ipairs(kind) do
+            self.infix[v] = parselet
          end
       end,
 
@@ -352,7 +352,7 @@ function m.from_infix(tokens)
             precedence = prec,
             assoc = assoc or 'left',
             parse = function(self, p, left, t)
-               return p.make_node(k_op, t.text, { left, p:parse_precedence(self.precedence) })
+               return m.op(t.text, { left, p:parse_precedence(self.precedence) })
             end
          })
       end,
@@ -441,7 +441,7 @@ function m.from_infix(tokens)
       precedence = 13,
       parse = function(self, p, left, t)
          local right = p:parse_infix(p.prefix[t.kind]:parse(p, t), self.precedence)
-         return p.make_node(k_op, '*', { left, right })
+         return m.op('*', { left, right })
       end
    })
 
@@ -451,11 +451,11 @@ function m.from_infix(tokens)
       parse = function(self, p, left, t)
          -- Implicit matrix multiplication
          if p:current() and p:current().kind == '[' then
-            return p.make_node(k_op, '*', { left, parser.prefix['[']:parse(p, t) })
+            return m.op('*', { left, parser.prefix['[']:parse(p, t) })
          end
 
          local indices = p:parse_list({ kind = ']' }, { kind = ',' })
-         return p.make_node(k_sub, '_[', { left, table.unpack(indices) })
+         return m.node('_[', k_sub, { left, table.unpack(indices) })
       end
    })
 
@@ -463,9 +463,9 @@ function m.from_infix(tokens)
    parser:add_prefix_op({ '#' }, 18)
    parser:add_suffix_op({ '!', '%', '@t', sym.RAD, sym.GRAD, sym.DEGREE, sym.TRANSP }, 17)
    parser:add_infix_op({ '^' }, 16, 'right')
-   parser:add_prefix({ '-', '(-)', sym.NEGATE }, {
+   parser:add_prefix({ '-', sym.NEGATE }, {
       parse = function(self, p, t)
-         return p.make_node(k_op, sym.NEGATE, { p:parse_precedence(15) })
+         return m.op(sym.NEGATE, { p:parse_precedence(15) })
       end
    })
    parser:add_infix_op({ '&' }, 14)
@@ -483,7 +483,7 @@ function m.from_infix(tokens)
 
    local t = parser:parse()
    if not parser:eof() then
-      error({ desc = 'Error parsing expression at ' .. parser:current().kind })
+      error({ desc = 'Error parsing expression at ' .. parser:current().kind..': '..parser:current().text })
    end
    return t
 end
@@ -500,7 +500,7 @@ function t:find_subexpr(subexpr, limit, meta)
    -- a Haystack
    -- b Needle
    local function match_subtree_recurse(a, b)
-      if b.kind == 'word' then
+      if b.kind == k_sym then
          if not metavars[b.text] then
             metavars[b.text] = a
             return true
@@ -561,10 +561,10 @@ end
 ---@param vars  table  Mapping from identifier to node
 function t:substitute_vars(vars)
    self:map_all(function(node)
-      if node.kind == 'word' then
+      if node.kind == k_sym then
          local repl = vars[node.text]
          if repl then
-            return table_clone(repl)
+            return repl:clone()
          end
       end
       return nil
@@ -623,7 +623,12 @@ function t:apply_operator(op, arguments)
          return node:apply_operator(op, arguments)
       end)
    else
-      local operator = m.op(op, table_clone(arguments))
+      local args = {}
+      for i, v in ipairs(arguments) do
+         args[i] = v:clone()
+      end
+
+      local operator = m.op(op, args)
       table.insert(operator.children, 1, self)
       self = operator
    end
@@ -676,21 +681,6 @@ function t:map_all(fn)
       map_recursive(self)
    end
    return self
-end
-
--- Replace symbols
----@param tab table<string, expr> Symbol name to expression map
----@param expr Self
-function t:replace_symbol(tab)
-   return self:map_all(function(node)
-      if node.kind == k_sym then
-         for k, v in pairs(tab) do
-            if node.text == k then
-               return v:clone()
-            end
-         end
-      end
-   end)
 end
 
 -- Collect operands of nested (same) operations

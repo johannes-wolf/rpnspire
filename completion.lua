@@ -25,7 +25,7 @@ function t.complete_unit(prefix, tab)
 end
 
 function t.complete_variable(prefix, tab)
-   for _, v in ipairs(var.list()) do
+   for _, v in ipairs(_G.var.list()) do
       match_and_add(v, prefix, tab)
    end
 end
@@ -36,7 +36,7 @@ function t.complete_function(prefix, tab)
    end
 end
 
-function t.complete_number(prefix, tab)
+function t.complete_number(_, _)
 end
 
 function t.complete_word(prefix, tab)

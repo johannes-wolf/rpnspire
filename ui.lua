@@ -1,3 +1,4 @@
+-- luacheck: ignore platform
 local ui = require 'ui.shared'
 require 'ui.geometry'
 require 'ui.gc'
@@ -72,7 +73,7 @@ function ui.on_event(name, ...)
 	    handled = v.kbd['on_'..name](v.kbd, ...)
 	 end
 	 if not handled and v['on_'..name] then
-	    handled = not (v['on_'..name](v, ...) == false)
+	    handled = v['on_'..name](v, ...) ~= false
 	 end
 	 --if not handled and v.parent and v.parent ~= v then
 	    --return dispatch_event(v.parent, ...)

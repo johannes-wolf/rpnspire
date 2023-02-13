@@ -51,7 +51,8 @@ function Test.run(tests)
         print("[OK    ]")
       else
         failed = failed + 1
-        print("[FAILED] "..(Test.failed or (err or "")))
+	if type(err) == 'table' and err.desc then err = err.desc end
+        print("[FAILED] "..(Test.failed or (tostring(err) or "")))
         if Test.scope_info then
           if type(Test.scope_info) == 'string' then
             print("[  info] " .. Test.scope_info)

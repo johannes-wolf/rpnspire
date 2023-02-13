@@ -1,3 +1,6 @@
+-- luacheck: ignore class
+-- luacheck: ignore platform
+-- luacheck: ignore on
 platform.apiLevel = '2.4'
 
 local ui = require 'ui'
@@ -30,6 +33,7 @@ local function build_main_view()
 end
 
 function on.construction()
+   -- luacheck: ignore toolpalette
    toolpalette.enableCopy(true)
    toolpalette.enableCut(true)
    toolpalette.enablePaste(true)
@@ -127,7 +131,7 @@ function on.paste()
    ui.on_event('paste')
 end
 
-function on.paint(gc, x, y, w, h)
+function on.paint(gc)
    ui.paint(ui.GC(gc, 0, 0))
 end
 
