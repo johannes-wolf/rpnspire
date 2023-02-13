@@ -406,20 +406,48 @@ function rpn_stack:smart_append()
 end
 
 -- Explode arguments ((a and b) and c) -> (a and b), c
-function rpn_stack:explode()
-   self:assert_size(1, 'EXPLODE')
+---@param top? expr Expression. If unset top-result is taken
+function rpn_stack:explode_result(top)
+   if not top then
+      self:assert_size(1, 'EXPLODE')
+      top = parse_inifix(self:pop().result)
+   end
 
-   local top = self:pop_n(1)[1]
    for _, v in ipairs(top.children or {}) do
       self:push_expr(v)
    end
 end
 
+-- Explode recursive up to token
+---@param text string Last token to explode
+---@param top? expr Expression. If unset top-result will be taken
+function rpn_stack:explode_result_to(text, top)
+   if not top then
+      self:assert_size(1, 'EXPLODET')
+      top = parse_inifix(self:pop().result)
+   end
+
+   local function explode_rec(node)
+      if node.text == text then
+         for _, v in ipairs(node.children or {}) do
+            self:push_expr(v)
+         end
+      elseif node.children and #node.children > 0 then
+         for _, v in ipairs(node.children or {}) do
+            explode_rec(v)
+         end
+      else
+         self:push_expr(node)
+      end
+   end
+   explode_rec(top)
+end
+
 -- Explode recursive ((a and b) and c) -> a, b, c
-function rpn_stack:explode_recursive()
+function rpn_stack:explode_result_recursive()
    self:assert_size(1, 'SEXPLODE')
 
-   local top = self:pop_n(1)[1]
+   local top = parse_inifix(self:pop().result)
    local answers = top:collect_operands_recursive()
    for _, v in ipairs(answers) do
       self:push_expr(v)

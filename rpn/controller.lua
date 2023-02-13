@@ -132,8 +132,7 @@ function meta:poison_edit()
 
    self.edit.kbd:set_seq({ '.', '/' }, function()
       self:record_undo()
-      self.stack:explode()
-      --self.stack:explode_recursive()
+      self:explode_interactive()
    end)
 
    if bindings.main then
@@ -502,6 +501,29 @@ function meta:solve_interactive()
          self:record_undo()
          self.stack:push_infix(text)
          self:dispatch_function('solve', true, false)
+      end
+   end
+end
+
+function meta:explode_interactive()
+   if not self.stack:top() then return end
+
+   local text = self.stack:top().infix
+   local dlg = dlg_input.display(string.format("Explode %s to ...", text or '?'))
+
+   local guess_list = {'=', 'and', 'or'}
+   for _, v in ipairs(guess_list) do
+      if text:find(v) then
+	 dlg.edit:set_text(v, true)
+	 break
+      end
+   end
+
+   dlg.on_done = function(text)
+      if text:len() > 0 then
+	 self.stack:explode_result_to(text)
+      else
+	 self.stack:explode_result()
       end
    end
 end
