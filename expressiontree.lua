@@ -4,10 +4,36 @@ local config = require 'config.config'
 
 local m = {}
 
+---@enum expr_kind
+---  | 'n' # Number
+---  | 'x' # Symbol
+---  | 'u' # Unit
+---  | 'o' # Operator
+---  | 'f' # Function
+---  | 's' # String
+---  | 'l' # List
+---  | 'm' # Matrix/Vector
+---  | '#' # Subscript
+m.NUMBER = 'n'
+m.SYMBOL = 'x'
+m.UNIT = 'u'
+m.OPERATOR = 'o'
+m.FUNCTION = 'f'
+m.FUNCTION_STAT = 't'
+m.STRING = 's'
+m.LIST = '{'
+m.MATRIX = '['
+m.SUB = '#'
+
+-- For faster access w/o lookup store kinds in locals
+local k_num, k_sym, k_unit, k_op, k_fn, k_fns, k_str, k_lst, k_mat, k_sub =
+   m.NUMBER, m.SYMBOL, m.UNIT, m.OPERATOR, m.FUNCTION, m.FUNCTION_STAT, m.STRING, m.LIST, m.MATRIX, m.SUB
+
+
 ---@class expr
----@field kind string
+---@field kind expr_kind
 ---@field text string
----@field children node[]
+---@field children expr[]
 local t = {}
 t.__index = t
 
@@ -15,11 +41,20 @@ function m.node(text, kind, children)
    return setmetatable({ text = text, kind = kind, children = children or {} }, t)
 end
 
-function m.operator(text, children)
-   return m.node(text, 'operator', children)
+function m.op(text, children)
+   return m.node(text, k_op, children)
 end
 
-function t:__string()
+-- Test node for equality
+---@param kind? expr_kind
+---@param text? string
+---@return boolean
+function t:isa(kind, text)
+   return ((kind and (kind == self.kind)) or not kind) and
+          ((text and (text == self.text)) or not text)
+end
+
+function t:print()
    local function to_string_recurse(node, level)
       level = level or 0
       local indent = string.rep('  ', level)
@@ -32,7 +67,17 @@ function t:__string()
       end
    end
 
-   to_string_recurse(self)
+   return to_string_recurse(self)
+end
+
+-- Return a deep copy of self
+---@return expr
+function t:clone()
+   local children = {}
+   for i, v in ipairs(self.children or {}) do
+      children[i] = v:clone()
+   end
+   return m.node(self.text, self.kind, children)
 end
 
 ---@return string
@@ -51,7 +96,7 @@ end
 ---@return string Infix string representation
 function t:infix_string()
    local function node_to_infix(node)
-      if node.kind == 'operator' then
+      if node.kind == k_op then
          local name, prec, _, side, assoc, aggr_assoc = operators.query_info(node.text)
          assoc = assoc == 'r' and 2 or (assoc == 'l' and 1 or 0)
 
@@ -59,17 +104,10 @@ function t:infix_string()
          for idx, operand in ipairs(node.children) do
             if str and side == 0 then str = str .. name end
             str = str or ''
-            if operand.kind == 'operator' then
+            if operand.kind == k_op then
                local _, operand_prec = operators.query_info(operand.text)
                if (operand_prec < prec) or
                    ((aggr_assoc or idx ~= assoc) and operand_prec < prec + (assoc ~= 0 and 1 or 0)) then
-                  --[[
-            print('DEBUG')
-            print('child prec: '..operand_prec)
-            print('my    prec: '..prec)
-            print('my   assoc: '..assoc)
-            print('my     idx: '..idx)
-            ]]
                   str = str .. '(' .. node_to_infix(operand) .. ')'
                else
                   str = str .. node_to_infix(operand)
@@ -79,48 +117,44 @@ function t:infix_string()
             end
          end
 
-         print(str)
-         print(side)
          if side < 0 then str = name .. str end
          if side > 0 then str = str .. name end
          return str
-      elseif node.kind == 'function' then
+      elseif node.kind == k_fn then
          return node.text .. '(' ..
              table.join_str(node.children, ',', node_to_infix) ..
              ')'
-      elseif node.kind == 'stat_function' then
+      elseif node.kind == k_fns then
          return node.text .. ' ' ..
              table.join_str(node.children, ',', node_to_infix)
-      elseif node.kind == 'syntax' then
-         if node.text == '{' then
-            return node.text ..
-                table.join_str(node.children, ',', node_to_infix) ..
-                '}'
-         elseif node.text == '[' then
-            local is_matrix = false
-            if node.children and #node.children >= 1 and node.children[1].text == '[' then
-               is_matrix = true
-            end
+      elseif node.kind == k_lst then
+	 return node.text ..
+	    table.join_str(node.children, ',', node_to_infix) ..
+	    '}'
+      elseif node.kind == k_mat then
+	 local is_matrix = false
+	 if node.children and #node.children >= 1 and node.children[1].text == '[' then
+	    is_matrix = true
+	 end
 
-            return node.text ..
-                table.join_str(node.children, is_matrix and '' or ',', node_to_infix) ..
-                ']'
-         elseif node.text == '_[' then
-            assert(node.children and #node.children >= 2)
+	 return node.text ..
+	     table.join_str(node.children, is_matrix and '' or ',', node_to_infix) ..
+	     ']'
+      elseif node.kind == k_sub then
+	 assert(node.children and #node.children >= 2)
 
-            return node_to_infix(node.children[1]) ..
-                '[' .. table.join_str({ table.unpack(node.children, 2) }, ',', node_to_infix) .. ']'
-         end
-      elseif node.kind == 'number' then
+	 return node_to_infix(node.children[1]) ..
+	     '[' .. table.join_str({ table.unpack(node.children, 2) }, ',', node_to_infix) .. ']'
+      elseif node.kind == k_num then
          local text = node.text
-         if node.kind == 'number' and node.text:sub(1, 1) == '-' then
+         if node.text:sub(1, 1) == '-' then
             text = sym.NEGATE .. node.text:sub(2)
          end
 
          -- This is a hack to get numbers formatted as specified by the
          -- documents settings: Convert them to a string and remove the
          -- resulting quotes.
-         if node.kind == 'number' and config.use_document_settings then
+         if config.use_document_settings then
             local function unquote_result(str)
                if str and str:sub(1, 1) == '"' and str:usub(-1) == '"' then
                   return str:usub(2, -2)
@@ -143,7 +177,6 @@ function t:infix_string()
 
    if not ok then
       error(res)
-      return nil
    end
 
    return res
@@ -151,7 +184,7 @@ end
 
 -- Helper function returning true if `node` is a relational operator
 local function node_is_rel_operator(node)
-   if node.kind == 'operator' then
+   if node.kind == k_op then
       return node.text == '=' or node.text == '<' or node.text == '>' or
           node.text == '/=' or node.text == sym.NEQ or node.text == sym.LEQ or
           node.text == sym.GEQ
@@ -181,7 +214,7 @@ function m.from_infix(tokens)
          offset = self.idx + (offset or 0)
          if offset <= #tokens then
             local text, kind = table.unpack(tokens[offset])
-            if kind == 'operator' or kind == 'syntax' then
+            if kind == k_op or kind == k_lst or kind == k_mat or kind == k_sub then
                return { kind = text, text = text }
             end
             return { kind = kind, text = text }
@@ -309,7 +342,7 @@ function m.from_infix(tokens)
       add_prefix_op = function(self, kind, prec)
          self:add_prefix(kind, {
             parse = function(self, p, t)
-               return p.make_node('operator', t.text, { p:parse_precedence(prec) })
+               return p.make_node(k_op, t.text, { p:parse_precedence(prec) })
             end
          })
       end,
@@ -319,7 +352,7 @@ function m.from_infix(tokens)
             precedence = prec,
             assoc = assoc or 'left',
             parse = function(self, p, left, t)
-               return p.make_node('operator', t.text, { left, p:parse_precedence(self.precedence) })
+               return p.make_node(k_op, t.text, { left, p:parse_precedence(self.precedence) })
             end
          })
       end,
@@ -337,7 +370,15 @@ function m.from_infix(tokens)
    -- Number/Word
    parser:add_prefix({ 'number', 'word', 'unit', 'string' }, {
       parse = function(self, p, t)
-         return p.make_node(t.kind, t.text)
+         local k
+         if t.kind == 'number' then k = k_num
+         elseif t.kind == 'word' then k = k_sym
+         elseif t.kind == 'unit' then k = k_unit
+         elseif t.kind == 'string' then k = k_str
+         end
+
+         assert(k, t.kind)
+         return p.make_node(k, t.text)
       end
    })
 
@@ -351,7 +392,7 @@ function m.from_infix(tokens)
 
          p:consume()
          local args = p:parse_list({ kind = ')' }, { kind = ',' })
-         return p.make_node('function', ident, args)
+         return p.make_node(k_fn, ident, args)
       end
    })
 
@@ -364,7 +405,7 @@ function m.from_infix(tokens)
    -- Lists
    parser:add_prefix('{', {
       parse = function(self, p, t)
-         return p.make_node('syntax', '{', p:parse_list({ kind = '}' }, { kind = ',' }))
+         return p.make_node(k_lst, '{', p:parse_list({ kind = '}' }, { kind = ',' }))
       end
    })
 
@@ -380,18 +421,18 @@ function m.from_infix(tokens)
                if not row then
                   error({ desc = 'Expected matrix row' })
                end
-               table.insert(rows, p.make_node('syntax', '[', row))
+               table.insert(rows, p.make_node(k_mat, '[', row))
             end
             if not p:match({ kind = ']' }) then
                error({ desc = 'Expected ] got ' .. p:current().kind })
             end
             p:consume()
 
-            return p.make_node('syntax', '[', rows)
+            return p.make_node(k_mat, '[', rows)
          end
 
          -- Vector
-         return p.make_node('syntax', '[', p:parse_list({ kind = ']' }, { kind = ',' }))
+         return p.make_node(k_mat, '[', p:parse_list({ kind = ']' }, { kind = ',' }))
       end
    })
 
@@ -400,7 +441,7 @@ function m.from_infix(tokens)
       precedence = 13,
       parse = function(self, p, left, t)
          local right = p:parse_infix(p.prefix[t.kind]:parse(p, t), self.precedence)
-         return p.make_node('operator', '*', { left, right })
+         return p.make_node(k_op, '*', { left, right })
       end
    })
 
@@ -410,11 +451,11 @@ function m.from_infix(tokens)
       parse = function(self, p, left, t)
          -- Implicit matrix multiplication
          if p:current() and p:current().kind == '[' then
-            return p.make_node('operator', '*', { left, parser.prefix['[']:parse(p, t) })
+            return p.make_node(k_op, '*', { left, parser.prefix['[']:parse(p, t) })
          end
 
          local indices = p:parse_list({ kind = ']' }, { kind = ',' })
-         return p.make_node('syntax', '_[', { left, table.unpack(indices) })
+         return p.make_node(k_sub, '_[', { left, table.unpack(indices) })
       end
    })
 
@@ -424,7 +465,7 @@ function m.from_infix(tokens)
    parser:add_infix_op({ '^' }, 16, 'right')
    parser:add_prefix({ '-', '(-)', sym.NEGATE }, {
       parse = function(self, p, t)
-         return p.make_node('operator', sym.NEGATE, { p:parse_precedence(15) })
+         return p.make_node(k_op, sym.NEGATE, { p:parse_precedence(15) })
       end
    })
    parser:add_infix_op({ '&' }, 14)
@@ -536,9 +577,7 @@ end
 ---@param subexpr expr  Expression to replace
 ---@param with    expr  Expression to replace with
 function t:rewrite_subexpr(subexpr, with)
-   subexpr = subexpr:canonicalize()
-
-   local target = self:canonicalize()
+   local target = self
    local matches, metavars = target:find_subexpr(subexpr, false, true)
 
    with = with:substitute_vars(metavars or {})
@@ -550,7 +589,6 @@ function t:rewrite_subexpr(subexpr, with)
       end
    end
 
-   self = target
    return self
 end
 
@@ -572,7 +610,7 @@ end
 
 -- Applies operator `op` to the expression, with arguments `arguments`.
 ---@param op string          Operator symbol
----@param arguments table[]  List of additional operator arguments (nodes) (besides self)
+---@param arguments expr[]  List of additional operator arguments (nodes) (besides self)
 ---@return expr
 function t:apply_operator(op, arguments)
    local apply_on_both_sides = {
@@ -585,7 +623,7 @@ function t:apply_operator(op, arguments)
          return node:apply_operator(op, arguments)
       end)
    else
-      local operator = m.node(op, 'operator', table_clone(arguments))
+      local operator = m.op(op, table_clone(arguments))
       table.insert(operator.children, 1, self)
       self = operator
    end
@@ -638,6 +676,42 @@ function t:map_all(fn)
       map_recursive(self)
    end
    return self
+end
+
+-- Replace symbols
+---@param tab table<string, expr> Symbol name to expression map
+---@param expr Self
+function t:replace_symbol(tab)
+   return self:map_all(function(node)
+      if node.kind == k_sym then
+         for k, v in pairs(tab) do
+            if node.text == k then
+               return v:clone()
+            end
+         end
+      end
+   end)
+end
+
+-- Collect operands of nested (same) operations
+--   (1 and 2) and 3 -> {1,2,3}
+---@return expr[]
+function t:collect_operands_recursive()
+   local kind, text = self.kind, self.text
+   local res = {}
+
+   local function merge_operands_rec(node)
+      if node:isa(kind, text) then
+	 for _, v in ipairs(node.children) do
+	    merge_operands_rec(v)
+	 end
+      else
+	 table.insert(res, node)
+      end
+   end
+
+   merge_operands_rec(self)
+   return res
 end
 
 return m

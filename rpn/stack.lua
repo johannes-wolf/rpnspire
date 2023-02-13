@@ -33,6 +33,12 @@ function rpn_stack_node:input_expr()
    return self.rpn
 end
 
+-- Deep copy self
+---@return rpn_stack_node
+function rpn_stack_node:clone()
+   return setmetatable({ rpn = self.rpn:clone(), infix = self.infix, result = self.result }, rpn_stack_node)
+end
+
 -- Reevaluate nodes expr and update infix and result
 ---@param stack rpn_stack Owning stack
 function rpn_stack_node:eval(stack)
@@ -236,11 +242,11 @@ function rpn_stack:push_with()
    if config.with_mode == 'smart' then
       local left, right = args[1], args[2]
 
-      if left.kind == 'operator' and left.text == '|' then
+      if left.kind == expr.OPERATOR and left.text == '|' then
          local condition = { left.children[2] }
          table.insert(condition, right)
 
-         left.children[2] = expr.node('and', 'operator', condition)
+         left.children[2] = expr.op('and', condition)
          self:push_expr(left)
          return true
       end
@@ -260,7 +266,7 @@ function rpn_stack:push_sq(idx)
    self:assert_size(1, "SQ")
    local top = self:top(idx)
    assert(top)
-   top.rpn = expr.node('^', 'operator', { top.rpn, expr.node('2', 'number') })
+   top.rpn = expr.op('^', { top.rpn, expr.node('2', 'number') })
 
    if top:eval(self) then
       self:notify_change(idx)
@@ -273,7 +279,7 @@ function rpn_stack:push_alog(idx)
    self:assert_size(1, "ALOG")
    local top = self:top(idx)
    assert(top)
-   top.rpn = expr.node('^', 'operator', { expr.node('10', 'number'), top.rpn })
+   top.rpn = expr.op('^', { expr.node('10', 'number'), top.rpn })
 
    if top:eval(self) then
       self:notify_change(idx)
@@ -287,9 +293,9 @@ function rpn_stack:push_invert(idx)
    self:assert_size(1, 'INV')
    local top = self:top(idx)
    assert(top)
-   if top.rpn.kind == 'operator' and top.rpn.text == '/' then
+   if top.rpn.kind == expr.OPERATOR and top.rpn.text == '/' then
       local num = top.rpn.children[1]
-      if num.kind == 'number' and num.text == '1' then
+      if num.kind == expr.NUMBER and num.text == '1' then
          top.rpn = top.rpn.children[2]
       else
          local denom = table.remove(top.rpn.children)
@@ -297,8 +303,7 @@ function rpn_stack:push_invert(idx)
          top.rpn.children[2] = num
       end
    else
-      top.rpn = expr.node('/', 'operator', { expr.node('1', 'number'),
-         top.rpn })
+      top.rpn = expr.op('/', { expr.node('1', 'number'), top.rpn })
    end
 
    if top:eval(self) then
@@ -313,10 +318,10 @@ function rpn_stack:push_negate(idx)
    self:assert_size(1, 'NEG')
    local top = self:top(idx)
    assert(top)
-   if top.rpn.kind == 'operator' and top.rpn.text == sym.NEGATE then
+   if top.rpn.kind == expr.OPERATOR and top.rpn.text == sym.NEGATE then
       top.rpn = top.rpn.children[1]
    else
-      top.rpn = expr.node(sym.NEGATE, 'operator', { top.rpn })
+      top.rpn = expr.op(sym.NEGATE, { top.rpn })
    end
 
    if top:eval(self) then
@@ -331,10 +336,10 @@ function rpn_stack:push_lnot(idx)
    self:assert_size(1, 'NOT')
    local top = self:top(idx)
    assert(top)
-   if top.rpn.kind == 'operator' and top.rpn.text == 'not' then
+   if top.rpn.kind == expr.OPERATOR and top.rpn.text == 'not' then
       top.rpn = top.rpn.children[1]
    else
-      top.rpn = expr.node('not', 'operator', { top.rpn })
+      top.rpn = expr.op('not', { top.rpn })
    end
 
    if top:eval(self) then
@@ -352,21 +357,74 @@ function rpn_stack:push_function(str, argc, builtin_only)
 
    self:assert_size(argc or fn_argc, fn_name)
    local args = self:pop_n(argc or fn_argc)
-   local expr = expr.node(str, fn_is_stat and 'stat_function' or 'function', args)
-   return self:push_expr(expr)
+   local e = expr.node(str, fn_is_stat and 'stat_function' or 'function', args)
+   return self:push_expr(e)
    --if fn_is_stat then
    --   self:push_expr(expr.node('stat.results', 'word', {}))
    --end
 end
 
+-- Push container and set top n items as child
+---@param kind expr_kind
+---@param consume_n? number
+function rpn_stack:push_container(kind, consume_n)
+   self:assert_size(consume_n, 'WRAP')
+
+   local children = consume_n > 0 and self:pop_n(consume_n) or {}
+   return self:push_expr(expr.node(kind, kind, children))
+end
+
+-- Join arguments upwards, default to constructing matrices
+--   {a} and {b} -> {a, {b}}
+--   {a} and b   -> {a,  b }
+function rpn_stack:smart_append()
+   self:assert_size(2, 'APPEND')
+
+   local args = self:pop_n(2)
+   local a, b = args[1], args[2]
+
+   local kind = expr.MATRIX ---@type expr_kind
+   if a:isa(expr.LIST) then
+      kind = expr.LIST
+   end
+
+   if not a:isa(kind) then
+      a = expr.node(kind, kind, {a})
+   end
+
+   table.insert(a.children, b)
+   return self:push_expr(a)
+end
+
+-- Explode arguments ((a and b) and c) -> (a and b), c
+function rpn_stack:explode()
+   self:assert_size(1, 'EXPLODE')
+
+   local top = self:pop_n(1)[1]
+   for _, v in ipairs(top.children or {}) do
+      self:push_expr(v)
+   end
+end
+
+-- Explode recursive ((a and b) and c) -> a, b, c
+function rpn_stack:explode_recursive()
+   self:assert_size(1, 'SEXPLODE')
+
+   local top = self:pop_n(1)[1]
+   local answers = top:collect_operands_recursive()
+   for _, v in ipairs(answers) do
+      self:push_expr(v)
+   end
+end
+
 --[[ COMMON STACK OPERATIONS ]] --
 
 -- Duplicate
----param n number
+---@param n number
 function rpn_stack:dup(n)
    n = n or #self.stack
    if n >= 1 and n <= #self.stack then
-      self:_push(table_clone(self.stack[n]))
+      self:_push(self.stack[n]:clone())
    end
 end
 

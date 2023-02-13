@@ -123,36 +123,21 @@ function meta:poison_edit()
          self.stack:dup()
       end
    end
+
    self.edit.kbd:set_seq({ '.', ',' }, function()
       self:record_undo()
-      self:handle_char('AUTOJOIN')
+      self:dispatch()
+      self.stack:smart_append()
    end)
 
    self.edit.kbd:set_seq({ '.', '/' }, function()
       self:record_undo()
-      self:handle_char('AUTOSPLIT')
+      self.stack:explode()
+      --self.stack:explode_recursive()
    end)
 
    if bindings.main then
       bindings.main(self, self.window, self.edit, self.list)
-   end
-end
-
-function meta:init_bindings(view, tab)
-   view.kbd = view.kbd or ui.keybindings()
-   for k, v in pairs(tab or {}) do
-      local action, args = k, {}
-      if type(k) == 'table' then
-         action = k[1]
-         args = { table.unpack(k, 2) }
-      end
-
-      assert(actions[action])
-      if type(v) == 'table' then
-         view.kbd:set_seq(v, function() (actions[action])(self, table.unpack(args)) end)
-      else
-         view.kbd:set_seq({ v }, function() (actions[action])(self, table.unpack(args)) end)
-      end
    end
 end
 
@@ -233,10 +218,6 @@ local function is_operator(c)
    return operators.query_info(c) or c == '^2' or c == '10^'
 end
 
-local function is_operator_rpn(c)
-   return c == 'AUTOJOIN' or c == 'AUTOSPLIT'
-end
-
 local function is_function(c)
    return functions.query_info(c, true) and true
 end
@@ -274,8 +255,6 @@ function meta:handle_char(c)
       self:dispatch_operator_store(c)
    elseif is_operator(c) then
       self:dispatch_operator(c)
-   elseif is_operator_rpn(c) then
-      self:dispatch_operator_rpn(c)
    elseif is_function(c) then
       self:dispatch_function(c, false, true)
    else
@@ -293,65 +272,6 @@ function meta:dispatch()
       return true
    end
    return false
-end
-
-function meta:dispatch_operator_rpn(c)
-   if c == 'AUTOJOIN' then
-      self:dispatch()
-
-      local args = self.stack:pop_n(2)
-      local first, second = args[1], args[2]
-
-      if first.kind == 'syntax' or second.kind == 'syntax' then
-         local text, all_args = nil, {}
-         if first.text == '[' or first.text == '{' then
-            text = first.text
-            for _, v in ipairs(first.children or {}) do table.insert(all_args, v) end
-         else
-            table.insert(all_args, first)
-         end
-
-         if second.text == '[' or second.text == '{' then
-            text = second.text
-            for _, v in ipairs(second.children or {}) do table.insert(all_args, v) end
-         else
-            table.insert(all_args, second)
-         end
-
-         if text then
-            first = expr.node(text, 'syntax', all_args)
-         end
-      else
-         first = expr.node('[', 'syntax', args)
-      end
-
-      self.stack:push_expr(first)
-   elseif c == 'AUTOSPLIT' then
-      self:dispatch()
-
-      local flat = {}
-      local function flatten_args(node, kind, text)
-         if node.kind == kind and node.text == text and node.children and #node.children > 0 then
-            for _, v in ipairs(node.children) do
-               if not flatten_args(v, kind, text) then
-                  table.insert(flat, v)
-               end
-            end
-            return true
-         end
-         return false
-      end
-
-      local first = self.stack:top().rpn
-      if first.children and #first.children > 0 then
-         self.stack:pop()
-         flatten_args(first, first.kind, first.text)
-         for _, v in ipairs(flat) do
-            self.stack:push_expr(v)
-         end
-      end
-
-   end
 end
 
 function meta:dispatch_operator_store(c)
@@ -664,11 +584,12 @@ end
 
 function meta:push_list(n)
    self:record_undo()
-   if self.stack:top() then
-      self.stack:push_expr(expr.node('{', 'syntax', self.stack:pop_n(n or 1)))
-   else
-      self.stack:push_expr(expr.node('{', 'syntax', {}))
-   end
+   self.stack:push_container(expr.LIST, n or 1)
+end
+
+function meta:push_matrix(n)
+   self:record_undo()
+   self.stack:push_container(expr.MATRIX, n or 1)
 end
 
 -- Push operator
