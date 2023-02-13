@@ -8,7 +8,7 @@ An RPN interface for the TI Nspire CX
 
 ## Install
 
-Use the latest build from the GitHub actions.
+Use the latest build from the GitHub actions and put it under `MyWidgets` on your nspire CX.
 Releases <= alpha-20 are of an old version of rpn-spire.
 
 ## Build
@@ -19,13 +19,15 @@ Building rpnspire depends on `luabundler` (install from `npm`) and `luna`.
 
 ## Usage
 
-The input field of rpnspire supports autocompletion for functions, variables and units. To trigger completion,
-press <kbd>tab</kbd>. Completion uses characters left to the cursor as compeltions prefix. Typing `so<tab>` will
-present you the first entry of a list of completion candidates starting with `so`. Pressing <kbd>tab</kbd> multiple times loops through all candidates. To accept a completion press a cursor key (<kbd>left</kbd> or <kbd>right</kbd>) or hit <kbd>enter</kbd> to directly evaluate. Completions are sorted by use (see [config/stats.lua](config/stats.lua)).
+Feel free to submit PRs or ask for features and fixes 😊.
 
 <p align="center">
-<img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-completion.gif" width="300px"></img>
+<img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn.gif" width="300px"></img>
 </p>
+
+The input field of rpnspire supports autocompletion for functions, variables and units. To trigger completion,
+press <kbd>tab</kbd>. Completion uses characters left to the cursor as compeltions prefix. Typing `so<tab>` will
+present you the first entry of a list of completion candidates starting with `so`. Pressing <kbd>tab</kbd> multiple times loops through all candidates. To accept a completion press hit <kbd>enter</kbd>. Completions are sorted by use (see [config/stats.lua](config/stats.lua)).
 
 ### RPN-Mode
 
@@ -66,12 +68,12 @@ top of the screen.
 | <kbd>.</kbd><kbd>right</kbd> | Go to end                                               |
 |------------------------------|---------------------------------------------------------|
 | <kbd>.</kbd><kbd>=</kbd>     | Store Y in X                                            |
-| <kbd>.</kbd><kbd>s</kbd>     | Store                                                   |
-| <kbd>.</kbd><kbd>x</kbd>     | Solve                                                   |
+| <kbd>.</kbd><kbd>s</kbd>     | Store interactive                                       |
+| <kbd>.</kbd><kbd>x</kbd>     | Solve interactive                                       |
 | <kbd>.</kbd><kbd>e</kbd>     | Edit last expression                                    |
 | <kbd>.</kbd><kbd>l</kbd>     | Push list                                               |
 | <kbd>.</kbd><kbd>,</kbd>     | Join X and Y as Vector or List (depending on type of Y) |
-| <kbd>.</kbd><kbd>{</kbd>     | Push list                   |
+| <kbd>.</kbd><kbd>/</kbd>     | Explode interactive                                     |
 |------------------------------|---------------------------------------------------------|
 | <kbd>.</kbd><kbd>v</kbd>     | Display variables                                       |
 | <kbd>.</kbd><kbd>m</kbd>     | Display apps/tool                                       |
