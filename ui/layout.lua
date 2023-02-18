@@ -1,22 +1,4 @@
-local class = require 'class'
 local ui = require 'ui.shared'
-
----@class ui.layout
-
----@class ui.absolute_layout : ui.layout
-local abs_layout = {}
-abs_layout.__index = abs_layout
-
--- Initialize absoulte layout
----@param frame ui.rect  Frame
----@return      ui.absolute_layout
-function ui.fixed_layout(frame)
-   return setmetatable({_frame = frame:clone()}, abs_layout)
-end
-
-function abs_layout:frame()
-   return self._frame
-end
 
 -- Convert input to factor, if it is a percentage string
 ---@param  s string|any
@@ -38,47 +20,11 @@ local function clamp(lo, v, hi)
 end
 
 
-local column_layout = {}
-column_layout.__index = column_layout
+---@class ui.layout # Layout base
+---@field update function(base : ui.rect, view : ui.view)
+---@field frame function() : ui.rect
 
-function ui.column_layout(shared_info, index, width)
-   local info = shared_info[index] or {}
-   info.width = width
-   shared_info[index] = info
-
-   local res = setmetatable({info = shared_info, index = index}, column_layout)
-   shared_info._columns = shared_info._columns or {}
-   shared_info._columns[index] = res
-   return res
-end
-
-function column_layout:update(base, view)
-   local info = self.info[self.index]
-
-   local w = info.width
-   if type(w) == 'function' then w = w(base) end
-
-   local x = 0
-   for i = 1, self.index - 1 do
-      x = x + self.info._columns[i]._frame.width
-   end
-
-   if not w or w == '*' then
-      w = base.width - x
-   end
-
-   print(string.format('col %d frame.x %d', self.index, x))
-
-   self._frame = ui.rect(x, 0, w, base.height):offset(base.x, base.y)
-   print(self._frame)
-   return self._frame
-end
-
-function column_layout:frame()
-   return self._frame
-end
-
----@class ui.tlrb_layout : ui.layout
+---@class ui.relative_layout : ui.layout
 ---@field t number|string
 ---@field l number|string
 ---@field r number|string
@@ -89,29 +35,29 @@ end
 ---@field max_w number|nil  Maximum width (absolute)
 ---@field min_h number|nil  Minimun height (absolute)
 ---@field max_h number|nil  Maximum height (absolute)
-local tlrb_layout = {}
-tlrb_layout.__index = tlrb_layout
+local relative_layout = {}
+relative_layout.__index = relative_layout
 
-function ui.tlrb_layout(t, l, r, b, w, h, minw, maxw, minh, maxh)
-   local res = setmetatable({}, tlrb_layout)
+function ui.relative_layout(t, l, r, b, w, h, minw, maxw, minh, maxh)
+   local res = setmetatable({}, relative_layout)
    res.t, res.t_rel = parse_percentage_string(t)
    res.l, res.l_rel = parse_percentage_string(l)
    res.b, res.b_rel = parse_percentage_string(b)
    res.r, res.r_rel = parse_percentage_string(r)
    res.w, res.w_rel = parse_percentage_string(w)
    res.h, res.h_rel = parse_percentage_string(h)
-   res.min_w = minw
+   res.min_w = minw or 0
    res.max_w = maxw
-   res.min_h = minh
+   res.min_h = minh or 0
    res.max_h = maxh
    return res
 end
 
-function tlrb_layout:frame()
+function relative_layout:frame()
    return self._frame or ui.rect(0, 0, 0, 0)
 end
 
-function tlrb_layout:update(base, view)
+function relative_layout:update(base, view)
    local t, l, r, b, w, h
    local x, y
    local min_w, max_w, min_h, max_h = self.min_w, self.max_w, self.min_h, self.max_h
@@ -133,11 +79,11 @@ function tlrb_layout:update(base, view)
    elseif h then
       h = clamp(min_h, h, max_h)
       if t then
-	 y = t
+         y = t
       elseif b then
-	 y = b - h
+         y = b - h
       else
-	 y = (base.height - h) / 2
+         y = (base.height - h) / 2
       end
    end
 
@@ -158,11 +104,11 @@ function tlrb_layout:update(base, view)
    elseif w then
       w = clamp(min_w, w, max_w)
       if l then
-	 x = l
+         x = l
       elseif r then
-	 x = r - w
+         x = r - w
       else
-	 x = (base.width - w) / 2
+         x = (base.width - w) / 2
       end
    end
 
@@ -171,16 +117,16 @@ end
 
 -- Generic relative layout constructor
 ---@param tab table
----@return    ui.tlrb_layout
+---@return    ui.relative_layout
 function ui.rel(tab)
-   return ui.tlrb_layout(tab.top,
-			 tab.left,
-			 tab.right,
-			 tab.bottom,
-			 tab.width,
-			 tab.height,
-			 tab.min_width,
-			 tab.max_width,
-			 tab.min_height,
-			 tab.max_height)
+   return ui.relative_layout(tab.top,
+                             tab.left,
+                             tab.right,
+                             tab.bottom,
+                             tab.width,
+                             tab.height,
+                             tab.min_width,
+                             tab.max_width,
+                             tab.min_height,
+                             tab.max_height)
 end
