@@ -56,9 +56,9 @@ function ui.edit:init(layout)
          ['%d'] = function(seq)
             self:insert_text('.' .. tostring(seq[#seq]), false)
          end,
-         ['c'] = function()
+         ['c'] = { function()
             special_char_menu(self)
-         end,
+         end, 'Insert character' }
       },
    }
    if bindings.edit then

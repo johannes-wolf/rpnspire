@@ -23,7 +23,7 @@ function ui.container:draw_self(gc, dirty)
       ui.fill_rect(gc, r, self.background)
       local inner = r:clone():inset(-1, -1):offset(-1, -1)
       ui.fill_rect(gc, inner, self.border)
-   else
+   elseif self.background then
       ui.fill_rect(gc, r, self.background)
    end
 end

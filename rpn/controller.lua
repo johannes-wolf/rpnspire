@@ -620,4 +620,33 @@ function meta:command_palette()
    print('TODO')
 end
 
+function meta:show_bindings()
+   local items = {}
+
+   local function collect_bindings(prefix, tab)
+      local function join_binding_path(path, tab)
+         for k, v in pairs(tab) do
+            if type(v) == 'table' and not v[1] then
+               join_binding_path(path..' ['..k..']', v)
+            elseif type(v) == 'table' and v[1] then
+               table.insert(items, { key = tostring(path..' ['..k..']'), value = v[2] or '?' })
+            end
+         end
+      end
+
+      if tab then
+         join_binding_path(prefix..': ', tab.kbd)
+      end
+   end
+
+   collect_bindings('All', self.window)
+   collect_bindings('Edit', self.edit)
+   collect_bindings('Stack', self.list)
+
+   local dlg = dlg_list.display('Bindings', items, 'key-value')
+   dlg.on_done = function(item)
+      return true
+   end
+end
+
 return t

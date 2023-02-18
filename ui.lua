@@ -24,7 +24,6 @@ require 'ui.view'
 ui.bindings = {}
 ui.kbd = ui.keybindings()
 ui.kbd.on_seq = function(self)
-   print('on_seq '..table.dump(self.seq))
    local v = ui.get_focus()
    while v do
       if self:try_call_table(v.kbd) then

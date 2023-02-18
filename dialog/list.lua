@@ -5,7 +5,7 @@ local t = {}
 -- Display dialog
 ---@param title?    string
 ---@param items     table<any>
----@param data      'string'|'simple'
+---@param data      'string'|'simple'|'key-value'|'custom'
 ---@param oninit?   function(label: ui.label, list: ui.list)
 ---@return list_dlg
 function t.display(title, items, data, oninit)
@@ -31,6 +31,24 @@ function t.display(title, items, data, oninit)
       return row.title:find(str)
    end
 
+   local function construct_keyvalue(_, row)
+      local wnd = ui.container(ui.rel{})
+      wnd.background = nil
+      local key_l = ui.label(ui.rel{left = ui.style.padding, right = '50%', top = 0, bottom = 0})
+      key_l.text = row.key
+      key_l.align = -1
+      wnd:add_child(key_l)
+      local value_l = ui.label(ui.rel{left = '50%', right = ui.style.padding, top = 0, bottom = 0})
+      value_l.text = row.value
+      value_l.align = -1
+      wnd:add_child(value_l)
+      return wnd
+   end
+
+   local function match_key(_, row, str)
+      return row.key:find(str)
+   end
+
    dlg.window = ui.container(ui.rel{left = 10, right = 10, top = 10, bottom = 10})
    dlg.window.style = '2D'
 
@@ -45,8 +63,16 @@ function t.display(title, items, data, oninit)
    if data == 'simple' then
       dlg.list.row_constructor = construct_simple
       dlg.list.row_match = match_simple
+      dlg.list:update_rows()
+   elseif data == 'key-value' then
+      dlg.list.row_constructor = construct_keyvalue
+      dlg.list.row_match = match_key
+      dlg.list:update_rows()
+   elseif data == 'string' then
+      dlg.list:update_rows()
+   else
+      -- Do not update rows yet
    end
-   dlg.list:update_rows()
    dlg.window:add_child(dlg.list)
 
    if oninit then oninit(dlg.label, dlg.list) end

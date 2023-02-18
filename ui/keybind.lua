@@ -16,6 +16,8 @@ end
 -- Try call current sequence in tab
 -- Example:
 --   try_call({'.', {'a', function() ... end}})
+--     or 
+--   try_call({'.', {'a', { function() ... end, 'description'} }})
 ---@param tab sequence_table Sequence table
 ---@return any|nil Matched action or nil
 function kbd:try_call_table(tab)
@@ -48,7 +50,12 @@ function kbd:reset()
 end
 
 function kbd:exec(tab)
-   if type(tab) ~= 'table' then
+   -- Binding tables can contain { fn, description-string }
+   if type(tab) == 'table' and type(tab[1]) == 'function' then
+      tab = tab[1]
+   end
+
+   if type(tab) == 'function' then
       tab(self.seq)
       self:reset()
    end
