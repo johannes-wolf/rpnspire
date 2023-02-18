@@ -1,6 +1,5 @@
 local class = require 'class'
 local ui = require 'ui.shared'
-local bindings = require 'config.bindings'
 
 ---@class ui.view
 ---@field parent    ui.view
@@ -140,32 +139,4 @@ function ui.view:ensure_visible(view_frame, f)
 
    self:layout_children()
    return self.scroll
-end
-
--- Bind key sequence
----@param seq string|table<string> Binding sequence
----@param action function(view: ui.view, ...)
-function ui.view:bind(seq, action)
-   if type(seq) == 'string' then
-      seq = {bindings.leader, seq}
-   else
-      table.insert(seq, 1, bindings.leader)
-   end
-   if not self.kbd then
-      self.kbd = ui.keybindings()
-   end
-   self.kbd:set_seq(seq, function(...) action(self, ...) end)
-end
-
--- Bind key sequence, ignoring global leader
----@param seq string|table<string> Binding sequence
----@param action function(view: ui.view, ...)
-function ui.view:bind_raw(seq, action)
-   if type(seq) == 'string' then
-      seq = {seq}
-   end
-   if not self.kbd then
-      self.kbd = ui.keybindings()
-   end
-   self.kbd:set_seq(seq, function(...) action(self, ...) end)
 end

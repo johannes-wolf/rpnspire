@@ -285,30 +285,6 @@ function test.infix_to_rpn_to_infix()
    fail("(+)")
 end
 
-function test.keybind_manager()
-   local last = nil
-   local kbd = ui.keybindings()
-
-   local function expect(seq, n)
-      kbd:reset()
-      last = nil
-      for _, v in ipairs(seq) do
-         kbd:on_char(v)
-      end
-      Test.assert(last == n, "Expected action " .. (n or "nil") .. " got " .. (last or "nil"))
-   end
-
-   kbd:set_seq({ 'a', 'b', '1' }, function() last = '1' end)
-   kbd:set_seq({ 'a', 'b', '2' }, function() last = '2' end)
-   kbd:set_seq({ 'a', 'c', '3' }, function() last = '3' end)
-   kbd:set_seq({ 'b' }, function() last = '4' end)
-
-   expect({}, nil)
-   expect({ 'c' }, nil)
-   expect({ 'b' }, '4')
-   expect({ 'a', 'b', '2' }, '2')
-end
-
 function test.rpn_input()
    local controller = require 'rpn.controller'
    require 'views.container'
@@ -318,7 +294,7 @@ function test.rpn_input()
 
    local edit = ui.edit(nil)
    local list = ui.list(nil)
-   local rpn = controller.new(nil, edit, list)
+   local rpn = controller.new({}, edit, list)
    local stack = rpn.stack
    rpn:initialize()
 

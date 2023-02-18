@@ -50,17 +50,19 @@ function ui.edit:init(layout)
    self.text = ""
    self.cursor = 1
    self.selection = 0
-   self.kbd = ui.keybindings()
-   self.kbd:set_seq({ bindings.leader, 'c' }, function(_)
-      special_char_menu(self)
-   end)
-   if bindings.leader == '.' then
-      self.kbd:set_seq({ '.', '%d' }, function(seq)
-         self:insert_text('.' .. tostring(seq[#seq]), false)
-      end)
-   end
+
+   self.kbd = {
+      [bindings.leader] = {
+         ['%d'] = function(seq)
+            self:insert_text('.' .. tostring(seq[#seq]), false)
+         end,
+         ['c'] = function()
+            special_char_menu(self)
+         end,
+      },
+   }
    if bindings.edit then
-      bindings.edit(self)
+      bindings.edit(self, self.kbd)
    end
 end
 

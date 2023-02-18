@@ -1,59 +1,62 @@
 local ui = require 'ui.shared'
 
+---@alias sequence_table table<string, any|function>
+
 ---@class ui.keybindings
----@field root        table
----@field current_tab table
----@field current_seq table
+---@field seq table # Current sequence
+---@field on_seq function(self) # Try sequences
+---@field on_exec function(any) # Execute callback for non function actions
 local kbd = {}
 kbd.__index = kbd
 
 function ui.keybindings()
-   return setmetatable({ root = {}, current_seq = {} }, kbd)
+   return setmetatable({ seq = {} }, kbd)
 end
 
-function kbd:set_seq(seq, action)
-   local tab = self.root
-   for idx, v in ipairs(seq) do
-      if idx == #seq then
-         break
+-- Try call current sequence in tab
+-- Example:
+--   try_call({'.', {'a', function() ... end}})
+---@param tab sequence_table Sequence table
+---@return any|nil Matched action or nil
+function kbd:try_call_table(tab)
+   local t = tab or {}
+   for i, v in ipairs(self.seq) do
+      local at_end = i == #self.seq
+      if not t or type(t) ~= 'table' then
+	 return nil
       end
-      if not tab[v] then
-         tab[v] = {}
+      if t[v] then
+	 t = t[v]
+	 if at_end then
+	    print('EXEC t')
+	    return self:exec(t)
+	 else
+	    if not v then
+	       if v:find('^[0-9]+$') then
+		  t = t['%d']
+	       else
+		  t = t['**']
+	       end
+	    end
+	 end
       end
-      tab = tab[v]
-   end
-   tab[seq[#seq]] = action
-end
-
-function kbd:notify_seq_changed()
-   if self.on_seq_changed then
-      self.on_seq_changed(self.current_seq)
    end
 end
 
 function kbd:reset()
-   self.current_tab = nil
-   self.current_seq = {}
-   self:notify_seq_changed()
+   self.seq = {}
 end
 
 function kbd:exec(tab)
-   local fn = self.on_exec
-   if type(tab) == 'function' then
-      fn = tab
-   end
-
-   local res = 'reset'
-   if fn then
-      res = fn(self.current_seq, tab)
-   end
-   if not res or res == 'reset' then
+   if type(tab) ~= 'table' then
+      tab(self.seq)
       self:reset()
    end
+   return tab
 end
 
 function kbd:on_escape()
-   if #self.current_seq > 0 then
+   if #self.seq > 0 then
       self:reset()
       return true
    end
@@ -89,27 +92,14 @@ function kbd:on_tab()
 end
 
 function kbd:on_char(c)
-   local tab = self.current_tab or self.root
-
-   if c:find('^%d$') then
-      table.insert(self.current_seq, tonumber(c))
-      tab = tab['%d'] or tab[c]
-   else
-      table.insert(self.current_seq, c)
-      tab = tab[c]
-   end
-
-   if tab then
-      if type(tab) == 'table' then
-         self.current_tab = tab
-         self:notify_seq_changed()
-      else
-         self:exec(tab)
-         self:reset()
+   if self.on_seq then
+      table.insert(self.seq, tostring(c))
+      if self:on_seq() then
+	 return true
       end
-      return true
+      self:reset()
    end
 
-   self:reset()
    return false
 end
+

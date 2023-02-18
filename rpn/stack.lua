@@ -457,7 +457,7 @@ end
 --[[ COMMON STACK OPERATIONS ]] --
 
 -- Duplicate
----@param n number
+---@param n? number Index or stackt top
 function rpn_stack:dup(n)
    n = n or #self.stack
    if n >= 1 and n <= #self.stack then

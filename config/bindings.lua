@@ -1,43 +1,71 @@
 local sym = require 'ti.sym'
+
+local function get_tab(tab, ...)
+   assert(tab)
+   local path = {...}
+   for _, v in ipairs(path) do
+      tab[v] = tab[v] or {}
+      tab = tab[v]
+   end
+   return tab
+end
+
+-- Global leader key (shortcut prefix key)
+local leader = '.'
+
 return {
    -- Shortcut prefix key
    ---@type string
-   leader = '.',
+   leader = leader,
 
    -- Bindings for ui.edit
-   edit = function(edit)
-      edit:bind('left',  function(self) self:set_cursor(1) end)
-      edit:bind('right', function(self) self:set_cursor('end') end)
+   edit = function(view)
+      local t = get_tab(view, 'kbd', leader)
+      t['left'] = function() view:set_cursor(1) end
+      t['right'] = function() view:set_cursor('end') end
    end,
 
    -- Bindings for main-view
    main = function(ctrl, win, edit, list)
-      assert(ctrl)
-      edit:bind('u', function(_) ctrl:undo() end)
-      edit:bind('r', function(_) ctrl:redo() end)
-      edit:bind('v', function(_) ctrl:variables_interactive() end)
-      edit:bind('e', function(_) ctrl:edit_interactive() end)
-      edit:bind('=', function(_) ctrl:push_operator('=:') end)
-      edit:bind('s', function(_) ctrl:store_interactive() end)
-      edit:bind('x', function(_) ctrl:solve_interactive() end)
-      edit:bind('m', function(_) ctrl:run_app() end)
-      edit:bind('l', function(_) ctrl:push_list() end)
-      edit:bind('^2', function(_) ctrl:push_operator('1/x') end)
-      edit:bind_raw('down', function(_) ctrl.stack:swap() end)
-      edit:bind_raw('return', function(_) ctrl:command_palette() end)
+      do
+         local t = get_tab(win, 'kbd', leader)
+         t['u'] = function() ctrl:undo() end
+         t['r'] = function() ctrl:redo() end
 
-      list:bind('u', function(_) ctrl:undo() end)
-      list:bind('r', function(_) ctrl:redo() end)
-      list:bind_raw('7', function(v) v:set_selection(1) end)
-      list:bind_raw('3', function(v) v:set_selection('end') end)
-      list:bind_raw('left', function(_) ctrl:roll_up() end)
-      list:bind_raw('right', function(_) ctrl:roll_down() end)
-      list:bind_raw('backspace', function(_) ctrl:pop(); print('pop') end)
-      list:bind_raw('enter', function(_) ctrl:dup() end)
-      list:bind_raw('c', function(_) edit:insert_text(ctrl:stack_sel_expr().infix, true) end)
-      list:bind_raw('r', function(_) edit:insert_text(ctrl:stack_sel_expr().result, true) end)
-      list:bind_raw('=', function(_) ctrl.stack:push_infix(ctrl:stack_sel_expr().result) end)
-      list:bind_raw('e', function(_) ctrl:edit_interactive() end)
-      list:bind_raw('return', function(_) ctrl:command_palette() end)
+         t['v'] = function() ctrl:variables_interactive() end
+         t['e'] = function() ctrl:edit_interactive() end
+         t['m'] = function() ctrl:run_app() end
+
+         t = win.kbd
+         t['return'] = function(_) ctrl:command_palette() end
+      end
+
+      do
+         local t = get_tab(edit, 'kbd', leader)
+         t['='] = function(_) ctrl:push_operator('=:') end
+         t['^2'] = function(_) ctrl:push_operator('1/x') end
+         t[','] = function(_) ctrl:smart_append() end
+         t['/'] = function(_) ctrl:explode_interactive() end
+         t['l'] = function(_) ctrl:push_list() end
+         t['s'] = function(_) ctrl:store_interactive() end
+         t['x'] = function(_) ctrl:solve_interactive() end
+
+         t = edit.kbd
+         t['down'] = function(_) ctrl.stack:swap() end
+      end
+
+      do
+         local t = get_tab(list, 'kbd')
+         t['7'] = function(v) v:set_selection(1) end
+         t['3'] = function(v) v:set_selection('end') end
+         t['left'] = function(_) ctrl:roll_up() end
+         t['right'] = function(_) ctrl:roll_down() end
+         t['backspace'] = function(_) ctrl:pop(); end
+         t['enter'] = function(_) ctrl:dup() end
+         t['e'] = function() ctrl:edit_interactive() end
+         t['c'] = function(_) edit:insert_text(ctrl:stack_sel_expr().infix, true) end
+         t['r'] = function(_) edit:insert_text(ctrl:stack_sel_expr().result, true) end
+         t['='] = function(_) ctrl.stack:push_infix(ctrl:stack_sel_expr().result) end
+      end
    end,
 }

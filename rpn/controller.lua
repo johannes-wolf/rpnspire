@@ -109,7 +109,7 @@ function meta:poison_edit()
             self:record_undo()
             if self.mode == 'rpn' then
                if self:dispatch_function(view.text, true, false) or
-                  self:dispatch_operator(view.text) then
+                   self:dispatch_operator(view.text) then
                   view:set_text('')
                end
             end
@@ -123,17 +123,6 @@ function meta:poison_edit()
          self.stack:dup()
       end
    end
-
-   self.edit.kbd:set_seq({ '.', ',' }, function()
-      self:record_undo()
-      self:dispatch()
-      self.stack:smart_append()
-   end)
-
-   self.edit.kbd:set_seq({ '.', '/' }, function()
-      self:record_undo()
-      self:explode_interactive()
-   end)
 
    if bindings.main then
       bindings.main(self, self.window, self.edit, self.list)
@@ -511,21 +500,27 @@ function meta:explode_interactive()
    local text = self.stack:top().infix
    local dlg = dlg_input.display(string.format("Explode %s to ...", text or '?'))
 
-   local guess_list = {'=', 'and', 'or'}
+   local guess_list = { '=', 'and', 'or' }
    for _, v in ipairs(guess_list) do
       if text:find(v) then
-	 dlg.edit:set_text(v, true)
-	 break
+         dlg.edit:set_text(v, true)
+         break
       end
    end
 
    dlg.on_done = function(text)
       if text:len() > 0 then
-	 self.stack:explode_result_to(text)
+         self.stack:explode_result_to(text)
       else
-	 self.stack:explode_result()
+         self.stack:explode_result()
       end
    end
+end
+
+function meta:smart_append()
+   self:record_undo()
+   self:dispatch()
+   self.stack:smart_append()
 end
 
 function meta:store_interactive()

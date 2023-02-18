@@ -21,6 +21,21 @@ require 'ui.keybind'
 require 'ui.layout'
 require 'ui.view'
 
+ui.bindings = {}
+ui.kbd = ui.keybindings()
+ui.kbd.on_seq = function(self)
+   print('on_seq '..table.dump(self.seq))
+   local v = ui.get_focus()
+   while v do
+      if self:try_call_table(v.kbd) then
+	 return true
+      end
+      v = v.parent
+   end
+
+   return self:try_call_table(ui.bindings)
+end
+
 -- Fill and outline a box
 ---@param r ui.rect
 function ui.draw_box(gc, r)
@@ -40,7 +55,7 @@ end
 ---@param main? ui.view
 ---@return table Modal session
 function ui.push_modal(main)
-   table.insert(ui.modal, {main = main, focus = nil})
+   table.insert(ui.modal, {main = main, focus = nil, idx = #ui.modal + 1})
    if main then ui.resize() end
    ui.update()
    return ui.get_modal()
@@ -50,7 +65,7 @@ end
 ---@param test? table Modal session
 function ui.pop_modal(test)
    assert(not test or test == ui.modal[#ui.modal])
-   table.remove(ui.modal)
+   table.remove(ui.modal, test and test.idx)
    ui.update()
 end
 
@@ -69,15 +84,12 @@ function ui.on_event(name, ...)
    local function dispatch_event(v, ...)
       if v then
 	 local handled = false
-	 if v.kbd and v.kbd['on_'..name] then
-	    handled = v.kbd['on_'..name](v.kbd, ...)
+	 if ui.kbd['on_'..name] then
+	    handled = ui.kbd['on_'..name](ui.kbd, ...)
 	 end
 	 if not handled and v['on_'..name] then
 	    handled = v['on_'..name](v, ...) ~= false
 	 end
-	 --if not handled and v.parent and v.parent ~= v then
-	    --return dispatch_event(v.parent, ...)
-	 --end
 	 return handled
       end
    end
