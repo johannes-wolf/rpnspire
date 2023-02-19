@@ -117,7 +117,7 @@ function ui.view:draw_children(gc, dirty)
    end
 end
 
--- Ensure frame f (in parent coordinates) is visible
+-- Ensure frame f (in absolute coordinates) is visible
 ---@param view_frame ui.rect  This views frame
 ---@param f          ui.rect  Rect to scroll to
 function ui.view:ensure_visible(view_frame, f)
@@ -139,4 +139,9 @@ function ui.view:ensure_visible(view_frame, f)
 
    self:layout_children()
    return self.scroll
+end
+
+-- Test if self is focused
+function ui.view:has_focus()
+   return ui.get_focus() == self
 end

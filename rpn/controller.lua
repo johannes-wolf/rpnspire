@@ -551,7 +551,7 @@ function meta:clear_all_vars()
 end
 
 function meta:variables_interactive()
-   local dlg = dlg_list.display('Variables', {}, 'string')
+   local dlg = dlg_list.display('Variables', {})
    local function load_data()
       dlg.list.items = var.list()
       dlg.list:update_rows()
@@ -590,7 +590,7 @@ function meta:run_app(name)
       table.insert(items, { title = v.title, fn = v.fn })
    end
 
-   local dlg = dlg_list.display('Apps', items, 'simple')
+   local dlg = dlg_list.display('Apps', items)
    dlg.on_done = function(item)
       if item then
          self:record_undo()
@@ -629,7 +629,7 @@ function meta:show_bindings()
             if type(v) == 'table' and not v[1] then
                join_binding_path(path..' ['..k..']', v)
             elseif type(v) == 'table' and v[1] then
-               table.insert(items, { key = tostring(path..' ['..k..']'), value = v[2] or '?' })
+               table.insert(items, { tostring(path..' ['..k..']'), v[2] or '?' })
             end
          end
       end
@@ -643,8 +643,8 @@ function meta:show_bindings()
    collect_bindings('Edit', self.edit)
    collect_bindings('Stack', self.list)
 
-   local dlg = dlg_list.display('Bindings', items, 'key-value')
-   dlg.on_done = function(item)
+   local dlg = dlg_list.display('Bindings', items)
+   function dlg.on_done(item)
       return true
    end
 end

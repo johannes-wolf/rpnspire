@@ -4,8 +4,10 @@ local sym = require 'ti.sym'
 local bindings = require 'config.bindings'
 
 ---@class ui.edit : ui.view
----@field on_complete function(ui.edit, string) : list<list<string>>
----@field on_complete_done function(ui.edit, string)
+---@field text string # Current text. Do not set manually! Use set_text(string)
+---@field on_complete? function(view: ui.edit, text: string) : list<list<string>>
+---@field on_complete_done? function(view: ui.edit, text: string)
+---@field on_text_changed? function(view: ui.edit, text: string)
 ui.edit = class(ui.view)
 ui.edit.paren_pairs = {
    ['('] = ')',
@@ -69,7 +71,7 @@ end
 -- Set view text
 ---@param text string
 function ui.edit:set_text(text)
-   self.text = text or ""
+   self:_set_text(text)
    self:set_cursor('end')
 end
 
@@ -163,7 +165,7 @@ end
 function ui.edit:draw_cursor(gc)
    local r = self:cursor_frame(gc)
    gc:draw_rect(r.x, r.y, r.width, r.height,
-                nil, ui.get_focus() == self and ui.style.caret or ui.style.caret_inactive)
+                nil, self:has_focus() and ui.style.caret or ui.style.caret_inactive)
 end
 
 function ui.edit:draw_self(gc, dirty)
@@ -203,7 +205,7 @@ function ui.edit:insert_text(text, sel)
       mid = text or ""
    end
 
-   self.text = left .. mid .. right
+   self:_set_text(left .. mid .. right)
    if sel then
       self.selection = sel and mid:ulen() or 0
    else
@@ -228,7 +230,7 @@ function ui.edit:on_backspace()
       self:set_cursor(math.max(self.cursor - 1, 1))
    end
 
-   self.text = left .. mid .. right
+   self:_set_text(left .. mid .. right)
 end
 
 function ui.edit:on_char(c)
@@ -286,9 +288,8 @@ function ui.edit:try_complete(word)
       local i, j = word:find(k..'$')
       if i then
          local left, right = self.text:sub(1, i - 1), self.text:sub(j + 1)
-         self.text = left .. v
-         self.cursor = self.text:ulen() + 1
-         self.text = self.text .. right
+         self.cursor = (left .. v):ulen() + 1
+	 self:_set_text(left .. v .. right)
          return
       end
    end
@@ -333,5 +334,12 @@ function ui.edit:complete_via_menu(l)
    end
    menu.on_backspace = function(this)
       this:close('recurse')
+   end
+end
+
+function ui.edit:_set_text(text)
+   self.text = text or ''
+   if self.on_text_changed then
+      self:on_text_changed(self.text)
    end
 end

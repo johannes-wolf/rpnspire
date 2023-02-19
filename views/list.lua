@@ -1,26 +1,41 @@
 local class = require 'class'
 local ui = require 'ui.shared'
 
----@alias list_item table<string, any>
-
 ---@class ui.list : ui.view
 ---@field sel             number
 ---@field items           table<any>
----@field row_match       function(view: ui.list, data: any, typeahead: string): boolean
----@field row_update      function(view: ui.list, row: ui.view, data: any)
+---@field row_update?     function(view: ui.list, row: ui.view, data: any)
 ---@field row_constructor function(view: ui.list, data: any)
 ---@field row_size        number
 ui.list = class(ui.view)
 
 local function string_row_constructor(_, str)
-   assert(type(str) == 'string')
    local v = ui.label()
    v.text = str
    return v
 end
 
-local function string_row_match(_, row, str)
-   return row:find(str or '')
+local function title_row_constructor(_, data)
+   local v = ui.label()
+   v.text = data.title
+   return v
+end
+
+local function columns_row_constructor(_, row)
+   local len = #row
+   local c = ui.container(ui.rel{})
+   if len > 0 then
+      for i = 0, len-1 do
+         local l = ui.label(ui.rel{left = string.format('%f%%', 100/len*i),
+				   width = string.format('%f%%', 100/len),
+				   top = 0,
+				   bottom = 0})
+         l.align = -1
+         l.text = row[i + 1] or ''
+         c:add_child(l)
+      end
+   end
+   return c
 end
 
 function ui.list:init(layout)
@@ -28,14 +43,40 @@ function ui.list:init(layout)
    self.items = {}
    self.sel = 1
    self.clip = true
-   self.row_constructor = string_row_constructor
-   self.row_match = string_row_match
    self.row_size = 20
+end
+
+-- Set row model template
+---@param kind 'string'|'title'|'columns'
+function ui.list:set_row_model(kind)
+   print('Setting row model: '..kind)
+   if kind == 'string' then
+      self.row_constructor = string_row_constructor
+   elseif kind == 'title' then
+      self.row_constructor = title_row_constructor
+   elseif kind == 'columns' then
+      self.row_constructor = columns_row_constructor
+   else
+      assert(false, 'Invalid row model!')
+   end
 end
 
 function ui.list:update_rows()
    local old_size = #self.children
    local new_size = #self.items
+
+   -- Auto detect row model type
+   if new_size > 0 and not self.row_constructor then
+      print('Detecting row model')
+      local first = self.items[1]
+      if type(first) == 'string' then
+	 self:set_row_model('string')
+      elseif type(first) == 'table' and first.title then
+	 self:set_row_model('title')
+      elseif type(first) == 'table' and #first > 0 then
+	 self:set_row_model('columns')
+      end
+   end
 
    local height = self.row_size
    if self.row_update then
@@ -72,18 +113,41 @@ function ui.list:update_rows()
    self:set_selection(self.sel > #self.items and #self.items or self.sel)
 end
 
+function ui.list:layout_children(parent_frame)
+   if parent_frame and self.layout and self.layout.update then
+      self.layout:update(parent_frame)
+   end
+
+   local r = self:frame():clone():inset(ui.style.padding, 0):offset(self.scroll.x, self.scroll.y)
+   for _, v in ipairs(self.children or {}) do
+      v:layout_children(r)
+   end
+end
+
+function ui.list:row_frame(idx)
+   local child = self.children[idx]
+   if child then
+      local my_frame = self:frame()
+      local child_frame = child:frame():clone()
+      child_frame.x = my_frame.x
+      child_frame.width = my_frame.width
+      return child_frame
+   end
+end
+
 function ui.list:draw_self(gc, dirty)
    local r = self:frame()
    ui.fill_rect(gc, r)
 
-   local has_focus = ui.get_focus() == self
-   for idx, v in ipairs(self.children) do
+   local has_focus = self:has_focus()
+   for idx = 1, #self.children do
+      local row_frame = self:row_frame(idx)
       if idx == self.sel and has_focus then
-	 ui.fill_rect(gc, v:frame(), ui.style.sel_background)
+	 ui.fill_rect(gc, row_frame, ui.style.sel_background)
       elseif idx % 2 == 0 then
-	 ui.fill_rect(gc, v:frame(), ui.style.background)
+	 ui.fill_rect(gc, row_frame, ui.style.background)
       else
-	 ui.fill_rect(gc, v:frame(), ui.style.alt_background)
+	 ui.fill_rect(gc, row_frame, ui.style.alt_background)
       end
    end
 
@@ -136,15 +200,4 @@ end
 
 function ui.list:on_down()
    self:set_selection(self.sel + 1)
-end
-
-function ui.list:on_char(c)
-   if c and self.row_match then
-      for idx, v in ipairs(self.items) do
-	 if self:row_match(v, c) then
-	    self:set_selection(idx)
-	    return
-	 end
-      end
-   end
 end
