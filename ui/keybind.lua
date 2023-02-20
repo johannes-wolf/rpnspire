@@ -62,6 +62,10 @@ function kbd:exec(tab)
    return tab
 end
 
+function kbd:on_return()
+   self:on_char('return')
+end
+
 function kbd:on_escape()
    if #self.seq > 0 then
       self:reset()

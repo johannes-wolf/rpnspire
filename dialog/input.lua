@@ -5,11 +5,11 @@ local t = {}
 ---@alias init_callback function(label: ui.label, edit: ui.edit)
 
 -- Display dialog (sync)
----@param title string Dialog title
+---@param options? table<string, any> Dialog options
 ---@param on_init? init_callback Initializer
-function t.display_sync(title, on_init)
+function t.display_sync(options, on_init)
    local co = coroutine.running()
-   local dlg = t.display(title, on_init)
+   local dlg = t.display(options, on_init)
 
    local res
    dlg.on_cancel = function()
@@ -27,10 +27,12 @@ function t.display_sync(title, on_init)
 end
 
 -- Display dialog
----@param title string Dialog title
+---@param options? table<string, any> Dialog options
 ---@param on_init? init_callback Initializer
 ---@return input_dlg
-function t.display(title, on_init)
+function t.display(options, on_init)
+   options = options or {}
+
    ---@class input_dlg
    ---@field window    ui.container
    ---@field label     ui.label
@@ -47,7 +49,7 @@ function t.display(title, on_init)
    dlg.window.style = '2D'
 
    dlg.label = ui.label(ui.rel{left = 0, right = 0, top = 0, height = '50%'})
-   dlg.label.text = title or ''
+   dlg.label.text = options.title or ''
    dlg.label.background = 0
    dlg.label.foreground = 0xffffff
    dlg.window:add_child(dlg.label)
@@ -74,6 +76,8 @@ function t.display(title, on_init)
    completion.setup_edit(dlg.edit)
 
    dlg.window:layout_children()
+   if options.text then dlg.edit:insert_text(options.text, true) end
+
    if on_init then
       on_init(dlg.label, dlg.edit)
    end

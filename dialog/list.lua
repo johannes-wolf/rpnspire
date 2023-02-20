@@ -41,9 +41,9 @@ function t.display(title, items, oninit)
       ui.pop_modal(session)
    end
 
-   dlg.list.on_enter_key = function(this)
+   function dlg.list:on_enter_key()
       dlg.cancel()
-      dlg.on_done(this:get_item())
+      dlg.on_done(self:get_item())
    end
 
    dlg.list.on_escape = function(_)

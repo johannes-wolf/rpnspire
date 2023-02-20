@@ -10,11 +10,12 @@ local bindings   = require 'config.bindings'
 local dlg_input  = require 'dialog.input'
 local dlg_list   = require 'dialog.list'
 local dlg_error  = require 'dialog.error'
+local dlg_filter = require 'dialog.filterlist'
 local completion = require 'completion'
 local apps       = require 'apps.apps'
 local lexer      = require 'ti.lexer'
 
-require 'apps.app_trassierung'
+require 'apps.init'
 
 local t = {}
 
@@ -585,12 +586,20 @@ function meta:run_app(name)
       end
    end
 
-   local items = {}
-   for _, v in ipairs(apps.tab) do
-      table.insert(items, { title = v.title, fn = v.fn })
+   local function apply_filter(text)
+      text = text or ''
+      text = text:gsub('.', function(c) return '.*'..c end)
+
+      local items = {}
+      for _, v in ipairs(apps.tab) do
+	 if v.title:find(text) or (v.description and v.description:find(text)) then
+	    table.insert(items, {v.title, v.description or '', fn = v.fn})
+	 end
+      end
+      return items
    end
 
-   local dlg = dlg_list.display('Apps', items)
+   local dlg = dlg_filter.display('Apps', apply_filter)
    dlg.on_done = function(item)
       if item then
          self:record_undo()

@@ -14,11 +14,11 @@ function t.display_sync(title, items, on_init)
    local dlg = t.display(title, items, on_init)
 
    local res
-   dlg.on_cancel = function()
+   function dlg.on_cancel()
       res = nil
       coroutine.resume(co)
    end
-   dlg.on_done = function(row)
+   function dlg.on_done(row)
       res = row.result
       coroutine.resume(co)
    end
@@ -35,18 +35,7 @@ end
 ---@return any
 function t.display(title, items, on_init)
    local dlg_list = require 'dialog.list'
-   local dlg = dlg_list.display(title, items, 'simple', on_init)
-
-   dlg.list.kbd = dlg.list.kbd or ui.keybindings()
-   for _, v in ipairs(items) do
-      if v.seq then
-	 dlg.list.kbd:set_seq(v.seq, function()
-	    dlg.cancel()
-	    dlg.on_done(v)
-	 end)
-      end
-   end
-
+   local dlg = dlg_list.display(title, items, on_init)
    dlg.window.layout = ui.rel{left = 10, right = 10, height = 20 + #items * dlg.list.row_size}
    ui.resize()
    return dlg
