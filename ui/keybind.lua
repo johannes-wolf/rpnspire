@@ -27,19 +27,10 @@ function kbd:try_call_table(tab)
       if not t or type(t) ~= 'table' then
 	 return nil
       end
-      if t[v] then
-	 t = t[v]
+      if t[v] or (v:find('^[0-9]+$') and t['%d']) then
+	 t = t[v] or t['%d']
 	 if at_end then
-	    print('EXEC t')
 	    return self:exec(t)
-	 else
-	    if not v then
-	       if v:find('^[0-9]+$') then
-		  t = t['%d']
-	       else
-		  t = t['**']
-	       end
-	    end
 	 end
       end
    end
