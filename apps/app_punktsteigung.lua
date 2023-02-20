@@ -75,9 +75,7 @@ local function run_tangent_pt(stack)
                 end
 
                 stack:push_infix(fn)
-                stack:push_operator('=:')
-                stack:pop()
-                stack:push_infix(fn)
+                stack:push_rstore()
              end
              n = n + 1
           else

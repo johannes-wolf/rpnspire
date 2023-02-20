@@ -199,10 +199,6 @@ function meta:display_error(msg)
    end
 end
 
-local function is_operator_store(c)
-   return c == ':=' or c == '=:' or c == sym.STORE
-end
-
 local function is_operator(c)
    return operators.query_info(c) or c == '^2' or c == '10^'
 end
@@ -239,10 +235,7 @@ function meta:handle_char(c)
       c = c:usub(1, -2)
    end
 
-   -- TODO: Move special operator handling to rpn_stack
-   if is_operator_store(c) then
-      self:dispatch_operator_store(c)
-   elseif is_operator(c) then
+   if is_operator(c) then
       self:dispatch_operator(c)
    elseif is_function(c) then
       self:dispatch_function(c, false, true)
@@ -261,27 +254,6 @@ function meta:dispatch()
       return true
    end
    return false
-end
-
-function meta:dispatch_operator_store(c)
-   if self:dispatch_operator(c) then
-      if config.store_mode == 'pop' then
-         self.stack:pop()
-      elseif config.store_mode == 'replace' then
-         local node = self.stack:pop()
-         node = node and node.rpn
-         if not node then return false end
-
-         local var_node
-         if node.text == ':=' then
-            var_node = node.children[1]
-         else
-            var_node = node.children[2]
-         end
-         self.stack:push_expr(var_node)
-      end
-      return true
-   end
 end
 
 function meta:undo_transaction(fn, ...)
@@ -529,7 +501,7 @@ function meta:store_interactive()
       if text:len() > 0 then
          self:record_undo()
          self.stack:push_infix(text)
-         self:handle_char('=:')
+	 self.stack:push_rstore()
       end
    end
 end

@@ -228,6 +228,9 @@ function rpn_stack:push_operator(str, argc)
       ["10^"]      = self.push_alog,
       ["1/x"]      = self.push_invert,
       ["|"]        = self.push_with,
+      [":="]       = self.push_lstore,
+      ["=:"]       = self.push_rstore,
+      [sym.STORE]  = self.push_rstore,
    }
    if special[str] then
       return (special[str])(self)
@@ -241,6 +244,34 @@ function rpn_stack:push_operator(str, argc)
    local expr = args[1]
    table.remove(args, 1)
    return self:push_expr(expr:apply_operator(str, args))
+end
+
+-- Push left store :=
+function rpn_stack:push_lstore()
+   self:assert_size(2, "LSTORE")
+   self:push_expr(expr.op(':=', self:pop_n(2)))
+
+   if config.store_mode == 'pop' then
+      self:pop()
+   elseif config.store_mode == 'replace' then
+      self:top().rpn = self:top().rpn.children[1]
+      self:top():eval(self)
+      self:notify_change()
+   end
+end
+
+-- Push right store =:
+function rpn_stack:push_rstore()
+   self:assert_size(2, "RSTORE")
+   self:push_expr(expr.op('=:', self:pop_n(2)))
+
+   if config.store_mode == 'pop' then
+      self:pop()
+   elseif config.store_mode == 'replace' then
+      self:top().rpn = self:top().rpn.children[2]
+      self:top():eval(self)
+      self:notify_change()
+   end
 end
 
 -- Push | (with)
