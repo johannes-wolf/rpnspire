@@ -7,7 +7,7 @@ local sym        = require 'ti.sym'
 local errtab     = require 'ti.error'
 local config     = require 'config.config'
 local bindings   = require 'config.bindings'
-local dlg_input  = require 'dialog.input'
+local ask        = require('dialog.input').display
 local dlg_list   = require 'dialog.list'
 local dlg_error  = require 'dialog.error'
 local dlg_filter = require 'dialog.filterlist'
@@ -466,9 +466,7 @@ end
 function meta:edit_interactive()
    local expr = self:stack_sel_expr()
    if expr then
-      local dlg = dlg_input.display()
-      dlg.label.text = string.format("Edit ...")
-      dlg.edit:insert_text(expr.infix, true)
+      local dlg = ask { title = 'Edit', text = expr.infix or '' }
       completion.setup_edit(dlg.edit)
       dlg.on_done = function(text)
          if text:len() > 0 then
@@ -483,8 +481,7 @@ end
 function meta:solve_interactive()
    if not self.stack:top() then return end
 
-   local dlg = dlg_input.display(string.format("Solve %s for ...", self.stack:top().infix or '?'))
-   dlg.edit:insert_text('{x}', false)
+   local dlg = ask { title = string.format("Solve %s for ...", self.stack:top().infix or '?'), text = '{x}' }
    dlg.edit:set_cursor(2, 1)
    dlg.on_done = function(text)
       if text:len() > 0 then
@@ -499,8 +496,7 @@ function meta:explode_interactive()
    if not self.stack:top() then return end
 
    local text = self.stack:top().infix
-   local dlg = dlg_input.display(string.format("Explode %s to ...", text or '?'))
-
+   local dlg = ask { title = string.format("Explode %s to ...", text or '?') }
    local guess_list = { '=', 'and', 'or' }
    for _, v in ipairs(guess_list) do
       if text:find(v) then
@@ -527,15 +523,8 @@ end
 function meta:store_interactive()
    if not self.stack:top() then return end
 
-   local dlg = dlg_input.display(string.format("Store %s to ...", self.stack:top().infix or '?'))
-   dlg.edit.on_complete = function(_, _)
-      local list = {}
-      if var then list = var:list() end
-      for n = 1, 9 do
-         table.insert(list, string.format('f%d(x)', n))
-      end
-      return list
-   end
+   local dlg = ask { title = string.format("Store %s to ...", self.stack:top().infix or '?') }
+   completion.setup_edit_store(dlg.edit)
    dlg.on_done = function(text)
       if text:len() > 0 then
          self:record_undo()

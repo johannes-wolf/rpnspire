@@ -36,7 +36,8 @@ function t.complete_function(prefix, tab)
    end
 end
 
-function t.complete_number(_, _)
+function t.complete_number(_, tab)
+   t.complete_unit('', tab)
 end
 
 function t.complete_word(prefix, tab)
@@ -73,6 +74,7 @@ function t.complete_smart(prefix)
    return {}
 end
 
+-- Setup completion
 function t.setup_edit(edit)
    edit.on_complete = function(_, prefix)
       return t.complete_smart(prefix)
@@ -81,6 +83,18 @@ function t.setup_edit(edit)
       if title and #title > 0 then
          completion_stats[title] = (completion_stats[title] or 0) + 1
       end
+   end
+end
+
+-- Setup completion for variables only
+function t.setup_edit_store(edit)
+   edit.on_complete = function(_, prefix)
+      local tab = {}
+      for n = 1, 9 do
+	 match_and_add(string.format('f%d(x)', n), prefix, tab)
+      end
+      t.complete_variable(prefix, tab)
+      return t.sort_completion(tab)
    end
 end
 
