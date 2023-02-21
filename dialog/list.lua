@@ -2,6 +2,26 @@ local ui = require 'ui'
 
 local t = {}
 
+-- Display dialog sync
+function t.display_sync(options)
+   local co = coroutine.running()
+   local dlg = t.display(options.title, options.items)
+
+   local res
+   function dlg.on_cancel()
+      res = nil
+      coroutine.resume(co)
+   end
+   function dlg.on_done(row)
+      res = row.result
+      coroutine.resume(co)
+   end
+
+   assert(co)
+   coroutine.yield(co)
+   return res
+end
+
 -- Display dialog
 ---@param title?    string
 ---@param items     table<any>

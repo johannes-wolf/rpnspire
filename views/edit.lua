@@ -285,11 +285,11 @@ function ui.edit:try_complete(word)
    -- Apply configured snippets
    local config = require 'config.config'
    for k, v in pairs(config.snippets or {}) do
-      local i, j = word:find(k..'$')
+      local i, j = word:find(k .. '$')
       if i then
          local left, right = self.text:sub(1, i - 1), self.text:sub(j + 1)
          self.cursor = (left .. v):ulen() + 1
-	 self:_set_text(left .. v .. right)
+         self:_set_text(left .. v .. right)
          return
       end
    end

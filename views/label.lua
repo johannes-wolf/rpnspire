@@ -31,5 +31,5 @@ function ui.label:draw_self(gc, _)
       ui.fill_rect(gc, r, self.background)
    end
    gc:draw_text(self.text, r.x, r.y, r.width, r.height, self.align, 0,
-		self.foreground or ui.style.text)
+                self.foreground or ui.style.text)
 end

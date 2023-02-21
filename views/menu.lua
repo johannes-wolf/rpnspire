@@ -11,8 +11,8 @@ local function menu_frame_at_point(pt, menu)
    if pt.y + optimal_height > ctx_height then
       pt.y = pt.y + (ctx_height - pt.y - optimal_height)
       if pt.y < 0 then
-	 pt.y = 0
-	 optimal_height = ctx_height
+         pt.y = 0
+         optimal_height = ctx_height
       end
    end
 
@@ -20,8 +20,8 @@ local function menu_frame_at_point(pt, menu)
    if pt.x + optimal_width > ctx_width then
       pt.x = pt.x + (ctx_width - pt.x - optimal_width)
       if pt.x < 0 then
-	 pt.x = 0
-	 optimal_width = ctx_width
+         pt.x = 0
+         optimal_width = ctx_width
       end
    end
    return ui.rect(pt.x, pt.y, optimal_width, optimal_height):inset(-ui.style.padding)
@@ -66,12 +66,12 @@ end
 -- Returns the maximum width of all menu items
 function ui.menu:max_width()
    return ui.GC.with_gc(function(gc)
-	 ui.menu.setup_gc(gc)
-	 local w = 0
-	 for _, v in ipairs(self.items) do
-	    w = math.max(w, self:item_width(v, gc))
-	 end
-	 return w
+      ui.menu.setup_gc(gc)
+      local w = 0
+      for _, v in ipairs(self.items) do
+         w = math.max(w, self:item_width(v, gc))
+      end
+      return w
    end)
 end
 
@@ -81,8 +81,8 @@ end
 
 function ui.menu:item_height()
    return ui.GC.with_gc(function(gc)
-	 ui.menu.setup_gc(gc)
-	 return gc:text_height('A') or 20
+      ui.menu.setup_gc(gc)
+      return gc:text_height('A') or 20
    end) or 20
 end
 
@@ -93,7 +93,7 @@ end
 function ui.menu:item_width(item, gc)
    local w = gc:text_width(item.title)
    if item_has_children(item) then
-      w = w + ui.style.padding + 2*ui.menu.submenu_marker_size
+      w = w + ui.style.padding + 2 * ui.menu.submenu_marker_size
    end
 
    return w
@@ -112,11 +112,11 @@ function ui.menu:draw_self(gc)
    for idx, v in ipairs(self.items) do
       local f = self:get_item_frame(idx)
       if f.y < ui.GC.screen_height() and f:max_y() > 0 then
-	 if idx == self.sel then
-	    local s = f:clone():inset(-ui.style.padding)
-	    gc:draw_rect(s.x, s.y, s.width, s.height, nil, 0xff0000)
-	 end
-	 self:draw_item(v, gc, f.x, f.y, f.width, f.height)
+         if idx == self.sel then
+            local s = f:clone():inset(-ui.style.padding)
+            gc:draw_rect(s.x, s.y, s.width, s.height, nil, 0xff0000)
+         end
+         self:draw_item(v, gc, f.x, f.y, f.width, f.height)
       end
    end
 
@@ -130,9 +130,9 @@ function ui.menu:draw_item(item, gc, x, y, w, h)
    if item_has_children(item) then
       gc:draw_rect(x + w - ui.style.padding - ui.menu.submenu_marker_size,
                    y + h / 2 - ui.menu.submenu_marker_size / 2,
-		   ui.menu.submenu_marker_size,
-		   ui.menu.submenu_marker_size,
-		   nil, ui.style.border)
+                   ui.menu.submenu_marker_size,
+                   ui.menu.submenu_marker_size,
+                   nil, ui.style.border)
    end
 
    return y + self:item_height()
@@ -174,7 +174,7 @@ end
 function ui.menu:close(mode)
    if self.parent then
       if mode == 'recurse' and getmetatable(self.parent) == getmetatable(self) then
-	 self.parent:close(mode)
+         self.parent:close(mode)
       end
       self.parent:remove_child(self)
    end
@@ -203,18 +203,18 @@ function ui.menu:exec(idx)
    local s = self:get_item(idx or self.sel)
    if s then
       if type(s.action) == 'table' then
-	 local f = self:get_item_frame()
-	 local sub = ui.menu()
-	 sub.items = s.action
-	 sub:open_at_point((f:top_right()):offset(-2, 2))
-	 ui.set_focus(sub)
+         local f = self:get_item_frame()
+         local sub = ui.menu()
+         sub.items = s.action
+         sub:open_at_point((f:top_right()):offset(-2, 2))
+         ui.set_focus(sub)
       elseif type(s.action) == 'function' then
-	 s.action()
-	 self:close('recurse')
+         s.action()
+         self:close('recurse')
       elseif self.on_exec then
-	 assert(type(self.on_exec) == 'function')
-	 self:on_exec(s)
-	 self:close()
+         assert(type(self.on_exec) == 'function')
+         self:on_exec(s)
+         self:close()
       end
    end
 end
@@ -260,9 +260,9 @@ function ui.menu:set_filter(str)
    if self.filter then
       local filtered_items = {}
       for _, v in ipairs(self.items) do
-	 if self:filter_match_item(str, v) then
-	    table.insert(filtered_items, v)
-	 end
+         if self:filter_match_item(str, v) then
+            table.insert(filtered_items, v)
+         end
       end
 
       self.full_items = self.full_items or self.items
@@ -286,10 +286,10 @@ end
 
 function ui.menu:on_char(c)
    if c == '.' or c == '[' or c == '(' or c == '%' then
-      c = '%'..c
+      c = '%' .. c
    end
    if self.filter_mode == 'fuzzy' then
-      c = c == ' ' and '.+' or '.*'..c
+      c = c == ' ' and '.+' or '.*' .. c
    else
       c = c == ' ' and '.*' or c
    end

@@ -16,5 +16,5 @@ max_line_length = 120
 insert_final_newline = true
 
 # [name style check]
-enable_name_style_check = false
+enable_name_style_check = true
 local_name_define_style = snake_case

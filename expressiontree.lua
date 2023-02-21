@@ -27,7 +27,7 @@ m.SUB = '#'
 
 -- For faster access w/o lookup store kinds in locals
 local k_num, k_sym, k_unit, k_op, k_fn, k_fns, k_str, k_lst, k_mat, k_sub =
-   m.NUMBER, m.SYMBOL, m.UNIT, m.OPERATOR, m.FUNCTION, m.FUNCTION_STAT, m.STRING, m.LIST, m.MATRIX, m.SUB
+m.NUMBER, m.SYMBOL, m.UNIT, m.OPERATOR, m.FUNCTION, m.FUNCTION_STAT, m.STRING, m.LIST, m.MATRIX, m.SUB
 
 
 ---@class expr
@@ -51,7 +51,7 @@ end
 ---@return boolean
 function t:isa(kind, text)
    return ((kind and (kind == self.kind)) or not kind) and
-          ((text and (text == self.text)) or not text)
+       ((text and (text == self.text)) or not text)
 end
 
 function t:print()
@@ -128,23 +128,23 @@ function t:infix_string()
          return node.text .. ' ' ..
              table.join_str(node.children, ',', node_to_infix)
       elseif node.kind == k_lst then
-	 return node.text ..
-	    table.join_str(node.children, ',', node_to_infix) ..
-	    '}'
+         return node.text ..
+             table.join_str(node.children, ',', node_to_infix) ..
+             '}'
       elseif node.kind == k_mat then
-	 local is_matrix = false
-	 if node.children and #node.children >= 1 and node.children[1].text == '[' then
-	    is_matrix = true
-	 end
+         local is_matrix = false
+         if node.children and #node.children >= 1 and node.children[1].text == '[' then
+            is_matrix = true
+         end
 
-	 return node.text ..
-	     table.join_str(node.children, is_matrix and '' or ',', node_to_infix) ..
-	     ']'
+         return node.text ..
+             table.join_str(node.children, is_matrix and '' or ',', node_to_infix) ..
+             ']'
       elseif node.kind == k_sub then
-	 assert(node.children and #node.children >= 2)
+         assert(node.children and #node.children >= 2)
 
-	 return node_to_infix(node.children[1]) ..
-	     '[' .. table.join_str({ table.unpack(node.children, 2) }, ',', node_to_infix) .. ']'
+         return node_to_infix(node.children[1]) ..
+             '[' .. table.join_str({ table.unpack(node.children, 2) }, ',', node_to_infix) .. ']'
       elseif node.kind == k_num then
          local text = node.text
          if node.text:sub(1, 1) == '-' then
@@ -273,7 +273,7 @@ function m.from_infix(tokens)
 
          local p = self.prefix[t.kind]
          if not p then
-            error({ desc = 'No prefix parser for '..t.kind..': '..t.text })
+            error({ desc = 'No prefix parser for ' .. t.kind .. ': ' .. t.text })
          end
          self:consume()
          local left = p:parse(self, t)
@@ -483,7 +483,7 @@ function m.from_infix(tokens)
 
    local t = parser:parse()
    if not parser:eof() then
-      error({ desc = 'Error parsing expression at ' .. parser:current().kind..': '..parser:current().text })
+      error({ desc = 'Error parsing expression at ' .. parser:current().kind .. ': ' .. parser:current().text })
    end
    return t
 end
@@ -692,11 +692,11 @@ function t:collect_operands_recursive()
 
    local function merge_operands_rec(node)
       if node:isa(kind, text) then
-	 for _, v in ipairs(node.children) do
-	    merge_operands_rec(v)
-	 end
+         for _, v in ipairs(node.children) do
+            merge_operands_rec(v)
+         end
       else
-	 table.insert(res, node)
+         table.insert(res, node)
       end
    end
 

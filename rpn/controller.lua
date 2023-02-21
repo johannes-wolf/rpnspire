@@ -501,7 +501,7 @@ function meta:store_interactive()
       if text:len() > 0 then
          self:record_undo()
          self.stack:push_infix(text)
-	 self.stack:push_rstore()
+         self.stack:push_rstore()
       end
    end
 end
@@ -549,13 +549,13 @@ function meta:run_app(name)
 
    local function apply_filter(text)
       text = text or ''
-      text = text:gsub('.', function(c) return '.*'..c end)
+      text = text:gsub('.', function(c) return '.*' .. c end)
 
       local items = {}
       for _, v in ipairs(apps.tab) do
-	 if v.title:find(text) or (v.description and v.description:find(text)) then
-	    table.insert(items, {v.title, v.description or '', fn = v.fn})
-	 end
+         if v.title:find(text) or (v.description and v.description:find(text)) then
+            table.insert(items, { v.title, v.description or '', fn = v.fn })
+         end
       end
       return items
    end
@@ -597,15 +597,15 @@ function meta:show_bindings()
       local function join_binding_path(path, tab)
          for k, v in pairs(tab) do
             if type(v) == 'table' and not v[1] then
-               join_binding_path(path..' ['..k..']', v)
+               join_binding_path(path .. ' [' .. k .. ']', v)
             elseif type(v) == 'table' and v[1] then
-               table.insert(items, { tostring(path..' ['..k..']'), v[2] or '?' })
+               table.insert(items, { tostring(path .. ' [' .. k .. ']'), v[2] or '?' })
             end
          end
       end
 
       if tab then
-         join_binding_path(prefix..': ', tab.kbd)
+         join_binding_path(prefix .. ': ', tab.kbd)
       end
    end
 

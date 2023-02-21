@@ -70,7 +70,7 @@ function rpn_stack:clone()
    for _, v in ipairs(self.stack) do
       table.insert(nodes, v:clone())
    end
-   return setmetatable({stack = nodes, on_change = self.on_change}, rpn_stack)
+   return setmetatable({ stack = nodes, on_change = self.on_change }, rpn_stack)
 end
 
 -- Evaluate (infix) string
@@ -429,7 +429,7 @@ function rpn_stack:smart_append()
    end
 
    if not a:isa(kind) then
-      a = expr.node(kind, kind, {a})
+      a = expr.node(kind, kind, { a })
    end
 
    table.insert(a.children, b)
@@ -471,6 +471,7 @@ function rpn_stack:explode_result_to(text, top)
          self:push_expr(node)
       end
    end
+
    explode_rec(top)
 end
 
