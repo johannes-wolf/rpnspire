@@ -46,11 +46,11 @@ local function run_tangent_pt(stack)
    local pt = { x = ask { title = 'x' }, y = ask { title = 'y' } }
    if not (pt.x and pt.y) then return end
 
-   local store = choice('Store results?', {
+   local store = choice { title = 'Store results?', items = {
       { title = 'As t1(x) ...', result = 'tx', seq = {'t'} },
       { title = 'As f2(x) ...', result = 'fx', seq = {'f'} },
       { title = 'No', result = false, seq = {'n'} },
-   })
+   }}
 
    local fd = eval(string.format('derivative(%s,x)', fx))
 

@@ -1,6 +1,6 @@
-local apps = require 'apps.apps'
-local ask = require('dialog.input').display_sync
-local dlg_choice = require 'dialog.choice'
+local apps   = require 'apps.apps'
+local ask    = require('dialog.input').display_sync
+local choice = require('dialog.choice').display_sync
 
 -- Generate polynom prototype of specified degree
 ---@param deg number Polynom degree
@@ -40,14 +40,14 @@ local function run_trassierung(stack)
    table.insert(eqs, 'derivative(g(x),x)=' .. 'derivative(' .. lofn .. '(x),x)|x=' .. lo)
    table.insert(eqs, 'derivative(g(x),x)=' .. 'derivative(' .. hifn .. '(x),x)|x=' .. hi)
 
-   if dlg_choice.display_sync('2nd diff?', dlg_choice.yesno) then
+   if choice { title = '2nd diff?', items = dlg_choice.yesno } then
       table.insert(eqs, 'derivative(derivative(g(x),x),x)=' .. 'derivative(derivative(' .. lofn .. '(x),x),x)|x=' .. lo)
       table.insert(eqs, 'derivative(derivative(g(x),x),x)=' .. 'derivative(derivative(' .. hifn .. '(x),x),x)|x=' .. hi)
    end
 
    stack:push_infix('system(' .. table.concat(eqs, ',') .. ')')
 
-   if dlg_choice.display_sync('solve?', dlg_choice.yesno) then
+   if choice { title = 'solve?', items = dlg_choice.yesno } then
       -- TODO: ...
    end
 end
