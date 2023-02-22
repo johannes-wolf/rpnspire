@@ -4,9 +4,9 @@ local ui = require 'ui.shared'
 ---@class ui.list : ui.view
 ---@field sel             number
 ---@field items           table<any>
----@field row_update?     function(view: ui.list, row: ui.view, data: any)
 ---@field row_constructor function(view: ui.list, data: any)
----@field row_size        number
+---@field row_update?     function(view: ui.list, row: ui.view, data: any)
+---@field row_size        number|function(view: ui.list, row: ui.view, data: any) # Row height
 ui.list = class(ui.view)
 
 local function string_row_constructor(_, str)
@@ -49,7 +49,6 @@ end
 -- Set row model template
 ---@param kind 'string'|'title'|'columns'
 function ui.list:set_row_model(kind)
-   print('Setting row model: ' .. kind)
    if kind == 'string' then
       self.row_constructor = string_row_constructor
    elseif kind == 'title' then
@@ -61,13 +60,17 @@ function ui.list:set_row_model(kind)
    end
 end
 
+function ui.list:_row_height(row, data)
+   return type(self.row_size) == 'number' and self.row_size
+       or self:row_size(row, data)
+end
+
 function ui.list:update_rows()
    local old_size = #self.children
    local new_size = #self.items
 
    -- Auto detect row model type
    if new_size > 0 and not self.row_constructor then
-      print('Detecting row model')
       local first = self.items[1]
       if type(first) == 'string' then
          self:set_row_model('string')
@@ -78,7 +81,6 @@ function ui.list:update_rows()
       end
    end
 
-   local height = self.row_size
    if self.row_update then
       for idx = 1, math.min(old_size, new_size) do
          self:row_update(self.children[idx], self.items[idx])
@@ -90,7 +92,7 @@ function ui.list:update_rows()
             local c = self:row_constructor(v)
             self.children[idx] = c
             c.parent = self
-            c.layout = ui.rel({ top = (idx - 1) * height, left = 0, right = 0, height = height })
+            c.layout = ui.rel({ top = 0, left = 0, right = 0, bottom = 0 })
          end
          self:layout_children(nil)
       elseif new_size < old_size then
@@ -102,9 +104,9 @@ function ui.list:update_rows()
    else
       self.children = {}
 
-      for idx, v in ipairs(self.items) do
+      for _, v in ipairs(self.items) do
          local c = self:add_child(self:row_constructor(v))
-         c.layout = ui.rel({ top = (idx - 1) * height, left = 0, right = 0, height = height })
+         c.layout = ui.rel({ top = 0, left = 0, right = 0, bottom = 0 })
       end
 
       self:layout_children(nil)
@@ -119,8 +121,10 @@ function ui.list:layout_children(parent_frame)
    end
 
    local r = self:frame():clone():inset(ui.style.padding, 0):offset(self.scroll.x, self.scroll.y)
-   for _, v in ipairs(self.children or {}) do
-      v:layout_children(r)
+   for idx, row in ipairs(self.children or {}) do
+      r.height = self:_row_height(row, self.items[idx])
+      row:layout_children(r)
+      r.y = row:frame():max_y()
    end
 end
 
