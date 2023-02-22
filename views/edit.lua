@@ -70,15 +70,14 @@ end
 
 -- Set view text
 ---@param text string
-function ui.edit:set_text(text)
+---@param select_all? boolean
+function ui.edit:set_text(text, select_all)
    self:_set_text(text)
-   self:set_cursor('end')
-end
-
--- Get view text
----@return string
-function ui.edit:get_text()
-   return self.text_left .. self.text_right
+   if select_all then
+      self:set_cursor(1, 'all')
+   else
+      self:set_cursor('end')
+   end
 end
 
 -- Returns if the cursor is at the rightmost position
