@@ -29,6 +29,13 @@ local t = {}
 local meta = {}
 meta.__index = meta
 
+local cmds = {}
+local function cmd(name, fn_name)
+   table.insert(cmds, { title = name, fn = function(target)
+      meta[fn_name](target)
+   end })
+end
+
 ---@param edit_view ui.edit
 ---@param list_view ui.list
 function t.new(window, edit_view, list_view)
@@ -41,7 +48,7 @@ function t.new(window, edit_view, list_view)
       _undo = {
          undo_stack = {},
          redo_stack = {},
-      }
+      },
    }, meta)
 end
 
@@ -327,6 +334,7 @@ function meta:undo_apply_state(state)
 end
 
 -- Undo last to last recorded state
+cmd('Undo', 'undo')
 function meta:undo()
    if #self._undo.undo_stack > 0 then
       local state = table.remove(self._undo.undo_stack)
@@ -336,6 +344,7 @@ function meta:undo()
 end
 
 -- Redo last undone operation
+cmd('Redo', 'redo')
 function meta:redo()
    if #self._undo.redo_stack > 0 then
       local state = table.remove(self._undo.redo_stack)
@@ -359,33 +368,38 @@ function meta:stack_sel_expr()
    return self.stack:top()
 end
 
+cmd('Swap', 'swap')
 function meta:swap()
    self:record_undo()
    self.stack:swap()
 end
 
+cmd('Dup', 'dup')
 function meta:dup()
    self:record_undo()
    self.stack:dup(self:stack_get_sel())
 end
 
+cmd('Drop', 'pop')
 function meta:pop()
    self:record_undo()
    self.stack:pop(self:stack_get_sel())
 end
 
-function meta:roll_up()
+cmd('Roll -1', 'roll_up')
+function meta:roll_up(n)
    self:record_undo()
-   self.stack:roll(-1)
+   self.stack:roll(n and (-n) or -1)
 end
 
-function meta:roll_down()
+cmd('Roll 1', 'roll_down')
+function meta:roll_down(n)
    self:record_undo()
-   self.stack:roll(1)
+   self.stack:roll(n or 1)
 end
 
 -- Get token ranges
----@param edit      ui.edit
+---@param edit ui.edit
 local function get_token_ranges(edit)
    local ok, tokens = pcall(function()
       local text = edit.text
@@ -421,6 +435,7 @@ local function edit_select_next_token(edit, direction)
    end
 end
 
+cmd('Copy expression', 'copy')
 function meta:copy()
    local expr = self:stack_sel_expr()
    if expr then
@@ -428,6 +443,7 @@ function meta:copy()
    end
 end
 
+cmd('Copy result', 'copy_result')
 function meta:copy_result()
    local expr = self:stack_sel_expr()
    if expr then
@@ -435,6 +451,7 @@ function meta:copy_result()
    end
 end
 
+cmd('Edit', 'edit_interactive')
 function meta:edit_interactive()
    local expr = self:stack_sel_expr()
    if expr then
@@ -450,6 +467,7 @@ function meta:edit_interactive()
    end
 end
 
+cmd('Solve', 'solve_interactive')
 function meta:solve_interactive()
    if not self.stack:top() then return end
 
@@ -464,6 +482,7 @@ function meta:solve_interactive()
    end
 end
 
+cmd('Explode', 'explode_interactive')
 function meta:explode_interactive()
    if not self.stack:top() then return end
 
@@ -486,12 +505,14 @@ function meta:explode_interactive()
    end
 end
 
+cmd('Smart append', 'smart_append')
 function meta:smart_append()
    self:record_undo()
    self:dispatch()
    self.stack:smart_append()
 end
 
+cmd('Store', 'store_interactive')
 function meta:store_interactive()
    if not self.stack:top() then return end
 
@@ -506,12 +527,14 @@ function meta:store_interactive()
    end
 end
 
+cmd('Clear variables', 'clear_all_vars')
 function meta:clear_all_vars()
    for _, v in ipairs(var.list()) do
       math.evalStr(string.format("delvar %s", v))
    end
 end
 
+cmd('Show variables', 'variables_interactive')
 function meta:variables_interactive()
    local dlg = dlg_list.display('Variables', {})
    local function load_data()
@@ -539,6 +562,7 @@ function meta:variables_interactive()
    end
 end
 
+cmd('Run tool', 'run_app')
 function meta:run_app(name)
    if name then
       if apps.tab[name] then
@@ -569,11 +593,13 @@ function meta:run_app(name)
    end
 end
 
+cmd('Push matrix', 'push_list')
 function meta:push_list(n)
    self:record_undo()
    self.stack:push_container(expr.LIST, n or 1)
 end
 
+cmd('Push matrix', 'push_matrix')
 function meta:push_matrix(n)
    self:record_undo()
    self.stack:push_container(expr.MATRIX, n or 1)
@@ -585,11 +611,39 @@ function meta:push_operator(operator)
    self:handle_char(operator)
 end
 
--- Show global command palette
-function meta:command_palette()
-   print('TODO')
+-- Clear stack
+cmd('Clear stack', 'clear_stack')
+function meta:clear_stack()
+   self:record_undo()
+   self.stack.stack = {}
+   self.list:set_selection(1)
+   self.list:update_rows()
 end
 
+-- Show global command palette
+function meta:command_palette()
+   local function apply_filter(text)
+      text = text or ''
+      text = text:gsub('.', function(c) return '.*' .. c end)
+
+      local items = {}
+      for _, cmd in ipairs(cmds) do
+         if cmd.title:lower():find(text) then
+            table.insert(items, cmd)
+         end
+      end
+      return items
+   end
+
+   local dlg = dlg_filter.display('Command', apply_filter)
+   function dlg.on_done(data)
+      self:safe_call(function()
+         data.fn(self)
+      end)
+   end
+end
+
+cmd('Show bindings', 'show_bindings')
 function meta:show_bindings()
    local items = {}
 
