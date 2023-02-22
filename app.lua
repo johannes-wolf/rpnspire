@@ -9,6 +9,7 @@ require 'views.edit'
 require 'views.label'
 require 'views.container'
 require 'views.list'
+require 'views.richedit'
 
 require 'tableext'
 require 'stringext'

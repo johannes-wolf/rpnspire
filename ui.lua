@@ -64,6 +64,7 @@ end
 ---@param test? table Modal session
 function ui.pop_modal(test)
    assert(not test or test == ui.modal[#ui.modal])
+   ui.set_focus(nil)
    table.remove(ui.modal, test and test.idx)
    ui.update()
 end
@@ -104,10 +105,12 @@ end
 ---@return     ui.view   Focused view
 function ui.set_focus(view)
    local session = ui.modal[#ui.modal]
-   if view and session.focus ~= view then
+   if session.focus ~= view then
       ui.on_event('exit')
       session.focus = view
-      ui.on_event('enter')
+      if session.focus then
+         ui.on_event('enter')
+      end
    end
    return session.focus
 end

@@ -2,6 +2,7 @@ local class = require 'class'
 local ui = require 'ui.shared'
 local geom = require 'ui.geometry'
 
+---@class ui.GC
 local GC = class()
 
 local a_height = {}

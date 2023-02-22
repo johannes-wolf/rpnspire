@@ -620,6 +620,28 @@ function meta:clear_stack()
    self.list:update_rows()
 end
 
+-- Show expresison and result using TI math view
+cmd('Show expression', 'interactive_show')
+function meta:interactive_show()
+   local top = self:stack_sel_expr()
+   if not top then return end
+
+   local wnd = ui.container(ui.rel { left = 10, right = 10, top = 10, bottom = 10 })
+   wnd.style = '2D'
+
+   local editor = ui.richedit(ui.rel{ left = 1, right = 1, top = 1, bottom = 1})
+   editor:set_expression("\\0el {" .. top.infix .. "}\n=\n" ..
+                         "\\0el {" .. top.result .. "}")
+   wnd:add_child(editor)
+
+   local session = ui.push_modal(wnd)
+   ui.set_focus(editor)
+
+   function editor:on_escape()
+      ui.pop_modal(session)
+   end
+end
+
 -- Show global command palette
 function meta:command_palette()
    local function apply_filter(text)

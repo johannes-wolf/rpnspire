@@ -4,9 +4,12 @@ local ui = require 'ui.shared'
 ---@class ui.view
 ---@field parent    ui.view
 ---@field children  ui.view[]
----@field font_size number
+---@field font_size? number
 ---@field clip      boolean
----@field layout    ui.layout
+---@field scroll    ui.point # Scroll offset
+---@field layout?    ui.layout
+---@field border?   number # Border color
+---@field background? number # Background color
 ui.view = class()
 
 function ui.view:init(layout)
@@ -73,7 +76,7 @@ function ui.view:text_height(s)
 end
 
 -- Draw view
----@param gc GC
+---@param gc ui.GC
 function ui.view:draw(gc, dirty)
    if not self:frame():intersects_rect(dirty) then
       return
@@ -104,10 +107,11 @@ function ui.view:draw(gc, dirty)
 end
 
 -- Draw self
-function ui.view:draw_self(gc, dirty)
-   local r = bounds
-   gc:draw_rect(r.x, r.y, r.width, r.height,
-		0xff0000, 0xffffff)
+function ui.view:draw_self(gc)
+   if self.border or self.background then
+      local r = self:frame()
+      gc:draw_rect(r.x, r.y, r.width, r.height, self.border, self.background)
+   end
 end
 
 -- Draw children
