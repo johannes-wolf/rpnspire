@@ -13,8 +13,6 @@ ui.style = {
    caret          = 0xff0000,
    caret_inactive = 0x999999,
    padding        = 2,
-   menu_font      = { size = 9 },
-   edit_font      = { size = 9 },
 }
 
 require 'ui.keybind'

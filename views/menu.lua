@@ -36,7 +36,7 @@ ui.menu = class(ui.view)
 ui.menu.submenu_marker_size = 4
 
 function ui.menu.setup_gc(gc)
-   --gc:set_font_size(ui.style.menu_font.size)
+   gc:set_font_size(9)
 end
 
 -- Construct and present temporary menu at point
@@ -80,10 +80,7 @@ function ui.menu:max_height()
 end
 
 function ui.menu:item_height()
-   return ui.GC.with_gc(function(gc)
-      ui.menu.setup_gc(gc)
-      return gc:text_height('A') or 20
-   end) or 20
+   return 16
 end
 
 local function item_has_children(item)
@@ -113,7 +110,7 @@ function ui.menu:draw_self(gc)
       local f = self:get_item_frame(idx)
       if f.y < ui.GC.screen_height() and f:max_y() > 0 then
          if idx == self.sel then
-            local s = f:clone():inset(-ui.style.padding)
+            local s = f:clone():inset(-ui.style.padding, 0)
             gc:draw_rect(s.x, s.y, s.width, s.height, nil, 0xff0000)
          end
          self:draw_item(v, gc, f.x, f.y, f.width, f.height)
