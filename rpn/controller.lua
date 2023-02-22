@@ -488,13 +488,6 @@ function meta:explode_interactive()
 
    local text = self.stack:top().infix
    local dlg = ask { title = string.format("Explode %s to ...", text or '?') }
-   local guess_list = { '=', 'and', 'or' }
-   for _, v in ipairs(guess_list) do
-      if text:find(v) then
-         dlg.edit:set_text(v, true)
-         break
-      end
-   end
 
    dlg.on_done = function(text)
       if text:len() > 0 then
