@@ -536,7 +536,7 @@ end
 
 cmd('Show variables', 'variables_interactive')
 function meta:variables_interactive()
-   local dlg = dlg_list.display('Variables', {})
+   local dlg = dlg_list.display{ title = 'Variables', items = {} }
    local function load_data()
       dlg.list.items = var.list()
       dlg.list:update_rows()
@@ -689,7 +689,7 @@ function meta:show_bindings()
    collect_bindings('Edit', self.edit)
    collect_bindings('Stack', self.list)
 
-   local dlg = dlg_list.display('Bindings', items)
+   local dlg = dlg_list.display{ title = 'Bindings', items = items }
    function dlg.on_done(item)
       return true
    end

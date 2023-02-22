@@ -14,8 +14,7 @@ t.yesno = {
 ---@return number Selection index
 function t.display_sync(options, on_init)
    local co = coroutine.running()
-   local dlg = t.display(options.title, options.items, on_init)
-   dlg.list:set_selection(options.selection or 1)
+   local dlg = t.display(options, on_init)
 
    local res, sel
    function dlg.on_cancel()
@@ -34,13 +33,12 @@ function t.display_sync(options, on_init)
 end
 
 -- Display dialog
----@param title string Dialog title
----@param items table<list_item> Choices
+---@param options table<string, any>
 ---@param on_init? function(label: ui.label, list: ui.list)
 ---@return any
-function t.display(title, items, on_init)
+function t.display(options, on_init)
    local dlg_list = require 'dialog.list'
-   return dlg_list.display(title, items, on_init)
+   return dlg_list.display(options, on_init)
 end
 
 return t

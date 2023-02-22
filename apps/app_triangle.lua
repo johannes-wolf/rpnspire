@@ -139,7 +139,7 @@ local function run_triangle(stack)
          end
 
          while true do
-            action = choice { title = 'Steps', items = step_items }
+            action = choice { title = 'Steps', items = step_items, font_size = 9, row_size = 16 }
             if not action then break end
             stack:push_infix(action)
          end

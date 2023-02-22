@@ -9,19 +9,21 @@ local ui = require 'ui.shared'
 ---@field row_size        number|function(view: ui.list, row: ui.view, data: any) # Row height
 ui.list = class(ui.view)
 
-local function string_row_constructor(_, str)
+local function string_row_constructor(list, str)
    local v = ui.label()
+   v.font_size = list.font_size
    v.text = str
    return v
 end
 
-local function title_row_constructor(_, data)
+local function title_row_constructor(list, data)
    local v = ui.label()
+   v.font_size = list.font_size
    v.text = data.title
    return v
 end
 
-local function columns_row_constructor(_, row)
+local function columns_row_constructor(list, row)
    local len = #row
    local c = ui.container(ui.rel {})
    if len > 0 then
@@ -32,6 +34,7 @@ local function columns_row_constructor(_, row)
                                bottom = 0 })
          l.align = -1
          l.text = row[i + 1] or ''
+         l.font_size = list.font_size
          c:add_child(l)
       end
    end
@@ -43,7 +46,7 @@ function ui.list:init(layout)
    self.items = {}
    self.sel = 1
    self.clip = true
-   self.row_size = 20
+   self.row_size = 18
 end
 
 -- Set row model template
