@@ -27,9 +27,6 @@ local vars_full = {
    { 'Height a', 'ha' },
    { 'Height b', 'hb' },
    { 'Height c', 'hc' },
-   { 'Median a', 'ma' },
-   { 'Median b', 'mb' },
-   { 'Median c', 'mc' },
    { 'Inradius', 'inrad' },
    { 'Circumradius', 'circumrad' },
 }
@@ -57,10 +54,6 @@ local function run_triangle(stack)
       '{ha}=2*{area}/{a}',
       '{hb}=2*{area}/{b}',
       '{hc}=2*{area}/{c}',
-      -- Median
-      '{ma}=sqrt((2*{b}^2+2*{c}^2-{a}^2)/4)',
-      '{mb}=sqrt((2*{c}^2+2*{a}^2-{b}^2)/4)',
-      '{mc}=sqrt((2*{a}^2+2*{b}^2-{c}^2)/4)',
       -- Inradius
       '{inrad}={area}/{s}',
       -- Circumradius
