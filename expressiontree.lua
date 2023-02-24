@@ -37,12 +37,28 @@ m.NUMBER, m.SYMBOL, m.UNIT, m.OPERATOR, m.FUNCTION, m.FUNCTION_STAT, m.STRING, m
 local t = {}
 t.__index = t
 
+function m.is_expr(v)
+   return v and getmetatable(v) == t
+end
+
 function m.node(text, kind, children)
    return setmetatable({ text = text, kind = kind, children = children or {} }, t)
 end
 
 function m.op(text, children)
    return m.node(text, k_op, children)
+end
+
+function m.num(n)
+   return m.node(tostring(n) or '0', k_num)
+end
+
+function m.list(items)
+   return m.node('{', k_lst, items)
+end
+
+function m.matrix(items)
+   return m.node('[', k_mat, items)
 end
 
 -- Parse infix expression string

@@ -13,6 +13,8 @@ local t = {}
 -- Display matrix editor modal
 ---@param ctrl rpn_controller
 ---@param init? expr # Matrix
+---@param rows? expr # Matrix
+---@param cols? expr # Matrix
 ---@return matrix_dialog
 function t.display(ctrl, init)
    local dlg = {
@@ -41,15 +43,36 @@ function t.display(ctrl, init)
       bindings.matrixeditor(dlg, grid, edit)
    end
 
+   -- Overload the matrix class to
+   -- always return a fixed size
+   local grid_matrix = {
+      __index = matrix.mt,
+      fixed_m = math.max(data and data.m or 1, 12),
+      fixed_n = math.max(data and data.n or 12, 1),
+   }
+   function grid_matrix:__len()
+      return grid_matrix.fixed_m
+   end
+
+   function dlg.matrix_resize(rows, cols)
+      rows = math.min(rows, 99)
+      cols = math.min(cols, 99)
+
+      local grid_m, grid_n =
+         math.max(grid_matrix.fixed_m, rows),
+         math.max(grid_matrix.fixed_n, cols)
+
+      data:resize(rows, cols)
+      dlg.grid_resize(grid_m, grid_n)
+      grid:set_selection('end', 'end')
+   end
+
    -- Action: Resize matrix
    ---@param rows?  number
    ---@param cols?  number
-   ---@param fill?  any
-   function dlg.matrix_resize(rows, cols, fill)
-      local mrows, mcols = data:size()
-      rows = math.max(1, rows or mrows)
-      cols = math.max(1, cols or mcols)
-      data:resize(rows, cols, fill)
+   function dlg.grid_resize(rows, cols)
+      rows = rows or grid_matrix.fixed_m
+      cols = cols or grid_matrix.fixed_n
 
       local new_columns = {}
       for i = 1, cols do
@@ -59,16 +82,19 @@ function t.display(ctrl, init)
          })
       end
 
+      grid_matrix.fixed_m = rows
+      grid_matrix.fixed_n = cols
+
       grid.columns = new_columns
       grid.children = {}
-      grid.items = data.data
+      grid.items = data
       grid:update_rows()
    end
 
    -- Action: Transpose
    function dlg.matrix_transpose()
       data:transpose()
-      dlg.matrix_resize()
+      dlg.grid_resize()
    end
 
    -- Action: Clear matrix values
@@ -185,13 +211,13 @@ function t.display(ctrl, init)
    end
 
    function grid:cell_update(cell, column, row)
-      local data = row[column.index]
+      local data = row and row[column.index]
       cell.text = data or ''
    end
 
    function grid:cell_constructor(column, row)
       local label = ui.label()
-      local data = row[column.index]
+      local data = row and row[column.index]
       label.text = data or ''
       label.align = 1
       return label
@@ -265,6 +291,17 @@ function t.display(ctrl, init)
          end)()
       end
 
+      function action_grid()
+         coroutine.wrap(function()
+            local rows = tonumber(ask.display_sync { title = 'Grid Rows', text = '10' })
+            if not rows then return end
+            local cols = tonumber(ask.display_sync { title = 'Grid Columns', text = '10' })
+            if not cols then return end
+
+            dlg.grid_resize(rows, cols)
+         end)()
+      end
+
       function action_col_size()
          coroutine.wrap(function()
             local size = ask.display_sync { title = 'Column Size', text = tostring(grid.column_size) }
@@ -276,6 +313,7 @@ function t.display(ctrl, init)
 
       local items = {
          { title = 'Resize...', action = action_resize },
+         { title = 'Grid...', action = action_grid },
          { title = 'Transpose', action = dlg.matrix_transpose },
          { title = 'Store matrix...', action = dlg.store_interactive },
          { title = 'Push matrix', action = dlg.push_to_stack },
@@ -305,7 +343,9 @@ function t.display(ctrl, init)
       end)
 
       if ok and res then
-         data:set(row, col, res, '0')
+         data:set(row, col, res)
+         data:fill(nil, nil, '0', false)
+
          grid:update_rows()
          ui.set_focus(grid)
          return true
@@ -339,11 +379,10 @@ function t.display(ctrl, init)
    -- Initialize empty matrix
    if not data then
       data = matrix.new()
-      dlg.matrix_resize(12, 12)
-   else
-      dlg.matrix_resize()
    end
 
+   setmetatable(data, grid_matrix)
+   dlg.grid_resize()
    update_selection()
 
    return dlg

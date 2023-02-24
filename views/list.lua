@@ -109,7 +109,7 @@ end
 
 function ui.list:update_rows()
    local old_size = #self.children
-   local new_size = #self.items
+   local new_size = self.items_len or #self.items
 
    self:layout_columns()
 
@@ -161,7 +161,6 @@ function ui.list:update_rows()
       self.children = {}
 
       for _, data in ipairs(self.items) do
-
          local row_view = ui.row_view()
          for _, column in ipairs(self.columns) do
             local cell = row_view:add_child(self:cell_constructor(column, data))

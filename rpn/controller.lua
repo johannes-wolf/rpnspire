@@ -464,7 +464,9 @@ function meta:edit_list_interactive(stack_item, cols)
    stack_item = stack_item or self:stack_sel_expr()
    if not stack_item then return end
 
-   local dlg = matrixeditor.display(self, matrix.new():from_list(stack_item.rpn, cols or 1))
+   local mat = matrix.new():from_list(stack_item.rpn, cols or 1)
+   local dlg = matrixeditor.display(self, mat)
+   dlg.grid_resize(mat.m + 10, cols)
    dlg.set_column_size('=')
    function dlg.on_done(mat)
       self:safe_call(function()

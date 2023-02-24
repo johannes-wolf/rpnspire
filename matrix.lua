@@ -1,19 +1,23 @@
 local expr  = require 'expressiontree'
-local lexer = require 'ti.lexer'
 
 ---@class matrix # Matrix helper class
----@field data any[][]
 local matrix = { mt = {} }
 matrix.mt.__index = matrix.mt
 
-function matrix.new()
-   return setmetatable({data = {}}, matrix.mt)
+function matrix.new(m, n)
+   return setmetatable({m = m or 0, n = n or 0}, matrix.mt)
 end
 
-function matrix.mt:from_expr(e)
-   self.data = {}
-   if e:isa(expr.MATRIX) then
-      for m, row in ipairs(e.children or {}) do
+function matrix.mt:__len()
+   return self.m
+end
+
+-- Set from ti matrix
+---@param mat expr Matrix
+function matrix.mt:from_expr(mat)
+   self:resize(0, 0)
+   if mat:isa(expr.MATRIX) then
+      for m, row in ipairs(mat.children or {}) do
          if row:isa(expr.MATRIX) then
             for n, col in ipairs(row.children or {}) do
                self:set(m, n, col:infix_string())
@@ -27,92 +31,132 @@ function matrix.mt:from_expr(e)
    return self
 end
 
-function matrix.mt:to_expr()
-   local m, n = self:size()
+-- Return as ti matrix
+---@param zero? expr Zero expression
+function matrix.mt:to_expr(zero)
+   zero = zero or expr.num(0)
 
    local rows = {}
-   for i = 1, m do
-      local cols = {}
-      for j = 1, n do
-         local tokens = lexer.tokenize(self.data[i][j])
-         table.insert(cols, expr.from_infix(tokens))
+   for i = 1, self.m do
+      local row = {}
+      for j = 1, self.n do
+         local v = self:get(i, j)
+         if type(v) == 'string' then
+            table.insert(row, expr.from_string(v))
+         elseif type(v) == 'number' then
+            table.insert(row, expr.num(v))
+         elseif expr.is_expr(v) then
+            table.insert(row, v)
+         else
+            table.insert(row, zero)
+         end
       end
-      table.insert(rows, expr.node('[', expr.MATRIX, cols))
+      table.insert(rows, expr.matrix(row))
    end
 
-   return expr.node('[', expr.MATRIX, rows)
+   return expr.matrix(rows)
 end
 
-function matrix.mt:from_list(e, cols)
-   cols = cols or 1
-   self.data = {}
-   for i, item in ipairs(e.children or {}) do
-      self:set(math.floor((i - 1) / cols + 1), (i - 1) % cols + 1, item:infix_string())
+-- Set values from list with column size n
+---@param lst expr Any expression
+---@param n? number Columns
+function matrix.mt:from_list(lst, n)
+   n = n or 1
+   self:resize(0, 0)
+   if not lst or not lst.children or #lst.children == 0 then
+      return self
+   end
+
+   self:resize(math.floor(#lst.children / n) + 1, n)
+   for i, item in ipairs(lst.children) do
+      self:set(math.floor((i - 1) / n + 1), (i - 1) % n + 1, item:infix_string())
    end
    return self
 end
 
-function matrix.mt:to_list()
-   local items = {}
+-- Store cells as flat list
+---@param zero? expr Zero expression
+---@return expr
+function matrix.mt:to_list(zero)
+   zero = zero or expr.num(0)
 
-   local m, n = self:size()
-   for i = 1, m do
-      for j = 1, n do
-         local tokens = lexer.tokenize(self.data[i][j])
-         table.insert(items, expr.from_infix(tokens))
+   local items = {}
+   for i = 1, self.m do
+      for j = 1, self.n do
+         local v = self:get(i, j)
+         if type(v) == 'string' then
+            table.insert(items, expr.from_string(v))
+         elseif type(v) == 'number' then
+            table.insert(items, expr.num(v))
+         elseif expr.is_expr(v) then
+            table.insert(items, v)
+         else
+            table.insert(items, zero)
+         end
       end
    end
 
-   return expr.node('{', expr.LIST, items)
+   return expr.list(items)
 end
 
--- Transpose matrix
+-- Transpose data
 function matrix.mt:transpose()
-   local rows, cols = self:size()
-
-   local new_data = {}
-   for n = 1, cols do
-      table.insert(new_data, {})
-      for m = 1, rows do
-         table.insert(new_data[n], self.data[m][n] or '0')
+   for j = 1, self.n do
+      for i = 1, self.m do
+         local tmp = self:get(i, j)
+         self:set(i, j, self:get(j, i))
+         self:set(j, i, tmp)
       end
    end
-   self.data = new_data
+   self.m, self.n = self.n, self.m
+   return self
 end
 
 -- Determine matrix size
 ---@return number Rows
 ---@return number Columns
 function matrix.mt:size()
-   local rows, cols = 0, 0
-   for row_idx, row in ipairs(self.data) do
-      for col_idx, col in ipairs(row) do
-         if col then
-            cols = math.max(cols, col_idx)
-            rows = math.max(rows, row_idx)
-         end
-      end
-   end
-
-   return rows, cols
+   return self.m, self.n
 end
 
--- Resize matrix to m, n, fill up with %zero
----@param m number # Row count
----@param n number # Column count
----@param zero any # Zero value
-function matrix.mt:resize(m, n, zero)
-   self:set(m, n, nil, zero)
-   for i = 1, #self.data, 1 do
-      if i > m then
-         self.data[i] = nil
-      else
-         for j = n + 1, #self.data[i] do
-            self.data[i][j] = nil
+-- Resize matrix to m, n
+---@param m number
+---@param n number
+function matrix.mt:resize(m, n)
+   if m < self.m then
+      for i = m + 1, self.m, 1 do
+         self[i] = nil
+      end
+   end
+   if n < self.n then
+      for i = 1, self.m do
+         if self[i] then
+            for j = n + 1, self.n, 1 do
+               self[i][j] = nil
+            end
          end
       end
    end
+
+   self.m = m
+   self.n = n
    return self
+end
+
+-- Fill vaules with %value up to m, n
+---@param m number|nil       Row count (or self.m)
+---@param n number|nil       Column count (or self.n)
+---@param value any          Value to set
+---@param overwrite? boolean Overwrite existing values
+function matrix.mt:fill(m, n, value, overwrite)
+   m = m or self.m
+   n = n or self.n
+   for i = 1, m do
+      for j = 1, n do
+         self[i] = self[i] or {}
+         self[i][j] = (overwrite and value) or self[i][j] or value
+      end
+   end
 end
 
 function matrix.mt:clear()
@@ -123,32 +167,20 @@ function matrix.mt:clear()
    end
 end
 
-function matrix.mt:set(m, n, value, fill)
-   local cm, cn = self:size()
-
-   local data = self.data
-   if m > cm or n > cn then
-      for row_idx = 1, math.max(m, cm) do
-         if not data[row_idx] then
-            data[row_idx] = {}
-         end
-
-         for col_idx = 1, math.max(n, cn) do
-            if not data[row_idx][col_idx] then
-               data[row_idx][col_idx] = fill
-            end
-         end
-      end
-   end
-
-   data[m][n] = value or data[m][n] or fill
+-- Set value at m, n
+---@param m number
+---@param n number
+---@param value any
+function matrix.mt:set(m, n, value)
+   self[m] = self[m] or {}
+   self[m][n] = value
+   self:resize(math.max(m, self.m), math.max(n, self.n))
 end
 
--- Return cell at m, n
+-- Get value at m, n
 ---@return any
 function matrix.mt:get(m, n)
-   local data = self.data
-   return data[m] and data[m][n]
+   return self[m] and self[m][n]
 end
 
 return matrix
