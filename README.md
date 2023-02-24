@@ -34,11 +34,23 @@ present you the first entry of a list of completion candidates starting with `so
 RPN-mode is the default mode of rpnspire. In RPN-mode, pressing an operator or function key submits the current input
 and directly evaluates the operator or function pressed. If the cursor is not at the last position, input mode is set to non-rpn (alg) automatically.
 
+<p align="center">
+<img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/stack.gif" width="300px"></img>
+</p>
+
 Calling functions from RPN-mode is done by just entering the function name without parentheses.
 To set the argument for variable argument functions, use parentheses.
 
 <p align="center">
 <img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn-zeros.gif" width="300px"></img>
+</p>
+
+### Matrix Editor
+
+RPNspire features a matrix editor to write and edit matrixes.
+
+<p align="center">
+<img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/matrix.gif" width="300px"></img>
 </p>
 
 ## Settings
@@ -68,6 +80,7 @@ top of the screen.
 | <kbd>.</kbd><kbd>right</kbd> | Go to end                                               |
 |------------------------------|---------------------------------------------------------|
 | <kbd>.</kbd><kbd>=</kbd>     | Store Y in X                                            |
+| <kbd>.</kbd><kbd>+-*/^</kbd> | Push dot operator                                       |
 | <kbd>.</kbd><kbd>s</kbd>     | Store interactive                                       |
 | <kbd>.</kbd><kbd>x</kbd>     | Solve interactive                                       |
 | <kbd>.</kbd><kbd>e</kbd>     | Edit last expression                                    |
@@ -76,7 +89,9 @@ top of the screen.
 | <kbd>.</kbd><kbd>/</kbd>     | Explode interactive                                     |
 |------------------------------|---------------------------------------------------------|
 | <kbd>.</kbd><kbd>v</kbd>     | Display variables                                       |
-| <kbd>.</kbd><kbd>m</kbd>     | Display apps/tool                                       |
+| <kbd>.</kbd><kbd>a</kbd>     | Display apps/tool                                       |
+| <kbd>.</kbd><kbd>b</kbd>     | Display bindings                                        |
+| <kbd>.</kbd><kbd>m</kbd>     | Open matrix editor                                      |
 
 ### Stack
 | Key                              | Function                                                        |
@@ -92,6 +107,23 @@ top of the screen.
 | <kbd>7</kbd>                     | Select bottom (oldest)                                          |
 | <kbd>3</kbd>                     | Select top (newest)                                             |
 | <kbd>tab</kbd>/<kbd>escape</kbd> | Focus input                                                     |
+
+### Matrix
+#### Grid
+| Key                          | Function            |
+|------------------------------|---------------------|
+| <kbd>.</kbd><kbd>left</kbd>  | Move to column 1    |
+| <kbd>.</kbd><kbd>right</kbd> | Move to last column |
+| <kbd>.</kbd><kbd>up</kbd>    | Move to first row   |
+| <kbd>.</kbd><kbd>down</kbd>  | Move to last row    |
+| <kbd>=</kbd>                 | Evaluate cell       |
+| <kbd>ctx</kbd>               | Show context menu   |
+
+#### Edit
+| Key              | Function                             |
+|------------------|--------------------------------------|
+| <kbd>,</kbd>     | Submit input and move to next column |
+| <kbd>enter</kbd> | Submit input and move to next row    |
 
 ## Features
 * [x] RPN interface supporting (nearly) all of the nspires operators
