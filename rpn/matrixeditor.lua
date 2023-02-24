@@ -112,6 +112,35 @@ function t.display(ctrl, init)
       ctrl.stack:push_expr(data:to_list())
    end
 
+   -- Action: Push matrix as system
+   function dlg.push_system_to_stack()
+      local e = data:to_list()
+      e.kind = expr.FUNCTION
+      e.text = 'system'
+      ctrl.stack:push_expr(e)
+   end
+
+   -- Action: Push matrix as piecewise
+   function dlg.push_piecewise_to_stack()
+      local e = data:to_list()
+      e.kind = expr.FUNCTION
+      e.text = 'piecewise'
+      ctrl.stack:push_expr(e)
+   end
+
+   -- Action: Push matrix as function
+   function dlg.push_any_to_stack()
+      local e = data:to_list()
+      e.kind = expr.FUNCTION
+      local ask_dlg = ask.display { title = 'Function name', text = 'system' }
+      function ask_dlg.on_done(text)
+         if text:len() > 0 then
+            e.text = text
+            ctrl.stack:push_expr(e)
+         end
+      end
+   end
+
    -- Action: Store interactive
    function dlg.store_interactive()
       ctrl.stack:push_expr(data:to_expr())
@@ -251,6 +280,9 @@ function t.display(ctrl, init)
          { title = 'Store matrix...', action = dlg.store_interactive },
          { title = 'Push matrix', action = dlg.push_to_stack },
          { title = 'Push list', action = dlg.push_list_to_stack },
+         { title = 'Push eqsystem', action = dlg.push_system_to_stack },
+         { title = 'Push piecewise', action = dlg.push_piecewise_to_stack },
+         { title = 'Push as...', action = dlg.push_any_to_stack },
          { title = 'Clear', action = dlg.matrix_clear },
          { title = 'Columns...', action = action_col_size },
       }

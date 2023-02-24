@@ -458,17 +458,17 @@ function meta:copy_result()
 end
 
 cmd('Edit list', 'edit_list_interactive')
-function meta:edit_list_interactive(stack_item)
+function meta:edit_list_interactive(stack_item, cols)
    local matrix = require 'matrix'
 
    stack_item = stack_item or self:stack_sel_expr()
    if not stack_item then return end
 
-   local dlg = matrixeditor.display(self, matrix.new():from_list(stack_item.rpn, 1))
+   local dlg = matrixeditor.display(self, matrix.new():from_list(stack_item.rpn, cols or 1))
    dlg.set_column_size('=')
    function dlg.on_done(mat)
       self:safe_call(function()
-         stack_item.rpn = mat:to_list()
+         stack_item.rpn.children = mat:to_list().children
          stack_item:eval(self.stack)
       end)
    end
@@ -494,10 +494,16 @@ cmd('Edit', 'edit_interactive')
 function meta:edit_interactive()
    local item = self:stack_sel_expr()
    if item then
-      if item.rpn:isa(expr.MATRIX) and config.edit_use_matrix_editor then
-         return self:edit_matrix_interactive(item)
-      elseif item.rpn:isa(expr.LIST) and config.edit_use_matrix_editor then
-         return self:edit_list_interactive(item)
+      if config.edit_use_matrix_editor then
+         if item.rpn:isa(expr.MATRIX) then
+            return self:edit_matrix_interactive(item)
+         elseif item.rpn:isa(expr.LIST) then
+            return self:edit_list_interactive(item, 1)
+         elseif item.rpn:isa(expr.FUNCTION, 'system') then
+            return self:edit_list_interactive(item, 1)
+         elseif item.rpn:isa(expr.FUNCTION, 'piecewise') then
+            return self:edit_list_interactive(item, 2)
+         end
       end
 
       local dlg = ask { title = 'Edit', text = item.infix or '' }

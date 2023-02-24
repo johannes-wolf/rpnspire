@@ -46,11 +46,8 @@ end
 function matrix.mt:from_list(e, cols)
    cols = cols or 1
    self.data = {}
-   if e:isa(expr.LIST) then
-      for i, item in ipairs(e.children or {}) do
-         print(string.format('Setting %d %d', math.floor(i / cols), i % cols + 1))
-         self:set(math.floor(i / cols), i % cols + 1, item:infix_string())
-      end
+   for i, item in ipairs(e.children or {}) do
+      self:set(math.floor((i - 1) / cols + 1), (i - 1) % cols + 1, item:infix_string())
    end
    return self
 end
