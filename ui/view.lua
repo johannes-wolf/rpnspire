@@ -52,7 +52,7 @@ function ui.view:layout_children(parent_frame)
       self.layout:update(parent_frame)
    end
 
-   local r = self:frame():clone():offset(self.scroll.x, self.scroll.y)
+   local r = self:content_frame():offset_rect(self.scroll.x, self.scroll.y)
    for _, v in ipairs(self.children or {}) do
       v:layout_children(r)
    end
@@ -63,6 +63,10 @@ function ui.view:frame()
       return self.layout:frame()
    end
    return ui.rect(0, 0, 0, 0)
+end
+
+function ui.view:content_frame()
+   return self:frame()
 end
 
 function ui.view:text_height(s)

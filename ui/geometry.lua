@@ -56,7 +56,7 @@ function rect_t:unpack()
 end
 
 -- Clone rect
----@return geom.rect
+---@return ui.rect
 function rect_t:clone()
    return geom.rect(self.x, self.y, self.width, self.height)
 end
@@ -65,6 +65,10 @@ function rect_t:offset(x, y)
    self.x = self.x + x
    self.y = self.y + y
    return self
+end
+
+function rect_t:offset_rect(x, y)
+   return geom.rect(self.x + x, self.y + y, self.width, self.height)
 end
 
 function rect_t:origin()
