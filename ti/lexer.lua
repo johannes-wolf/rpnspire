@@ -53,13 +53,15 @@ function lexer.tokenize(input)
         return nil
       end
     else
-      -- Normal number
+      -- Integer part
       i, j, token = input:find('^(%d*)', pos)
-      local ii, jj, real_part = input:find('^(%.%d+)', j and j+1 or pos)
-      if jj then
-         i = i or ii
-         j = jj
-         token = (token or '') .. real_part
+
+      -- Optional real part
+      local ri, rj, rtoken = input:find('^(%.%d+)', j and j+1 or pos)
+      if ri then
+         i = i or ri
+         j = rj
+         token = (token or '')..rtoken
       end
 
       if not i then return end
@@ -76,6 +78,9 @@ function lexer.tokenize(input)
         end
         if ei then
           j, token = ej, token..etoken
+        end
+        if input:find('^%.%d+', j+1) then
+           return nil
         end
       end
     end

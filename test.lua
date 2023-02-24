@@ -114,11 +114,11 @@ function test.tokenize_infix()
 
    -- Number
    expect("1", { { '1', 'n' } })
-   expect("1.", { { '1.', 'n' } })
    expect(".1", { { '.1', 'n' } })
    expect("1.1", { { '1.1', 'n' } })
    expect("123", { { '123', 'n' } })
-   fail("1.1.", 'Number followed by point')
+   fail("1.", 'Trailing point is invalid')
+   fail("1.1.", 'Trailing point is invalid')
    fail(".", 'Point is not a valid number')
 
    -- Number exponents
