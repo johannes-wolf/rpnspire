@@ -25,6 +25,21 @@ return {
       t['right'] = { function() view:set_cursor('end') end, 'Move to end' }
    end,
 
+   matrixeditor = function(dialog, grid, edit)
+      local t = get_tab(grid, 'kbd', leader)
+      t['left'] = { function() grid:set_selection(nil, 1) end, 'First column' }
+      t['right'] = { function() grid:set_selection(nil, 'end') end, 'Last column' }
+      t['up'] = { function() grid:set_selection(1, nil) end, 'First row' }
+      t['down'] = { function() grid:set_selection('end', nil) end, 'Last row' }
+
+      t = grid.kbd
+      t['='] = function() dialog.eval_cell() end
+      t['tab'] = function() dialog.next_cell('right') end
+
+      -- Hardcoded (see matrixeditor)
+      -- edit: [,] at end of input: Submit cell and move right
+   end,
+
    -- Bindings for main-view
    main = function(ctrl, win, edit, list)
       do
@@ -36,6 +51,7 @@ return {
          t['e'] = { function() ctrl:edit_interactive() end, 'Edit*' }
          t['a'] = { function() ctrl:run_app() end, 'Run app' }
          t['b'] = { function() ctrl:show_bindings() end, 'Show bindings' }
+         t['m'] = { function() ctrl:matrix_writer() end, 'Matrix writer' }
 
          t = win.kbd
          t['return'] = { function(_) ctrl:command_palette() end, 'Command palette' }

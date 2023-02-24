@@ -2,6 +2,25 @@ local ui = require 'ui'
 
 local t = {}
 
+function t.display_sync(title, text)
+   local co = coroutine.running()
+   local dlg = t.display(title, text)
+
+   local res
+   function dlg.on_cancel()
+      res = nil
+      coroutine.resume(co)
+   end
+   function dlg.on_done()
+      res = true
+      coroutine.resume(co)
+   end
+
+   assert(co)
+   coroutine.yield(co)
+   return res
+end
+
 -- Display dialog
 ---@param title?    string
 ---@param oninit?   function(ui.label, ui.label)

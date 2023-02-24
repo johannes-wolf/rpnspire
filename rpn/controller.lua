@@ -1,19 +1,20 @@
-local ui         = require 'ui'
-local stack      = require 'rpn.stack'
-local operators  = require 'ti.operators'
-local expr       = require 'expressiontree'
-local functions  = require 'ti.functions'
-local sym        = require 'ti.sym'
-local errtab     = require 'ti.error'
-local config     = require 'config.config'
-local bindings   = require 'config.bindings'
-local ask        = require('dialog.input').display
-local dlg_list   = require 'dialog.list'
-local dlg_error  = require 'dialog.error'
-local dlg_filter = require 'dialog.filterlist'
-local completion = require 'completion'
-local apps       = require 'apps.apps'
-local lexer      = require 'ti.lexer'
+local ui           = require 'ui'
+local stack        = require 'rpn.stack'
+local operators    = require 'ti.operators'
+local expr         = require 'expressiontree'
+local functions    = require 'ti.functions'
+local sym          = require 'ti.sym'
+local errtab       = require 'ti.error'
+local config       = require 'config.config'
+local bindings     = require 'config.bindings'
+local ask          = require('dialog.input').display
+local dlg_list     = require 'dialog.list'
+local dlg_error    = require 'dialog.error'
+local dlg_filter   = require 'dialog.filterlist'
+local completion   = require 'completion'
+local apps         = require 'apps.apps'
+local lexer        = require 'ti.lexer'
+local matrixeditor = require 'rpn.matrixeditor'
 
 require 'apps.init'
 
@@ -447,23 +448,43 @@ end
 
 cmd('Copy result', 'copy_result')
 function meta:copy_result()
-   local expr = self:stack_sel_expr()
-   if expr then
-      self.edit:insert_text(expr.result, true)
+   local item = self:stack_sel_expr()
+   if item then
+      self.edit:insert_text(item.result, true)
+   end
+end
+
+cmd('Edit matrix', 'edit_matrix_interactive')
+function meta:edit_matrix_interactive(stack_item)
+   local matrix = require 'matrix'
+
+   stack_item = stack_item or self:stack_sel_expr()
+   if not stack_item then return end
+
+   local dlg = matrixeditor.display(self, matrix.new():from_expr(stack_item.rpn))
+   function dlg.on_done(mat)
+      self:safe_call(function()
+         stack_item.rpn = mat:to_expr()
+         stack_item:eval(self.stack)
+      end)
    end
 end
 
 cmd('Edit', 'edit_interactive')
 function meta:edit_interactive()
-   local expr = self:stack_sel_expr()
-   if expr then
-      local dlg = ask { title = 'Edit', text = expr.infix or '' }
+   local item = self:stack_sel_expr()
+   if item then
+      if item.rpn:isa(expr.MATRIX) and config.edit_use_matrix_editor then
+         return self:edit_matrix_interactive(item)
+      end
+
+      local dlg = ask { title = 'Edit', text = item.infix or '' }
       completion.setup_edit(dlg.edit)
       dlg.on_done = function(text)
          if text:len() > 0 then
             self:record_undo()
-            expr.infix = text
-            self.stack:reeval_infix(expr)
+            item.infix = text
+            self.stack:reeval_infix(item)
          end
       end
    end
@@ -508,7 +529,8 @@ function meta:smart_append()
 end
 
 cmd('Store', 'store_interactive')
-function meta:store_interactive()
+---@param mode? 'pop'|'replace' # Config store mode override
+function meta:store_interactive(mode)
    if not self.stack:top() then return end
 
    local dlg = ask { title = string.format("Store %s to ...", self.stack:top().infix or '?') }
@@ -517,7 +539,7 @@ function meta:store_interactive()
       if text:len() > 0 then
          self:record_undo()
          self.stack:push_infix(text)
-         self.stack:push_rstore()
+         self.stack:push_rstore(mode)
       end
    end
 end
@@ -683,10 +705,21 @@ function meta:show_bindings()
    collect_bindings('All', self.window)
    collect_bindings('Edit', self.edit)
    collect_bindings('Stack', self.list)
+   -- TODO: How show bindings of other views not existing yet? 
 
    local dlg = dlg_list.display{ title = 'Bindings', items = items }
    function dlg.on_done(item)
       return true
+   end
+end
+
+cmd('Matrix writer', 'matrix_writer')
+function meta:matrix_writer()
+   local dlg = matrixeditor.display(self, nil)
+   function dlg.on_done(mat)
+      self:safe_call(function()
+         self.stack:push_expr(mat:to_expr())
+      end)
    end
 end
 

@@ -20,6 +20,9 @@ return {
    -- Respect document settings for formatting numbers
    use_document_settings = true,
 
+   -- Edit matrices via the matrix editor
+   edit_use_matrix_editor = true,
+
    -- Expandable edit snippets
    -- Expanding a snippet will _not_ trigger autocompletion!
    snippets = {
