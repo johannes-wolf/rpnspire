@@ -98,6 +98,11 @@ function GC:draw_rect(x, y, w, h, stroke, fill)
    end
 end
 
+function GC:draw_line(x, y, x2, y2, color)
+   self.gc:setColorRGB(color or 0)
+   self.gc:drawLine(x, y, x2, y2)
+end
+
 function GC:text_width(text)
    return text and self.gc:getStringWidth(text) or 0
 end

@@ -54,6 +54,8 @@ end
 
 function meta:initialize()
    self.list.font_size = config.stack_font_size
+   self.list.style = 'list'
+   self.list.columns = {{ size = '*' }}
 
    self:poison_edit()
    self:poison_list()
@@ -155,13 +157,13 @@ function meta:poison_list()
       ui.set_focus(self.edit)
    end
 
-   self.list.row_update = function(this, row, data)
-      row._infix.text = data.label or data.infix or ''
-      row._result.text = data.result or ''
+   self.list.cell_update = function(this, cell, column, data)
+      cell._infix.text = data.label or data.infix or ''
+      cell._result.text = data.result or ''
    end
 
-   self.list.row_constructor = function(this, data)
-      local padding = 2
+   self.list.cell_constructor = function(this, column, data)
+      local padding = ui.style.padding
       local row = ui.container()
       row.style = 'none'
 

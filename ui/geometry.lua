@@ -2,7 +2,16 @@ local ui = require 'ui.shared'
 
 local geom = {}
 
+---@class ui.point
+---@field x number
+---@field y number
 local point_t = {}
+
+---@class ui.rect
+---@field x number
+---@field y number
+---@field width number
+---@field height number
 local rect_t = {}
 
 local function is_point(o)
@@ -128,6 +137,15 @@ function rect_t:intersection_rect(r)
       return geom.rect(x1, y1, x2 - x1, y2 - y1)
    end
    return geom.rect(0, 0, 0, 0)
+end
+
+-- Return union rect of self and %r
+---@param r ui.rect
+---@return ui.rect
+function rect_t:union_rect(r)
+   local x1, x2 = math.min(self.x, r.x), math.max(self:max_x(), r:max_x())
+   local y1, y2 = math.min(self.y, r.y), math.max(self:max_y(), r:max_y())
+   return geom.rect(x1, y1, x2 - x1, y2 - y1)
 end
 
 function rect_t:__tostring()

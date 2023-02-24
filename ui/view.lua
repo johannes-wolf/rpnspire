@@ -104,6 +104,10 @@ function ui.view:draw(gc, dirty)
    if self.clip then
       gc:reset_clip()
    end
+
+   if self.draw_overlay then
+      self:draw_overlay(gc)
+   end
 end
 
 -- Draw self
