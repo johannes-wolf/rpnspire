@@ -47,6 +47,9 @@ function rpn_stack_node:eval(s)
    if res then
       self.infix = infix
       self.result = res
+      if s.on_change then
+         s:on_change()
+      end
       return true
    end
 end
