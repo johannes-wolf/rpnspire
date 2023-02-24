@@ -64,6 +64,12 @@ function t.display(ctrl, init)
       grid:update_rows()
    end
 
+   -- Action: Transpose
+   function dlg.matrix_transpose()
+      data:transpose()
+      dlg.matrix_resize()
+   end
+
    -- Action: Clear matrix values
    function dlg.matrix_clear()
       data:clear()
@@ -221,6 +227,7 @@ function t.display(ctrl, init)
 
       local items = {
          { title = 'Resize...', action = action_resize },
+         { title = 'Transpose', action = dlg.matrix_transpose },
          { title = 'Store...', action = dlg.store_interactive },
          { title = 'Push', action = dlg.push_to_stack },
          { title = 'Clear', action = dlg.matrix_clear },

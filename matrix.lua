@@ -43,6 +43,20 @@ function matrix.mt:to_expr()
    return expr.node('[', expr.MATRIX, rows)
 end
 
+-- Transpose matrix
+function matrix.mt:transpose()
+   local rows, cols = self:size()
+
+   local new_data = {}
+   for n = 1, cols do
+      table.insert(new_data, {})
+      for m = 1, rows do
+         table.insert(new_data[n], self.data[m][n] or '0')
+      end
+   end
+   self.data = new_data
+end
+
 -- Determine matrix size
 ---@return number Rows
 ---@return number Columns
