@@ -34,7 +34,7 @@ return {
 
          t['v'] = { function() ctrl:variables_interactive() end, 'Show variables' }
          t['e'] = { function() ctrl:edit_interactive() end, 'Edit*' }
-         t['m'] = { function() ctrl:run_app() end, 'Run tool' }
+         t['a'] = { function() ctrl:run_app() end, 'Run app' }
          t['b'] = { function() ctrl:show_bindings() end, 'Show bindings' }
 
          t = win.kbd
