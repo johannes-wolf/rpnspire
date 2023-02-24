@@ -22,8 +22,6 @@ function t.display(ctrl, init)
 
    local data = init
 
-   local stack = ctrl.stack
-
    local window = ui.container(ui.rel { left = 10, right = 10, top = 10, bottom = 10 })
    window.style = '2D'
 
@@ -55,7 +53,10 @@ function t.display(ctrl, init)
 
       local new_columns = {}
       for i = 1, cols do
-         table.insert(new_columns, { index = i, size = grid.column_size })
+         table.insert(new_columns, {
+            index = i,
+            size = grid.column_size,
+         })
       end
 
       grid.columns = new_columns
@@ -77,9 +78,23 @@ function t.display(ctrl, init)
    end
 
    -- Action: Set grid column size
-   ---@param size number
+   ---@param size number|'-'|'+'|'*'|'='
    function dlg.set_column_size(size)
-      grid.column_size = math.min(math.max(10, size), 200)
+      if size == '*' then
+         grid.column_size = '*'
+      elseif size == '=' then
+         grid.column_size = grid:frame().width / #grid.columns
+      else
+         if grid.column_size == '*' then
+            grid.column_size = 50
+         end
+         if size == '-' then
+            size = grid.column_size - 10
+         elseif size == '+' then
+            size = grid.column_size + 10
+         end
+         grid.column_size = math.min(math.max(10, size), 260)
+      end
 
       for _, column in ipairs(grid.columns) do
          column.size = grid.column_size
@@ -90,6 +105,11 @@ function t.display(ctrl, init)
    -- Action: Push matrix to stack
    function dlg.push_to_stack()
       ctrl.stack:push_expr(data:to_expr())
+   end
+
+   -- Action: Push matrix as list
+   function dlg.push_list_to_stack()
+      ctrl.stack:push_expr(data:to_list())
    end
 
    -- Action: Store interactive
@@ -218,7 +238,7 @@ function t.display(ctrl, init)
 
       function action_col_size()
          coroutine.wrap(function()
-            local size = tonumber(ask.display_sync { title = 'Column Size', text = tostring(grid.column_size) })
+            local size = ask.display_sync { title = 'Column Size', text = tostring(grid.column_size) }
             if not size then return end
 
             dlg.set_column_size(size)
@@ -228,8 +248,9 @@ function t.display(ctrl, init)
       local items = {
          { title = 'Resize...', action = action_resize },
          { title = 'Transpose', action = dlg.matrix_transpose },
-         { title = 'Store...', action = dlg.store_interactive },
-         { title = 'Push', action = dlg.push_to_stack },
+         { title = 'Store matrix...', action = dlg.store_interactive },
+         { title = 'Push matrix', action = dlg.push_to_stack },
+         { title = 'Push list', action = dlg.push_list_to_stack },
          { title = 'Clear', action = dlg.matrix_clear },
          { title = 'Columns...', action = action_col_size },
       }

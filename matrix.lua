@@ -43,6 +43,32 @@ function matrix.mt:to_expr()
    return expr.node('[', expr.MATRIX, rows)
 end
 
+function matrix.mt:from_list(e, cols)
+   cols = cols or 1
+   self.data = {}
+   if e:isa(expr.LIST) then
+      for i, item in ipairs(e.children or {}) do
+         print(string.format('Setting %d %d', math.floor(i / cols), i % cols + 1))
+         self:set(math.floor(i / cols), i % cols + 1, item:infix_string())
+      end
+   end
+   return self
+end
+
+function matrix.mt:to_list()
+   local items = {}
+
+   local m, n = self:size()
+   for i = 1, m do
+      for j = 1, n do
+         local tokens = lexer.tokenize(self.data[i][j])
+         table.insert(items, expr.from_infix(tokens))
+      end
+   end
+
+   return expr.node('{', expr.LIST, items)
+end
+
 -- Transpose matrix
 function matrix.mt:transpose()
    local rows, cols = self:size()
@@ -89,6 +115,7 @@ function matrix.mt:resize(m, n, zero)
          end
       end
    end
+   return self
 end
 
 function matrix.mt:clear()

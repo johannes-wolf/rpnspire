@@ -181,7 +181,7 @@ function ui.list:layout_column(column, x)
    column._x = x
    if column.size == '*' then
       column._x = x
-      column._size = math.max(0, self:frame().width - x)
+      column._size = math.max(0, self:frame().width)
    else
       column._size = column.size
    end

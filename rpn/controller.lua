@@ -454,6 +454,22 @@ function meta:copy_result()
    end
 end
 
+cmd('Edit list', 'edit_list_interactive')
+function meta:edit_list_interactive(stack_item)
+   local matrix = require 'matrix'
+
+   stack_item = stack_item or self:stack_sel_expr()
+   if not stack_item then return end
+
+   local dlg = matrixeditor.display(self, matrix.new():from_list(stack_item.rpn, 1))
+   function dlg.on_done(mat)
+      self:safe_call(function()
+         stack_item.rpn = mat:to_list()
+         stack_item:eval(self.stack)
+      end)
+   end
+end
+
 cmd('Edit matrix', 'edit_matrix_interactive')
 function meta:edit_matrix_interactive(stack_item)
    local matrix = require 'matrix'
@@ -476,6 +492,8 @@ function meta:edit_interactive()
    if item then
       if item.rpn:isa(expr.MATRIX) and config.edit_use_matrix_editor then
          return self:edit_matrix_interactive(item)
+      elseif item.rpn:isa(expr.LIST) and config.edit_use_matrix_editor then
+         return self:edit_list_interactive(item)
       end
 
       local dlg = ask { title = 'Edit', text = item.infix or '' }
