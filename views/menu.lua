@@ -48,6 +48,7 @@ function ui.menu.menu_at_point(parent, items, pt)
 
    local m = ui.menu()
    m.items = items
+   m.origin_session = ui.get_modal()
    m.origin = parent
    m:open_at_point(pt)
    ui.set_focus(m)
@@ -175,7 +176,10 @@ function ui.menu:close(mode)
       end
       self.parent:remove_child(self)
    end
-   ui.set_focus(self.origin)
+
+   if self.origin_session then
+      self.origin_session.focus = self.origin
+   end
 end
 
 function ui.menu:on_left()
@@ -229,7 +233,6 @@ function ui.menu:on_enter_key()
 end
 
 function ui.menu:on_enter()
-   print('ENTER')
    if not ui.menu then
       ui.menu = self
    end
