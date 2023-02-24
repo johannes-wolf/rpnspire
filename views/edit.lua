@@ -111,9 +111,10 @@ function ui.edit:set_cursor(pos, sel)
 
    if sel == 'all' then
       self.selection = self.text:ulen() - self.cursor + 1
+   else
+      self.selection = sel or 0
    end
 
-   self.selection = sel or 0
    if self.selection < 0 then
       self.cursor = self.cursor + self.selection
       self.selection = -1 * self.selection
