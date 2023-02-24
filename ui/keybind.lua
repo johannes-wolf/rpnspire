@@ -16,7 +16,7 @@ end
 -- Try call current sequence in tab
 -- Example:
 --   try_call({'.', {'a', function() ... end}})
---     or 
+--     or
 --   try_call({'.', {'a', { function() ... end, 'description'} }})
 ---@param tab sequence_table Sequence table
 ---@return any|nil Matched action or nil
@@ -25,13 +25,13 @@ function kbd:try_call_table(tab)
    for i, v in ipairs(self.seq) do
       local at_end = i == #self.seq
       if not t or type(t) ~= 'table' then
-	 return nil
+         return nil
       end
       if t[v] or (v:find('^[0-9]+$') and t['%d']) then
-	 t = t[v] or t['%d']
-	 if at_end then
-	    return self:exec(t)
-	 end
+         t = t[v] or t['%d']
+         if at_end then
+            return self:exec(t)
+         end
       end
    end
 end
@@ -49,12 +49,13 @@ function kbd:exec(tab)
    if type(tab) == 'function' then
       tab(self.seq)
       self:reset()
+      return true
    end
    return tab
 end
 
 function kbd:on_return()
-   self:on_char('return')
+   return self:on_char('return')
 end
 
 function kbd:on_escape()
@@ -66,42 +67,41 @@ function kbd:on_escape()
 end
 
 function kbd:on_enter_key()
-   self:on_char('enter')
+   return self:on_char('enter')
 end
 
 function kbd:on_left()
-   self:on_char('left')
+   return self:on_char('left')
 end
 
 function kbd:on_right()
-   self:on_char('right')
+   return self:on_char('right')
 end
 
 function kbd:on_up()
-   self:on_char('up')
+   return self:on_char('up')
 end
 
 function kbd:on_down()
-   self:on_char('down')
+   return self:on_char('down')
 end
 
 function kbd:on_backspace()
-   self:on_char('backspace')
+   return self:on_char('backspace')
 end
 
 function kbd:on_tab()
-   self:on_char('tab')
+   return self:on_char('tab')
 end
 
 function kbd:on_char(c)
    if self.on_seq then
       table.insert(self.seq, tostring(c))
       if self:on_seq() then
-	 return true
+         return true
       end
       self:reset()
    end
 
    return false
 end
-
