@@ -54,7 +54,15 @@ function lexer.tokenize(input)
       end
     else
       -- Normal number
-      i, j, token = input:find('^(%d*%.?%d*)', pos)
+      i, j, token = input:find('^(%d*)', pos)
+      local ii, jj, real_part = input:find('^(%.%d+)', j and j+1 or pos)
+      if jj then
+         i = i or ii
+         j = jj
+         token = (token or '') .. real_part
+      end
+
+      if not i then return end
 
       -- '.' is not a number
       if i and (token == '' or token == '.') then i = nil end
@@ -69,11 +77,6 @@ function lexer.tokenize(input)
         if ei then
           j, token = ej, token..etoken
         end
-      end
-
-      -- Fail if followed by additional digit or point
-      if input:find('^[%d%.]', j+1) then
-        return nil
       end
     end
 
@@ -118,7 +121,8 @@ function lexer.tokenize(input)
             tokens[#tokens][2] = 'function'
           end
 
-          table.insert(tokens, {token, m.kind, location = {i, j}})
+          --table.insert(tokens, {token, m.kind, location = {i, j}})
+          table.insert(tokens, {token, m.kind})
         end
         pos = j+1
         break

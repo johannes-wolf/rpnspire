@@ -45,6 +45,16 @@ function m.op(text, children)
    return m.node(text, k_op, children)
 end
 
+-- Parse infix expression string
+---@param input string Input infix expression string
+---@return expr?
+function m.from_string(input)
+   local lexer = require('ti.lexer')
+   local tokens = lexer.tokenize(input)
+   if not tokens then error { desc = 'Error tokenizing input' } end
+   return m.from_infix(tokens)
+end
+
 -- Test node for equality
 ---@param kind? expr_kind
 ---@param text? string
@@ -78,6 +88,13 @@ function t:clone()
       children[i] = v:clone()
    end
    return m.node(self.text, self.kind, children)
+end
+
+-- Evaluate node to string
+---@return string Result
+---@return number Error code
+function t:eval()
+   return math.evalStr(self:infix_string())
 end
 
 ---@return string
@@ -462,15 +479,15 @@ function m.from_infix(tokens)
    -- Operators
    parser:add_prefix_op({ '#' }, 18)
    parser:add_suffix_op({ '!', '%', '@t', sym.RAD, sym.GRAD, sym.DEGREE, sym.TRANSP }, 17)
-   parser:add_infix_op({ '^' }, 16, 'right')
+   parser:add_infix_op({ '^', '.^' }, 16, 'right')
    parser:add_prefix({ '-', sym.NEGATE }, {
       parse = function(self, p, t)
          return m.op(sym.NEGATE, { p:parse_precedence(15) })
       end
    })
    parser:add_infix_op({ '&' }, 14)
-   parser:add_infix_op({ '*', '/' }, 13)
-   parser:add_infix_op({ '+', '-' }, 12)
+   parser:add_infix_op({ '*', '/', '.*', './' }, 13)
+   parser:add_infix_op({ '+', '-', '.+', '.-' }, 12)
    parser:add_infix_op({ '=', '/=', '<', '>', '<=', '>=', sym.NEQ, sym.LEQ, sym.GEQ }, 11)
    parser:add_prefix_op({ 'not' }, 10)
    parser:add_infix_op({ 'and', 'or' }, 10)

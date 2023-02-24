@@ -44,6 +44,10 @@ return {
       do
          local t = get_tab(edit, 'kbd', leader)
          t['='] = { function(_) ctrl:push_operator('=:') end, '=:' }
+         t['+'] = { function(_) ctrl:push_operator('.+') end, '.+' }
+         t['-'] = { function(_) ctrl:push_operator('.-') end, '.-' }
+         t['*'] = { function(_) ctrl:push_operator('.*') end, '.*' }
+         t['/'] = { function(_) ctrl:push_operator('./') end, './' }
          t['^2'] = { function(_) ctrl:push_operator('1/x') end, '1/x' }
          t[','] = { function(_) ctrl:smart_append() end, 'Smart append' }
          t['/'] = { function(_) ctrl:explode_interactive() end, 'Explode*' }

@@ -247,13 +247,15 @@ function rpn_stack:push_operator(str, argc)
 end
 
 -- Push left store :=
-function rpn_stack:push_lstore()
+---@param mode? 'pop'|'replace' # Configuration store mode override
+function rpn_stack:push_lstore(mode)
+   mode = mode or config.store_mode
    self:assert_size(2, "LSTORE")
    self:push_expr(expr.op(':=', self:pop_n(2)))
 
-   if config.store_mode == 'pop' then
+   if mode == 'pop' then
       self:pop()
-   elseif config.store_mode == 'replace' then
+   elseif mode == 'replace' then
       self:top().rpn = self:top().rpn.children[1]
       self:top():eval(self)
       self:notify_change()
@@ -261,13 +263,15 @@ function rpn_stack:push_lstore()
 end
 
 -- Push right store =:
-function rpn_stack:push_rstore()
+---@param mode? 'pop'|'replace' # Configuration store mode override
+function rpn_stack:push_rstore(mode)
+   mode = mode or config.store_mode
    self:assert_size(2, "RSTORE")
    self:push_expr(expr.op('=:', self:pop_n(2)))
 
-   if config.store_mode == 'pop' then
+   if mode == 'pop' then
       self:pop()
-   elseif config.store_mode == 'replace' then
+   elseif mode == 'replace' then
       self:top().rpn = self:top().rpn.children[2]
       self:top():eval(self)
       self:notify_change()
