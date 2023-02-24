@@ -15,6 +15,7 @@ local completion   = require 'completion'
 local apps         = require 'apps.apps'
 local lexer        = require 'ti.lexer'
 local matrixeditor = require 'rpn.matrixeditor'
+local advice       = require 'advice'
 
 require 'apps.init'
 
@@ -75,44 +76,46 @@ end
 function meta:poison_edit()
    self.edit.on_up = function(view)
       self.list:set_selection('end')
-      ui.set_focus(self.list)
-   end
-
-   local orig_on_backspace = self.edit.on_backspace
-   self.edit.on_backspace = function(view)
-      if view.text:len() == 0 then
-         self.stack:pop()
-      else
-         orig_on_backspace(view)
+      if #self.stack.stack > 0 then
+         ui.set_focus(self.list)
       end
    end
 
-   local orig_insert_text = self.edit.insert_text
-   self.edit.insert_text = function(view, text, sel)
-      if view:is_cursor_at_end() then
-         self:safe_call(function()
-            if not self:handle_char(text) then
-               orig_insert_text(view, text, sel)
-            end
-         end)
-         return
-      end
-      orig_insert_text(view, text, sel)
-   end
+   self.edit.on_backspace = advice.around(self.edit.on_backspace,
+       function(fn, view)
+          if view.text:len() == 0 then
+             self.stack:pop()
+          else
+             fn(view)
+          end
+   end)
 
-   local orig_on_char = self.edit.on_char
-   self.edit.on_char = function(view, c)
-      -- Filter leading space
-      if view.cursor <= 1 and c == ' ' then
-         return
-      end
-
-      self:safe_call(function()
-         if not self:handle_char(c) then
-            orig_on_char(view, c)
-         end
+   self.edit.insert_text = advice.around(self.edit.insert_text,
+       function(fn, view, text, sel)
+          if view:is_cursor_at_end() then
+             self:safe_call(function()
+                if not self:handle_char(text) then
+                   fn(view, text, sel)
+                end
+             end)
+             return
+          end
+          fn(view, text, sel)
       end)
-   end
+
+   self.edit.on_char = advice.around(self.edit.on_char,
+       function(fn, view, c)
+          -- Filter leading space
+          if view.cursor <= 1 and c == ' ' then
+             return
+          end
+
+          self:safe_call(function()
+             if not self:handle_char(c) then
+                fn(view, c)
+             end
+          end)
+      end)
 
    self.edit.on_enter_key = function(view)
       if view.text:ulen() > 0 then
@@ -462,6 +465,7 @@ function meta:edit_list_interactive(stack_item)
    if not stack_item then return end
 
    local dlg = matrixeditor.display(self, matrix.new():from_list(stack_item.rpn, 1))
+   dlg.set_column_size('=')
    function dlg.on_done(mat)
       self:safe_call(function()
          stack_item.rpn = mat:to_list()
