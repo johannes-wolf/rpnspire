@@ -19,7 +19,8 @@ function matrix.mt:from_expr(e)
                self:set(m, n, col:infix_string())
             end
          else
-            self:set(m, 1, row:infix_string())
+            -- [x,y,z] -> [[x,y,z]]
+            self:set(1, m, row:infix_string())
          end
       end
    end
