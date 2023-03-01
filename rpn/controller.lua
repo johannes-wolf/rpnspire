@@ -220,6 +220,46 @@ local function is_function(c)
    return functions.query_info(c, true) and true
 end
 
+-- Togle +/- of input string
+--   '123'  -> '-123'
+--   '1EE2' -> '1EE-2'
+---@param str string
+---@return string
+local function toggle_sign(str)
+   assert(str)
+
+   local n
+   str, n = str:gsub(sym.EE .. sym.NEGATE, sym.EE, 1)
+   if n == 0 then
+      str, n = str:gsub(sym.EE .. '%-', sym.EE, 1)
+   end
+   if n == 0 then
+      str, n = str:gsub(sym.EE .. '%+?', sym.EE .. sym.NEGATE, 1)
+   end
+
+   if n > 0 then
+      return str
+   end
+
+   str, n = str:gsub('^' .. sym.NEGATE, '', 1)
+   if n == 0 then
+      str, n = str:gsub('^%-', '', 1)
+   end
+   if n == 0 then
+      str, n = str:gsub('^%+?', sym.NEGATE, 1)
+   end
+   return str
+end
+
+-- Toggle input sign +/-
+function meta:negate_input()
+   local text = toggle_sign(self.edit.text or '')
+   local cursor = self.edit.text:ulen() - self.edit.cursor
+   self.edit:set_text(text)
+   self.edit:set_cursor(self.edit.text:ulen() - cursor)
+   return true
+end
+
 function meta:handle_char(c)
    if self.mode ~= 'rpn' then
       return false
@@ -232,14 +272,7 @@ function meta:handle_char(c)
 
    -- Toggle negative sign for non empty input
    if self.edit.text:ulen() > 0 and c == sym.NEGATE then
-      local is_negative = self.edit.text:find(sym.NEGATE) == 1
-      if is_negative then
-         self.edit.text = self.edit.text:usub(2)
-         self.edit.cursor = self.edit.cursor - 1
-      else
-         self.edit.text = sym.NEGATE .. self.edit.text
-         self.edit.cursor = self.edit.cursor + 1
-      end
+      self:negate_input()
       return true
    end
 
