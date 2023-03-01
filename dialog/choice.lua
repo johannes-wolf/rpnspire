@@ -23,7 +23,7 @@ function t.display_sync(options, on_init)
       coroutine.resume(co)
    end
    function dlg.on_done(row)
-      res = row.result
+      res = row.result or row
       sel = dlg.list.sel
       col = dlg.list.col
       coroutine.resume(co)
@@ -39,8 +39,13 @@ end
 ---@param on_init? function(label: ui.label, list: ui.list)
 ---@return any
 function t.display(options, on_init)
-   local dlg_list = require 'dialog.list'
-   return dlg_list.display(options, on_init)
+   if options.filter then
+      local dlg = require 'dialog.filterlist'
+      return dlg.display(options, options.filter, on_init)
+   else
+      local dlg = require 'dialog.list'
+      return dlg.display(options, on_init)
+   end
 end
 
 return t

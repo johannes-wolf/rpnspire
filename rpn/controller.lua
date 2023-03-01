@@ -664,7 +664,7 @@ function meta:run_app(name)
       return items
    end
 
-   local dlg = dlg_filter.display('Apps', apply_filter)
+   local dlg = dlg_filter.display({ title = 'Apps' }, apply_filter)
    dlg.on_done = function(item)
       if item then
          self:record_undo()
@@ -744,7 +744,7 @@ function meta:command_palette()
       return items
    end
 
-   local dlg = dlg_filter.display('Command', apply_filter)
+   local dlg = dlg_filter.display({ title = 'Command' }, apply_filter)
    function dlg.on_done(data)
       self:safe_call(function()
          data.fn(self)

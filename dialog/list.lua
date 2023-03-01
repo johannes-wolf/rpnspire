@@ -54,6 +54,7 @@ function t.display(options, oninit)
 
    dlg.list = ui.list(ui.rel{left = 0, right = 0, bottom = 0, top = top})
    dlg.list.items = options.items
+   dlg.list.columns = options.columns or dlg.list.columns
    dlg.list.font_size = options.font_size or dlg.list.font_size
    dlg.list.row_size = options.row_size or dlg.list.row_size
    dlg.window:add_child(dlg.list)

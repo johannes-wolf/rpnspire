@@ -3,11 +3,11 @@ local ui = require 'ui'
 local t = {}
 
 -- Display dialog
----@param title?    string
+---@param options   table<string, any>
 ---@param filter_fn function(text): list<any> # Filter function. Must return all items when called with nil or ''.
 ---@param on_init?  function(label: ui.label, edit: ui.edit, list: ui.list)
 ---@return list_dlg
-function t.display(title, filter_fn, on_init)
+function t.display(options, filter_fn, on_init)
    ---@class list_dlg
    ---@field window    ui.container
    ---@field label     ui.label
@@ -25,7 +25,7 @@ function t.display(title, filter_fn, on_init)
    dlg.window.style = '2D'
 
    dlg.label = ui.label(ui.rel { left = 0, right = 0, top = 0, height = 20 })
-   dlg.label.text = title or ''
+   dlg.label.text = options.title or ''
    dlg.label.background = 0
    dlg.label.foreground = 0xffffff
    dlg.window:add_child(dlg.label)
@@ -35,6 +35,9 @@ function t.display(title, filter_fn, on_init)
 
    dlg.list = ui.list(ui.rel { left = 0, right = 0, bottom = 0, top = 40 })
    dlg.list.items = filter_fn(nil)
+   dlg.list.columns = options.columns or dlg.list.columns
+   dlg.list.font_size = options.font_size or dlg.list.font_size
+   dlg.list.row_size = options.row_size or dlg.list.row_size
    dlg.window:add_child(dlg.list)
 
    if on_init then on_init(dlg.label, dlg.edit, dlg.list) end
