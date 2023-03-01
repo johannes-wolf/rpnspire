@@ -691,6 +691,13 @@ function meta:push_operator(operator)
    self:handle_char(operator)
 end
 
+-- Do [+/-]
+cmd('+/-', 'negate')
+function meta:negate()
+   self:record_undo()
+   self:handle_char(sym.NEGATE)
+end
+
 -- Clear stack
 cmd('Clear stack', 'clear_stack')
 function meta:clear_stack()
