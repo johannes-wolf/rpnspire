@@ -24,7 +24,7 @@ function lexer.tokenize(input)
   end
 
   local function unit(input, i)
-    return input:find('^(_[%a\128-\255]+)', i)
+    return input:find('^(_[%a\128-\255][%w\128-\255]*)', i)
   end
 
   local function number(input, pos)

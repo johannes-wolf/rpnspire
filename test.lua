@@ -143,6 +143,9 @@ function test.tokenize_infix()
 
    -- Units
    expect("_m", { { '_m', 'u' } })
+   expect("_tonne", { { '_tonne', 'u' } })
+   expect("_mmH2O", { { '_mmH2O', 'u' } })
+   expect("_a_b", { { '_a', 'u' }, { '_b', 'u' } })
 
    -- String
    expect('"hello"', { { '"hello"', 'str' } })

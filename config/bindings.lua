@@ -23,6 +23,12 @@ return {
       local t = get_tab(view, 'kbd', leader)
       t['left'] = { function() view:set_cursor(1) end, 'Move to beginning' }
       t['right'] = { function() view:set_cursor('end') end, 'Move to end' }
+
+      t = get_tab(view, 'kbd', leader, 'g')
+      t['a'] = { function() view:insert_text(sym.alpha, false) end, 'greek alpha' }
+      t['b'] = { function() view:insert_text(sym.beta, false) end, 'greek beta' }
+      t['c'] = { function() view:insert_text(sym.gamma, false) end, 'greek gamma' }
+      t['d'] = { function() view:insert_text(sym.delta, false) end, 'greek delta' }
    end,
 
    matrixeditor = function(dialog, grid, edit)

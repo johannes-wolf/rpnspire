@@ -23,6 +23,13 @@ end
 
 local function special_char_menu(edit)
    local chars = {
+      { title = sym.alpha, hint = 'alpha' },
+      { title = sym.beta, hint = 'beta' },
+      { title = sym.gamma, hint = 'gamma' },
+      { title = sym.delta, hint = 'delta' },
+      { title = sym.pi, hint = 'pi' },
+      { title = sym.sigma, hint = 'sigma' },
+      { title = sym.Omega, hint = 'Omega' },
       { title = '[', hint = 'lbracket (' },
       { title = ']', hint = 'rbracket )' },
       { title = '{', hint = 'lbrace (' },
