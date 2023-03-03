@@ -476,9 +476,9 @@ end
 
 cmd('Copy expression', 'copy')
 function meta:copy()
-   local expr = self:stack_sel_expr()
-   if expr then
-      self.edit:insert_text(expr.infix, true)
+   local e = self:stack_sel_expr()
+   if e then
+      self.edit:insert_text(e.infix, true)
    end
 end
 
