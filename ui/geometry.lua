@@ -83,6 +83,14 @@ function rect_t:max_y()
    return self.y + self.height
 end
 
+function rect_t:mid_x()
+   return self.x + self.width / 2
+end
+
+function rect_t:mid_y()
+   return self.y + self.height / 2
+end
+
 function rect_t:top_left()
    return geom.point(self.x, self.y)
 end
@@ -150,6 +158,37 @@ function rect_t:union_rect(r)
    local x1, x2 = math.min(self.x, r.x), math.max(self:max_x(), r:max_x())
    local y1, y2 = math.min(self.y, r.y), math.max(self:max_y(), r:max_y())
    return geom.rect(x1, y1, x2 - x1, y2 - y1)
+end
+
+
+-- Return aligned rect
+---@param v_align 'top'|'center'|'bottom' Vertical alignment
+---@param h_align 'left'|'center'|'right' Horizontal alignment
+---@param width number
+---@param height number
+---@return geom.rect
+function rect_t:aligned_rect(v_align, h_align, width, height)
+   v_align = v_align or 'center'
+   local y
+   if v_align == 'top' then
+      y = self.y
+   elseif v_align == 'center' then
+      y = self.y + self.height / 2 - height / 2
+   elseif v_align == 'bottom' then
+      y = self:max_y() - height
+   end
+
+   h_align = h_align or 'center'
+   local x
+   if h_align == 'left' then
+      x = self.x
+   elseif h_align == 'center' then
+      x = self.x + self.width / 2 - width / 2
+   elseif h_align == 'right' then
+      x = self:max_x() - width
+   end
+
+   return geom.rect(x, y, width, height)
 end
 
 function rect_t:__tostring()

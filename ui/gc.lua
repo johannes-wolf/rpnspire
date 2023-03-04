@@ -28,6 +28,18 @@ function GC.a_height(s)
    return h
 end
 
+-- Return text size
+---@param text string Text
+---@param font_size number Font size
+---@return number Width
+---@return number Height
+function GC.text_size(text, font_size)
+   return platform.withGC(function(gc)
+      gc:setFont('sansserif', 'r', font_size)
+      return gc:getStringWidth(text), gc:getStringHeight(text)
+   end)
+end
+
 function GC.with_gc(fn)
    return platform.withGC(function(gc)
       return fn(ui.GC(gc))

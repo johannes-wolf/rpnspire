@@ -10,6 +10,7 @@ require 'views.label'
 require 'views.container'
 require 'views.list'
 require 'views.richedit'
+require 'views.expression'
 
 require 'tableext'
 require 'stringext'
@@ -46,6 +47,17 @@ function on.construction()
    main_controller:initialize()
 
    ui.set_focus(main_controller.edit)
+
+   local c = ui.container(ui.rel { left = 0, right = 0, top = 0, bottom = 0 })
+   local v = ui.expression(ui.rel { left = 0, right = 0, top = 0, bottom = 20 })
+   local i = ui.edit(ui.rel { left = 0, right = 0, bottom = 0, height = 20 })
+   c:add_child(v)
+   c:add_child(i)
+   function i:on_text_changed(text)
+      v:set_expression(text)
+   end
+   local test = ui.push_modal(c)
+   ui.set_focus(i)
 end
 
 function on.resize(w, h)
