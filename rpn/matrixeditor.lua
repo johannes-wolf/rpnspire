@@ -168,6 +168,7 @@ function t.display(ctrl, init)
          local result, err = math.evalStr(value)
          if result then
             data:set(m, n, result)
+            grid:update_rows()
          end
       end
    end
