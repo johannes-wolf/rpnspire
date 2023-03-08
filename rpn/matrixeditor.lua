@@ -43,24 +43,13 @@ function t.display(ctrl, init)
       bindings.matrixeditor(dlg, grid, edit)
    end
 
-   -- Overload the matrix class to
-   -- always return a fixed size
-   local grid_matrix = {
-      __index = matrix.mt,
-      fixed_m = math.max(data and data.m or 1, 12),
-      fixed_n = math.max(data and data.n or 12, 1),
-   }
-   function grid_matrix:__len()
-      return grid_matrix.fixed_m
-   end
-
    function dlg.matrix_resize(rows, cols)
       rows = math.min(rows, 99)
       cols = math.min(cols, 99)
 
       local grid_m, grid_n =
-         math.max(grid_matrix.fixed_m, rows),
-         math.max(grid_matrix.fixed_n, cols)
+         math.max(grid.items_len, rows),
+         math.max(#grid.columns, cols)
 
       data:resize(rows, cols)
       dlg.grid_resize(grid_m, grid_n)
@@ -71,8 +60,8 @@ function t.display(ctrl, init)
    ---@param rows?  number
    ---@param cols?  number
    function dlg.grid_resize(rows, cols)
-      rows = rows or grid_matrix.fixed_m
-      cols = cols or grid_matrix.fixed_n
+      rows = rows or grid.items_len
+      cols = cols or #grid.columns
 
       local new_columns = {}
       for i = 1, cols do
@@ -82,9 +71,7 @@ function t.display(ctrl, init)
          })
       end
 
-      grid_matrix.fixed_m = rows
-      grid_matrix.fixed_n = cols
-
+      grid.items_len = rows
       grid.columns = new_columns
       grid.children = {}
       grid.items = data
@@ -381,8 +368,8 @@ function t.display(ctrl, init)
       data = matrix.new()
    end
 
-   setmetatable(data, grid_matrix)
-   dlg.grid_resize()
+   dlg.grid_resize(math.max(6, data.m),
+                   math.max(6, data.n))
    update_selection()
 
    return dlg

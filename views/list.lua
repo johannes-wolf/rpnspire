@@ -107,9 +107,14 @@ function ui.list:_row_width(row, data)
    return self:frame().width
 end
 
+function ui.list:item_len()
+   return self.items_len or #self.items
+end
+
 function ui.list:update_rows()
    local old_size = #self.children
-   local new_size = self.items_len or #self.items
+   local new_size = self:item_len()
+   print(new_size)
 
    self:layout_columns()
 
@@ -173,7 +178,7 @@ function ui.list:update_rows()
       self:layout_children(nil)
    end
 
-   self:set_selection(self.sel > #self.items and #self.items or self.sel)
+   self:set_selection(self.sel > self:item_len() and self:item_len() or self.sel)
 end
 
 function ui.list:layout_column(column, x)
@@ -313,15 +318,17 @@ end
 ---@param row  number|'end'
 ---@param col? number|'end'
 function ui.list:set_selection(row, col)
+   local max_row = self:item_len()
+
    row = row or self.sel or 1
    col = col or self.col or 1
    if row == 'end' then
-      row = #self.items
+      row = max_row
    end
 
    if row < 1 then
-      row = #self.items
-   elseif row > #self.items then
+      row = max_row
+   elseif row > max_row then
       row = 1
    end
 
