@@ -213,7 +213,7 @@ function meta:display_error(msg)
 end
 
 local function is_operator(c)
-   return operators.query_info(c) or c == '^2' or c == '10^'
+   return operators.query_info(c) or c == '^2' or c == '10^' or c == '1/x'
 end
 
 local function is_function(c)
