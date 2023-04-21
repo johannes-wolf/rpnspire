@@ -77,6 +77,7 @@ function t.display(options, on_init)
 
    dlg.window:layout_children()
    if options.text then dlg.edit:insert_text(options.text, true) end
+   if options.cursor then dlg.edit:set_cursor(options.cursor) end
 
    if on_init then
       on_init(dlg.label, dlg.edit)
