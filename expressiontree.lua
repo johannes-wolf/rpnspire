@@ -61,6 +61,10 @@ function m.matrix(items)
    return m.node('[', k_mat, items)
 end
 
+function m.fn(fn, args)
+   return m.node(fn, k_fn, args)
+end
+
 -- Parse infix expression string
 ---@param input string Input infix expression string
 ---@return expr?

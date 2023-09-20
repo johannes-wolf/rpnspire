@@ -10,11 +10,28 @@ local bindings   = require 'config.bindings'
 
 local t = {}
 
+function t.display_sync(ctrl, init)
+   local co = coroutine.running()
+   local dlg = t.display(ctrl, init)
+
+   local res
+   dlg.on_cancel = function()
+      res = nil
+      coroutine.resume(co)
+   end
+   dlg.on_done = function(mat)
+      res = mat
+      coroutine.resume(co)
+   end
+
+   assert(co)
+   coroutine.yield(co)
+   return res
+end
+
 -- Display matrix editor modal
 ---@param ctrl rpn_controller
 ---@param init? expr # Matrix
----@param rows? expr # Matrix
----@param cols? expr # Matrix
 ---@return matrix_dialog
 function t.display(ctrl, init)
    local dlg = {

@@ -20,7 +20,11 @@ local constants = {
    C("R",    "Universal gas",           "8.31446261815324", "J/mol K"),
    C("StdT", "Standard temperature",    "273.15",           "K"),
    C("StdP", "Standard pressure",       "101.325",          "kPa"),
-   -- TODO: To be completed
+   C("c",    "Speed of light Vakuum",   "2.99792458E8",     "m/s"),
+   C("e",    "Elemental charge",        "1.60217646E-19",   "Coul"),
+   C("me",   "Elektron rest mass",      "9.10938188E-31",   "kg"),
+   C("mn",   "Neutron rest mass",       "1.67492716E-27",   "kg"),
+   C("mp",   "Proton rest mass",        "1.67262158E-27",   "kg"),
 }
 
 local function run_consts(stack)

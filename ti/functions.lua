@@ -111,7 +111,7 @@ t.tab = {
   ["impdif"]          = {n = 4, min = 3},
   ["instring"]        = {n = 3, min = 2},
   ["int"]             = {n = 1},
-  ["integral"]        = {n = 2},
+  ["integral"]        = {n = 4, min = 2, def = 2},
   ["intdiv"]          = {n = 2},
   ["interpolate"]     = {n = 4},
   --["invx^2"]          = {n = 1},

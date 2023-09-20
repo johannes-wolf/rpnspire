@@ -27,6 +27,8 @@ return {
    -- Expanding a snippet will _not_ trigger autocompletion!
    snippets = {
       inf = sym.INFTY,
+      oo  = sym.INFTY,
+      deg = sym.DEGREE,
       to  = sym.CONVERT
    }
 }

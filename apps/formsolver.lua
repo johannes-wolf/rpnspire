@@ -103,14 +103,15 @@ local function build_formula_solve_queue(want_var, set, formulas)
    return solve_queue
 end
 
-function m.solve_for(var, set, formulas)
+function m.solve_for(var, set, formulas, fn)
+   fn = fn or 'nsolve'
    local q = build_formula_solve_queue(var, set, formulas)
    local steps = {}
    for _, v in ipairs(q) do
       local variable, formula = v[1], v[2]
 
       -- Solve numeric
-      local numeric = math.evalStr(string.format('nsolve(%s,%s)', formula_replace_vars(formula, set), variable))
+      local numeric = math.evalStr(string.format('%s(%s,%s)', fn, formula_replace_vars(formula, set), variable))
       set[variable] = numeric
 
       -- Solve symbolic (for steps)

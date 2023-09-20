@@ -35,7 +35,7 @@ local function special_char_menu(edit)
       { title = '{', hint = 'lbrace (' },
       { title = '}', hint = 'rbrace )' },
       { title = '|', hint = 'pipe with' },
-      { title = sym.INFTY, hint = 'infinity infty' },
+      { title = sym.INFTY, hint = 'infinity infty oo' },
       { title = sym.CONVERT, hint = 'convert to as' },
       { title = sym.NEQ, hint = 'neq not equal' },
       { title = '<', hint = 'lt less' },
@@ -43,6 +43,7 @@ local function special_char_menu(edit)
       { title = '>', hint = 'gt greater' },
       { title = sym.GEQ, hint = 'geq greater equal' },
       { title = '!', hint = 'exclamation factorial' },
+      { title = sym.DEGREE, hint = 'degree' },
    }
 
    local m = ui.menu.menu_at_point(edit, chars)

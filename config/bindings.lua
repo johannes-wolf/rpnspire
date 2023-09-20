@@ -29,6 +29,9 @@ return {
       t['b'] = { function() view:insert_text(sym.beta, false) end, 'greek beta' }
       t['c'] = { function() view:insert_text(sym.gamma, false) end, 'greek gamma' }
       t['d'] = { function() view:insert_text(sym.delta, false) end, 'greek delta' }
+      t['w'] = { function() view:insert_text(sym.omega, false) end, 'greek omega' }
+      t['s'] = { function() view:insert_text(sym.sigma, false) end, 'greek sigma' }
+      t['p'] = { function() view:insert_text(sym.phi, false) end, 'greek phi' }
    end,
 
    matrixeditor = function(dialog, grid, edit)
