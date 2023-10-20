@@ -80,6 +80,8 @@ return {
          t['l'] = { function(_) ctrl:push_list() end, 'Push list' }
          t['s'] = { function(_) ctrl:store_interactive() end, 'Store*' }
          t['x'] = { function(_) ctrl:solve_interactive() end, 'Solve*' }
+         t['d'] = { function(_) ctrl:diff_interactive() end, 'Derivative*' }
+         t['i'] = { function(_) ctrl:integrate_interactive() end, 'Integrate*' }
 
          t = edit.kbd
          t['down'] = { function(_) ctrl.stack:swap() end, 'Swap' }

@@ -8,6 +8,7 @@ local errtab       = require 'ti.error'
 local config       = require 'config.config'
 local bindings     = require 'config.bindings'
 local ask          = require('dialog.input').display
+local ask_n        = require('dialog.input').display_n
 local dlg_list     = require 'dialog.list'
 local dlg_error    = require 'dialog.error'
 local dlg_filter   = require 'dialog.filterlist'
@@ -328,6 +329,15 @@ function meta:dispatch_function(str, ignore_input, builtin_only)
    end)
 end
 
+function meta:dispatch_function_n(str, n, ignore_input, builtin_only)
+   return self:undo_transaction(function()
+      if not ignore_input then
+         self:dispatch()
+      end
+      return self.stack:push_function(str, n, builtin_only)
+   end)
+end
+
 function meta:validate_stack_n(n)
    if #self.stack.stack < n then
       error({ desc = string.format('too few items on stack. want %d', n) })
@@ -564,6 +574,39 @@ function meta:solve_interactive()
          self:record_undo()
          self.stack:push_infix(text)
          self:dispatch_function('solve', true, false)
+      end
+   end
+end
+
+cmd('Derivative', 'diff_interactive')
+function meta:diff_interactive()
+   if not self.stack:top() then return end
+
+   local dlg = ask { title = string.format("Derivative %s over ...", self.stack:top().infix or '?'), text = 'x' }
+   dlg.on_done = function(text)
+      self:record_undo()
+      self.stack:push_infix(text)
+      self:dispatch_function('derivative', true, false)
+   end
+end
+
+cmd('Integral', 'integrate_interactive')
+function meta:integrate_interactive()
+   if not self.stack:top() then return end
+
+   local dlg = ask_n(3, { title = string.format("Integrate %s over ...", self.stack:top().infix or '?'), text = 'x' })
+   dlg.on_done = function(text)
+      local var, low, high = table.unpack(text)
+      if var:len() == 0 then return end
+
+      self:record_undo()
+      self.stack:push_infix(var)
+      if low:len() > 0 or high:len() > 0 then
+         self.stack:push_infix(low)
+         self.stack:push_infix(high)
+         self:dispatch_function_n('integral', 4, true, false)
+      else
+         self:dispatch_function_n('integral', 2, true, false)
       end
    end
 end
