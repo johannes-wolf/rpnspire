@@ -611,6 +611,20 @@ function meta:integrate_interactive()
    end
 end
 
+cmd('Call n', 'call_n_interactive')
+function meta:call_n_interactive()
+   if not self.stack:top() then return end
+
+   local dlg = ask_n(2, { title = string.format("Call ...", self.stack:top().infix or '?'), text = '' })
+   dlg.on_done = function(text)
+      local fn, n = table.unpack(text)
+      if fn:len() == 0 then return end
+      if tonumber(n) < 0 then return end
+
+      self:dispatch_function_n(fn, tonumber(n), true, false)
+   end
+end
+
 cmd('Explode', 'explode_interactive')
 function meta:explode_interactive()
    if not self.stack:top() then return end

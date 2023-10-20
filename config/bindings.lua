@@ -82,6 +82,7 @@ return {
          t['x'] = { function(_) ctrl:solve_interactive() end, 'Solve*' }
          t['d'] = { function(_) ctrl:diff_interactive() end, 'Derivative*' }
          t['i'] = { function(_) ctrl:integrate_interactive() end, 'Integrate*' }
+         t['f'] = { function(_) ctrl:call_n_interactive() end, 'Call*' }
 
          t = edit.kbd
          t['down'] = { function(_) ctrl.stack:swap() end, 'Swap' }
