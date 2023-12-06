@@ -101,6 +101,11 @@ function t.display(ctrl, init)
       dlg.grid_resize()
    end
 
+   -- Action: Edit Cell
+   function dlg.edit_cell()
+      ui.set_focus(edit)
+   end
+
    -- Action: Clear matrix values
    function dlg.matrix_clear()
       data:clear()
