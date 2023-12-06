@@ -41,6 +41,7 @@ return {
       t['up'] = { function() grid:set_selection(1, nil) end, 'First row' }
       t['down'] = { function() grid:set_selection('end', nil) end, 'Last row' }
       t['t'] = function() dialog.matrix_transpose() end
+      t['e'] = function() dialog.edit_cell() end
 
       t = grid.kbd
       t['='] = function() dialog.eval_cell() end
