@@ -7,7 +7,7 @@ local ui         = require('ui.shared')
 --   E with sym.EE
 --   - with sym.NEGATE
 local function replace_symbols(str)
-   return (str:gsub('E', sym.EE)):gsub('-', sym.NEGATE)
+   return (str:gsub('E', sym.EE)):gsub('-', sym.NEGATE):gsub('DEG', sym.DEGREE)
 end
 
 local function C(symbol, name, value, unit)
@@ -15,9 +15,9 @@ local function C(symbol, name, value, unit)
 end
 
 local constants = {
-   C("NA",   "Avogadro's number",       "6.02214076E23",    "1/mol"),
-   C("k",    "Boltzmann",               "1.380649E-23",     "J/K"),
-   C("R",    "Universal gas",           "8.31446261815324", "J/mol K"),
+   C("NA",   "Avogadro's number",       "6.02214076E23",    "mol^-1"),
+   C("k",    "Boltzmann",               "1.380649E-23",     "J/DEGK"),
+   C("R",    "Universal gas",           "8.31446261815324", "J/mol DEGK"),
    C("StdT", "Standard temperature",    "273.15",           "K"),
    C("StdP", "Standard pressure",       "101.325",          "kPa"),
    C("c",    "Speed of light Vakuum",   "2.99792458E8",     "m/s"),
@@ -25,6 +25,7 @@ local constants = {
    C("me",   "Elektron rest mass",      "9.10938188E-31",   "kg"),
    C("mn",   "Neutron rest mass",       "1.67492716E-27",   "kg"),
    C("mp",   "Proton rest mass",        "1.67262158E-27",   "kg"),
+   C("h",    "Planck's constant",       "6.62607015E-34",   "J s")
 }
 
 local function run_consts(stack)
