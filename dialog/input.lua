@@ -26,6 +26,28 @@ function t.display_sync(options, on_init)
    return res
 end
 
+-- Display dialog (sync)
+---@param options? table<string, any> Dialog options
+---@param on_init? init_callback Initializer
+function t.display_sync_n(n, options, on_init)
+   local co = coroutine.running()
+   local dlg = t.display_n(n, options, on_init)
+
+   local res
+   dlg.on_cancel = function()
+      res = nil
+      coroutine.resume(co)
+   end
+   dlg.on_done = function(text)
+      res = text
+      coroutine.resume(co)
+   end
+
+   assert(co)
+   coroutine.yield(co)
+   return res
+end
+
 -- Display dialog
 ---@param options? table<string, any> Dialog options
 ---@param on_init? init_callback Initializer
