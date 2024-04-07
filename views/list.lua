@@ -50,6 +50,7 @@ local function title_cell_constructor(list, col, data)
    local v = ui.label()
    v.font_size = list.font_size
    v.text = data.title
+   v.align = data.align or 0
    return v
 end
 

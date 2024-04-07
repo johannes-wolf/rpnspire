@@ -20,6 +20,8 @@ return {
   IMAG    = "\239\128\175", -- i
   CHECK   = "\226\156\147", -- checkmark
   STAR    = "\226\152\133", -- filled star
+  CDOT    = "\194\183",
+  TIMES   = "\195\151",
 
   alpha   = "\206\177",
   beta    = "\206\178",
