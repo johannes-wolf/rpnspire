@@ -97,8 +97,9 @@ function t.display(ctrl, init)
 
    -- Action: Transpose
    function dlg.matrix_transpose()
-      data:transpose()
+      data = data:transpose()
       dlg.grid_resize()
+      grid:update_rows()
    end
 
    -- Action: Edit Cell

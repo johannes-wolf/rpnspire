@@ -70,6 +70,7 @@ return {
 
       do
          local t = get_tab(edit, 'kbd', leader)
+         t['enter'] = { function(_) ctrl:push_operator('approx') end, 'approx' }
          t['='] = { function(_) ctrl:push_operator('=:') end, '=:' }
          t['+'] = { function(_) ctrl:push_operator('.+') end, '.+' }
          t['-'] = { function(_) ctrl:push_operator('.-') end, '.-' }
