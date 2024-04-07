@@ -64,7 +64,7 @@ function lexer.tokenize(input)
       i, j, token = input:find('^(%d*)', pos)
 
       -- Optional real part
-      local ri, rj, rtoken = input:find('^(%.%d+)', j and j+1 or pos)
+      local ri, rj, rtoken = input:find('^(%.%d*)', j and j+1 or pos)
       if ri then
          i = i or ri
          j = rj
