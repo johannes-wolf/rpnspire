@@ -198,7 +198,13 @@ function t.display_n(n, options, on_init)
    end
 
    dlg.window:layout_children()
-   if options.text then dlg.edit[1]:insert_text(options.text, true) end
+   if type(options.text) == 'table' then
+      for i, v in ipairs(options.text) do
+         dlg.edit[i]:insert_text(v or "", true)
+      end
+   elseif options.text then
+      dlg.edit[1]:insert_text(options.text, true)
+   end
    if options.cursor then dlg.edit[1]:set_cursor(options.cursor) end
 
    if on_init then

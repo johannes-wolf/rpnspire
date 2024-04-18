@@ -86,6 +86,7 @@ return {
          t['d'] = { function(_) ctrl:diff_interactive() end, 'Derivative*' }
          t['i'] = { function(_) ctrl:integrate_interactive() end, 'Integrate*' }
          t['f'] = { function(_) ctrl:call_n_interactive() end, 'Call*' }
+         t['q'] = { function(_) ctrl:seq_interactive() end, 'Seq*' }
          t['right'] = { function(_) ctrl:roll_down() end, 'Roll down' }
          t['left'] = { function(_) ctrl:roll_up() end, 'Roll up' }
 

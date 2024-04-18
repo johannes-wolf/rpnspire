@@ -198,6 +198,7 @@ end
 ---@param text string   Text to insert at the current cursor position
 ---@param sel  boolean  Select inserted text
 function ui.edit:insert_text(text, sel)
+   text = tostring(text)
    local left, mid, right = self:split_text()
 
    local closing_paren = ui.edit.paren_pairs[text]
