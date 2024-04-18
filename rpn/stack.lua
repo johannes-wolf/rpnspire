@@ -281,6 +281,25 @@ function rpn_stack:push_rstore(mode)
    end
 end
 
+-- Push approx
+function rpn_stack:push_approx()
+   self:assert_size(1, "APPROX")
+   
+   local top = self:top()
+   assert(top)
+
+   if top.rpn.kind == expr.FUNCTION and top.rpn.text == "approx" then
+      top.rpn = top.rpn.children[1]
+   else
+      top.rpn = expr.fn("approx", { top.rpn })
+   end
+
+   if top:eval(self) then
+      self:notify_change(#self.stack)
+   end
+   return top
+end
+
 -- Push | (with)
 function rpn_stack:push_with()
    self:assert_size(2, "WITH")

@@ -70,12 +70,13 @@ return {
 
       do
          local t = get_tab(edit, 'kbd', leader)
-         t['enter'] = { function(_) ctrl:push_operator('approx') end, 'approx' }
+         t['enter'] = { function(_) ctrl.stack:push_approx() end, 'approx' }
          t['='] = { function(_) ctrl:push_operator('=:') end, '=:' }
          t['+'] = { function(_) ctrl:push_operator('.+') end, '.+' }
          t['-'] = { function(_) ctrl:push_operator('.-') end, '.-' }
          t['*'] = { function(_) ctrl:push_operator('.*') end, '.*' }
          t['/'] = { function(_) ctrl:push_operator('./') end, './' }
+         t['w'] = { function(_) ctrl:push_operator('|') end, '|' }
          t['^2'] = { function(_) ctrl:push_operator('1/x') end, '1/x' }
          t[','] = { function(_) ctrl:smart_append() end, 'Smart append' }
          t['/'] = { function(_) ctrl:explode_interactive() end, 'Explode*' }
@@ -85,6 +86,8 @@ return {
          t['d'] = { function(_) ctrl:diff_interactive() end, 'Derivative*' }
          t['i'] = { function(_) ctrl:integrate_interactive() end, 'Integrate*' }
          t['f'] = { function(_) ctrl:call_n_interactive() end, 'Call*' }
+         t['right'] = { function(_) ctrl:roll_down() end, 'Roll down' }
+         t['left'] = { function(_) ctrl:roll_up() end, 'Roll up' }
 
          t = edit.kbd
          t['down'] = { function(_) ctrl.stack:swap() end, 'Swap' }
