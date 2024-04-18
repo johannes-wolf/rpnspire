@@ -8,7 +8,14 @@ function lexer.tokenize(input)
   lexer.operators_trie = lexer.operators_trie or trie.build(operators.tab)
 
   local function operator(input, i)
-    return trie.find(input, lexer.operators_trie, i)
+    local i, j, token = trie.find(input, lexer.operators_trie, i)
+    if i and j > i then
+      -- Discard matches followed by a letter!
+      if input:find('^([a-zA-Z])', j) then
+        return nil, nil, nil
+      end
+    end
+    return i, j, token
   end
 
   local function syntax(input, i)
