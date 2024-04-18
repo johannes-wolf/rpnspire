@@ -611,11 +611,21 @@ function meta:integrate_interactive()
    end
 end
 
+cmd('Seq*', 'seq_interactive')
+function meta:seq_interactive()
+   local top = self.stack:top() and self.stack:top().infix or ""
+   local dlg = ask_n(4, { title = "Seq ...", text = {top, 'x', '1', '10'} })
+   dlg.on_done = function(args)
+      local e, v, i, j = table.unpack(args)
+      self.stack:push_infix(string.format('seq(%s,%s,%s,%s)', e, v, i, j))
+   end
+end
+
 cmd('Call n', 'call_n_interactive')
 function meta:call_n_interactive()
    if not self.stack:top() then return end
 
-   local dlg = ask_n(2, { title = string.format("Call ...", self.stack:top().infix or '?'), text = '' })
+   local dlg = ask_n(2, { title = "Call ...", text = {'f1(x)', '1'} })
    dlg.on_done = function(text)
       local fn, n = table.unpack(text)
       if fn:len() == 0 then return end
