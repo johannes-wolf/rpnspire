@@ -10,7 +10,7 @@ local bindings   = require 'config.bindings'
 
 local t = {}
 
-function t.display_sync(ctrl, init)
+function t.display_sync(ctrl, init, setup)
    local co = coroutine.running()
    local dlg = t.display(ctrl, init)
 
@@ -22,6 +22,10 @@ function t.display_sync(ctrl, init)
    dlg.on_done = function(mat)
       res = mat
       coroutine.resume(co)
+   end
+
+   if setup then
+      setup(dlg)
    end
 
    assert(co)
@@ -200,17 +204,18 @@ function t.display(ctrl, init)
    function dlg.next_cell(direction)
       local m, n = data:size()
       local row, col = grid:get_selection()
+      local roff, coff = grid:get_header()
 
       if direction == 'right' then
          if col == n and n > 1 and m > 1 then
             row = row + 1
-            col = 1
+            col = 1 + coff
          else
             col = col + 1
          end
       elseif direction == 'down' then
          if row == m and m > 1 and n > 1 then
-            row = 1
+            row = 1 + roff
             col = col + 1
          else
             row = row + 1
@@ -391,6 +396,8 @@ function t.display(ctrl, init)
       data = matrix.new()
    end
 
+   dlg.edit = edit
+   dlg.grid = grid
    dlg.grid_resize(math.max(6, data.m),
                    math.max(6, data.n))
    update_selection()
