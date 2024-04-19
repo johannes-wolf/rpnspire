@@ -8,8 +8,7 @@ An RPN interface for the TI Nspire CX
 
 ## Install
 
-Use the latest build from the GitHub actions and put it under `MyWidgets` on your nspire CX.
-Releases <= alpha-20 are of an old version of rpn-spire.
+Use the latest build from the *GitHub actions* and put it under `MyWidgets` on your nspire CX.
 
 ## Build
 
@@ -27,7 +26,7 @@ Feel free to submit PRs or ask for features and fixes 😊.
 
 The input field of rpnspire supports autocompletion for functions, variables and units. To trigger completion,
 press <kbd>tab</kbd>. Completion uses characters left to the cursor as compeltions prefix. Typing `so<tab>` will
-present you the first entry of a list of completion candidates starting with `so`. Pressing <kbd>tab</kbd> multiple times loops through all candidates. To accept a completion press hit <kbd>enter</kbd>. Completions are sorted by use (see [config/stats.lua](config/stats.lua)).
+present you the first entry of a list of completion candidates starting with `so`. Pressing <kbd>tab</kbd> multiple times loops through all candidates. To accept a completion press hit <kbd>enter</kbd>. Completions are sorted by use (see [config/stats.lua](config/stats.lua)). Typing with the completion pop-up open, further filters the candidates.
 
 ### RPN-Mode
 
@@ -55,11 +54,11 @@ RPNspire features a matrix editor to write and edit matrixes.
 
 ## Settings
 
-See [config/config.lua](config/config.lua).
+See [config/config.lua](config/config.lua), to adjust defaults.
 
 ## Bindings
 
-See [config/bindings.lua](config/bindings.lua).
+See [config/bindings.lua](config/bindings.lua), to configure your own bindings.
 
 rpnspire uses key-sequences for its bindings. <kbd>.</kbd><kbd>e</kbd> means: Press `.` and then press `e`.
 The current sequence of keys pressed (that are part of a binding) is displayed by a dialog at the
@@ -76,8 +75,10 @@ top of the screen.
 | <kbd>down</kbd>              | Swap stack 1 & 2                                        |
 | <kbd>enter</kbd>             | Submit input; if empty: dup 1                           |
 | <kbd>tab</kbd>               | Start completion for current input                      |
-| <kbd>.</kbd><kbd>left</kbd>  | Go to beginning                                         |
-| <kbd>.</kbd><kbd>right</kbd> | Go to end                                               |
+| <kbd>.</kbd><kbd>left</kbd>  | Roll up beginning                                         |
+| <kbd>.</kbd><kbd>right</kbd> | Roll down end                                               |
+
+| Key                          | Function                                                |
 |------------------------------|---------------------------------------------------------|
 | <kbd>.</kbd><kbd>=</kbd>     | Store Y in X                                            |
 | <kbd>.</kbd><kbd>+-*/^</kbd> | Push dot operator                                       |
@@ -92,6 +93,8 @@ top of the screen.
 | <kbd>.</kbd><kbd>a</kbd>     | Display apps/tool                                       |
 | <kbd>.</kbd><kbd>b</kbd>     | Display bindings                                        |
 | <kbd>.</kbd><kbd>m</kbd>     | Open matrix editor                                      |
+| <kbd>.</kbd><kbd>return</kbd>     | Show command palette editor                                      |
+
 
 ### Stack
 | Key                              | Function                                                        |

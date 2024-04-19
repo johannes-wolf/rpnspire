@@ -320,17 +320,18 @@ end
 ---@param col? number|'end'
 function ui.list:set_selection(row, col)
    local max_row = self:item_len()
+   local roff, coff = self:get_header()
 
-   row = row or self.sel or 1
-   col = col or self.col or 1
+   row = math.max(row or self.sel or 1, roff)
+   col = math.max(col or self.col or 1, coff)
    if row == 'end' then
       row = max_row
    end
 
-   if row < 1 then
+   if row < roff + 1 then
       row = max_row
    elseif row > max_row then
-      row = 1
+      row = roff + 1
    end
 
    if col == 'end' then
@@ -338,15 +339,15 @@ function ui.list:set_selection(row, col)
    end
 
    if self.columns then
-      if col < 1 then
+      if col < coff + 1 then
          col = #self.columns
       elseif col > #self.columns then
-         col = 1
+         col = coff + 1
       end
    end
 
-   self.sel = tonumber(row) or 1
-   self.col = tonumber(col) or 1
+   self.sel = tonumber(row) or roff + 1
+   self.col = tonumber(col) or coff + 1
 
    local cell_frame = self:cell_frame(self.sel, self.col)
    if cell_frame then
@@ -380,6 +381,17 @@ function ui.list:scroll_to_item(row, col)
    if self.children[row] then
       self:ensure_visible(self:frame(), self:cell_frame(row, col))
    end
+end
+
+function ui.list:set_header(rows, cols)
+   self.header = { rows or 0, cols or 0 }
+end
+
+function ui.list:get_header()
+   if self.header then
+      return self.header[1] or 0, self.header[2] or 0
+   end
+   return 0, 0
 end
 
 -- Events
