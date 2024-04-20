@@ -7,6 +7,7 @@ local choice     = require('dialog.choice').display_sync
 local matrix_ed  = require('rpn.matrixeditor').display_sync
 local expr       = require 'expressiontree'
 local sym        = require 'ti.sym'
+local fn = require 'fn'
 
 local function table_to_vec(t)
    local r = ""
@@ -67,94 +68,237 @@ local function ask_n_vectors(ctrl, names)
    end
 end
 
--- Find plane equation from 3 pts
-local function run_plane_3pt(ctrl, stack)
-   local a, b, c = table.unpack(ask_n_vectors(ctrl, {"a", "b", "c"}))
-   local ab = math.evalStr(table_to_vec(a) .. "-" .. table_to_vec(b))
-   local ac = math.evalStr(table_to_vec(a) .. "-" .. table_to_vec(c))
-   local n = math.evalStr("crossp(" .. ab .. "," .. ac .. ")")
-   local eq = math.evalStr("dotp(" ..n .. "," .. table_to_vec({"x", "y", "z"}) .. ")")
-   local d = math.evalStr(string.format(eq .."|(x=%s and y=%s and z=%s)", a[1], a[2], a[3]))
+-- Find line-point distance
+local function run_line_point(ctrl)
+   local a, n, p = table.unpack(fn.imap(ask_n_vectors(ctrl, {"a", "n", "p"}), table_to_vec))
+   if a and p then
+      local n = math.evalStr("(" .. n .. "/norm(" .. n .. "))")
+      local eq = a .. "+t*".. n
+      local isection = "solve(" .. eq .. "=" .. p .. ",t)"
+      local rvec = string.format("(%s-%s)-dotp(%s-%s,%s)*%s", p, a, p, a, n, n)
+      local distance = "norm(" .. rvec .. ")"
+      local proj = string.format("%s+dotp(%s-%s,%s)*%s", a, p, a, n, n)
 
-   local res_c = eq .. " = " .. d
-   local res_p = "x = " .. table_to_vec(a) .. " + s*" .. ab .. " + t*" .. ac
-   local res_n = "(x - " .. table_to_vec(a) .. ") " .. sym.CDOT .. " " .. n
-
-   local action = choice { title = 'Results', items = {
-      { title = 'E: ' .. res_c, align = -1, result = 'c' },
-      { title = 'E: ' .. res_p, align = -1, result = 'p' },
-      { title = 'E: ' .. res_n, align = -1, result = 'n' },
-      { title = 'Store...', result = 'store' },
-      { title = 'Exit', result = 'done' },
-   }}
-
-   if action == 'store' then
-      local sym = ask { title = 'Variable', text = 'E1' }
-      if sym and #sym > 0 then
-         stack:push_infix(res_c)
-         stack:push_infix(sym)
-         stack:push_operator('=:')
+      -- Results
+      local r_isection = math.evalStr(isection)
+      if r_isection == "false" then
+         r_isection = nil
       end
-   elseif action == 'c' then
-      stack:push_infix(res_c)
-   elseif action == 'done' then
-      return
+      local r_distance = math.evalStr(distance)
+      local r_rvec = math.evalStr(rvec)
+      local r_proj = math.evalStr(proj)
+
+      -- Collect results
+      local r = {}
+      if r_isection then
+         table.insert(r, { title = 'Point on line', result = '*' })
+         table.insert(r, { title = 't: ' .. r_isection, result = r_isection, align = -1 })
+      else
+         table.insert(r, { title = 'Point not on line', result = '*' })
+         table.insert(r, { title = 'Shortest distance: ' .. r_distance, result = r_distance, align = -1 })
+         table.insert(r, { title = 'Vector p to x: ' .. r_rvec, result = r_rvec, align = -1})
+         table.insert(r, { title = 'Projection on x: ' .. r_proj, result = r_proj, align = -1 })
+      end
+
+      -- Show results
+      table.insert(r, { title = 'Done', result = 'done' })
+      while true do
+         local action = choice {
+            title = 'Results',
+            items = r,
+         }
+         if action == 'done' then
+            break
+         elseif action then
+            ctrl:push_infix(tostring(action))
+         end
+      end
    end
 end
 
 -- Find intersection point or distance between two lines
-local function run_2lines(ctrl, stack)
-   local function vec_str(l)
-      return string.format("[[%s,%s,%s]]", table.unpack(l))
-   end
-
-   local p1, d1, p2, d2 = table.unpack(ask_n_vectors(ctrl, {"p1", "d1", "p2", "d2"}))
-   if p1 then
-      local vp1, vd1 = vec_str(p1), vec_str(d1)
-      local vp2, vd2 = vec_str(p2), vec_str(d2)
-
-      local eq1 = vp1 .. "+a*".. vd1
-      local eq2 = vp2 .. "+b*".. vd2
-
+local function run_line_line(ctrl)
+   local p1, d1, p2, d2 = table.unpack(fn.imap(ask_n_vectors(ctrl, {"p1", "d1", "p2", "d2"}), table_to_vec))
+   if p1 and p2 then
+      local eq1 = p1 .. "+a*".. d1
+      local eq2 = p2 .. "+b*".. d2
       local isection = "solve(" .. eq1 .. "=" .. eq2 .. ",a,b)"
-      local parallel = "solve(" .. vd1 .. "=t*" .. vd2 .. ",t)"
-      local n = math.evalStr("crossp(" .. vd1 .. "," .. vd2 .. ")")
-      local n1 = math.evalStr("crossp(" .. vd1 .. "," .. n .. ")")
-      local n2 = math.evalStr("crossp(" .. vd2 .. "," .. n .. ")")
+      local parallel = "solve(" .. d1 .. "=t*" .. d2 .. ",t)"
+      local n = "crossp(" .. d1 .. "," .. d2 .. ")"
+      local n1 = "crossp(" .. d1 .. "," .. n .. ")"
+      local n2 = "crossp(" .. d2 .. "," .. n .. ")"
       local nearest1 = string.format("%s+(dotp(%s-%s,%s)/dotp(%s,%s))*%s",
-        vp1, vp2, vp1, n2, vd1, n2, vd1)
+        p1, p2, p1, n2, d1, n2, d1)
       local nearest2 = string.format("%s+(dotp(%s-%s,%s)/dotp(%s,%s))*%s",
-        vp2, vp1, vp2, n1, vd2, n1, vd2)
+        p2, p1, p2, n1, d2, n1, d2)
       local distance = "norm(" .. nearest1 .. "-" .. nearest2 ..")"
+      local angle = "arccos(dotp(" .. d1 .. "," .. d2 .. ")/(norm(" .. d1 .. ")*norm(" .. d2 .. ")))"
 
+      -- Results
+      local r = {}
       local r_isection = math.evalStr(isection)
+      if r_isection == 'false' then
+         r_isection = nil
+      end
       local r_parallel = math.evalStr(parallel)
-      print(r_isection)
-      print(r_parallel)
+      if r_parallel == 'false' then
+         r_parallel = nil
+      end
 
-      if r_isection ~= 'false' then
-         return
+      local r_c1 = math.evalStr(nearest1)
+      local r_c2 = math.evalStr(nearest2)
+      local r_dist = math.evalStr(distance)
+      
+      -- Collect results
+      if r_isection then
+         local r_angle = math.evalStr(angle)
+
+         table.insert(r, { title = 'Intersecting lines', result = '*' })
+         table.insert(r, { title = 'Intersection: ' .. r_c1, result = r_c1, align = -1 })
+         table.insert(r, { title = 'Angle: ' .. r_angle, result = r_angle, align = -1 })
+      elseif r_parallel then
+         table.insert(r, { title = 'Parallel lines', result = '*' })
+         table.insert(r, { title = 'Distance: ' .. r_dist, result = r_dist, align = -1 })
       else
-         return
+         table.insert(r, { title = 'Skew lines', result = '*' })
+         table.insert(r, { title = 'Distance: ' .. r_dist, result = r_dist, align = -1 })
+         table.insert(r, { title = 'Nearest point on a: ' .. r_c1, result = r_c1, align = -1 })
+         table.insert(r, { title = 'Nearest point on b: ' .. r_c2, result = r_c2, align = -1 })
+      end
+
+      -- Show results
+      table.insert(r, { title = 'Done', result = 'done' })
+      while true do
+         local action = choice {
+            title = 'Results',
+            items = r,
+         }
+         if action == 'done' then
+            break
+         elseif action then
+            ctrl:push_infix(tostring(action))
+         end
       end
    end
 end
 
-local function run_angle_2vec(stack)
-   local a = table_to_vec(ask_vector("Vector a"))
-   local b = table_to_vec(ask_vector("Vector b"))
+-- Find intersection point between line and plane
+local function run_line_plane(ctrl)
+   local p0, n, l0, l = table.unpack(fn.imap(ask_n_vectors(ctrl, {"p0", "n", "l0", "ln"}), table_to_vec))
+   if p0 and l0 then
+      local parallel = "dotp(" .. n .. "," .. l .. ")=0"
+      local angle = "arccos(dotp(" .. n .. "," .. l .. ")/(norm(" .. n .. ")*norm(" .. l .. ")))"
+      local d = string.format("dotp((%s-%s),%s)/dotp(%s,%s)", p0, l0, n, l, n)
+      local dist = string.format("dotp((%s-%s),%s)/dotp(%s,%s)", p0, l0, n, n, n)
 
-   stack:push_infix("arccos(dotp(" .. a .. "," .. b .. ")/(norm(" .. a .. "*norm(" .. b ..  "))")
+      -- Results
+      local r = {}
+      local r_parallel = math.evalStr(parallel) == 'true'
+      
+      -- Collect results
+      if not r_parallel then
+         local r_d = math.evalStr(d)
+         local r_angle = math.evalStr(angle)
+         local r_pt = math.evalStr(l0 .. "+" .. l .. "*" .. d)
+
+         table.insert(r, { title = 'Intersecting lines', result = '*' })
+         table.insert(r, { title = 'Intersection: ' .. r_pt, result = r_pt, align = -1 })
+         table.insert(r, { title = 'Angle: ' .. r_angle, result = r_angle, align = -1 })
+      else
+         local r_dist = math.evalStr(dist)
+         local r_in_plane = math.evalStr("dotp(" .. p0  .. "-" .. l0 .. "," .. n .. ")=0") == 'true'
+
+         if r_in_plane then
+            table.insert(r, { title = 'Parallel (in plane)', result = '*' })
+            table.insert(r, { title = 'Reason: (p0 - l0) * n = 0', result = '*', align = -1 })
+         else
+            table.insert(r, { title = 'Parallel', result = '*' })
+            table.insert(r, { title = 'Distance: ' .. r_dist, result = r_dist, align = -1 })
+         end
+      end
+
+      -- Show results
+      table.insert(r, { title = 'Done', result = 'done' })
+      while true do
+         local action = choice {
+            title = 'Results',
+            items = r,
+         }
+         if action == 'done' then
+            break
+         elseif action then
+            ctrl:push_infix(tostring(action))
+         end
+      end
+   end
 end
 
-local function run_dist_2pt(stack)
-   local a = table_to_vec(ask_vector("Point A"))
-   local b = table_to_vec(ask_vector("Point B"))
+local function run_angle_2vec(ctrl, stack)
+   local a, b = table.unpack(fn.imap(ask_n_vectors(ctrl, {"a", "b"}), table_to_vec))
+   stack:push_infix("arccos(dotp(" .. a .. "," .. b .. ")/(norm(" .. a .. ")*norm(" .. b ..  "))")
+end
 
+local function run_dist_2pt(ctrl, stack)
+   local a, b = table.unpack(fn.imap(ask_n_vectors(ctrl, {"a", "b"}), table_to_vec))
    stack:push_infix("norm(" .. b .. "-" .. a .. ")")
 end
 
-apps.add('plane - 3pt', 'Plane - 3 Points', run_plane_3pt)
+local function run_convert_plane(ctrl)
+   local from
+   while not from do
+      from = choice {
+         title = 'Input format',
+         items = {
+            { title = 'Points (a,b,c)', result = 'points' },
+            { title = 'Vector ((x-p)*n=0)', result = 'vector' },
+            --{ title = 'Equation (x+y+z=d)', result = 'equation' },
+            { title = 'Cancel', result = 'done' }
+         }
+      }
+      if from == 'done' then return end
+   end
+
+   local p0, n
+
+   if from == "points" then
+      local a, b, c = table.unpack(ask_n_vectors(ctrl, { "a", "b", "c" }))
+      if a and b and c then
+         local ab = table_to_vec(b) .. "-" .. table_to_vec(a)
+         local ac = table_to_vec(c) .. "-" .. table_to_vec(a)
+
+         p0 = table_to_vec(a)
+         n = "crossp(" .. ab .. "," .. ac .. ")"
+      end
+   elseif from == "vector" then
+      p0, n = table.unpack(fn.imap(ask_n_vectors(ctrl, { "p0", "n" }), table_to_vec))
+   end
+
+   local r_eq = math.evalStr("dotp([[x][y][z]]," .. n .. ")") .. "=" .. math.evalStr("dotp(" .. p0 .. "," .. n .. ")")
+   local r_vector = string.format("dotp((x-%s), %s)", p0, n)
+   local r_vector_norm = string.format("dotp((x-%s), %s)", p0, math.evalStr(n .. "/norm(" .. n .. ")"))
+
+   while true do
+      local action = choice {
+         title = "Resutl",
+         items = {
+            { title = r_eq, result = r_eq },
+            { title = r_vector, result = r_vector },
+            { title = r_vector_norm, result = r_vector_norm },
+            { title = 'Done', result = 'done' },
+         }
+      }
+      if action == 'done' then
+         break
+      elseif action then
+         ctrl:push_infix(action)
+      end
+   end
+end
+
 apps.add('angle - 2vec', 'Angle - 2 Vectors', run_angle_2vec)
 apps.add('dist - 2pt',   'Dist. - 2 Points', run_dist_2pt)
-apps.add('2line',   '2line', run_2lines)
+
+apps.add('AnaGeo: line-point', 'line-point', run_line_point)
+apps.add('AnaGeo: line-line',  'line-line',  run_line_line)
+apps.add('AnaGeo: line-plane', 'line-plane', run_line_plane)
+apps.add('AnaGeo: convert plane', 'convert plane', run_convert_plane)
