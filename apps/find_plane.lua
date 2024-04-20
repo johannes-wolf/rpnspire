@@ -36,12 +36,14 @@ local function ask_vector(title, dim)
    end
 end
 
-local function ask_n_vectors(ctrl, names)
+local function ask_n_vectors(ctrl, names, dim)
+   local elems = {"x", "y", "z", "w"}
    local mat = matrix.new(4, 5)
+   dim = dim or 3
    mat:set(1,1," ")
-   mat:set(2,1,"x")
-   mat:set(3,1,"y")
-   mat:set(4,1,"z")
+   for i = 1, dim do
+      mat:set(1 + i,1, elems[i])
+   end
    mat:resize(4, 1 + #names)
    for n = 1, #names do
       mat:set(1, 1 + n, tostring(names[n]))
@@ -51,18 +53,18 @@ local function ask_n_vectors(ctrl, names)
       local grid = dlg.grid
       grid:set_header(1,1)
       grid:set_selection(2,2)
-      dlg.grid_resize(4, 1 + #names)
+      dlg.grid_resize(1 + dim, 1 + #names)
    end
 
    local res = matrix_ed(ctrl, mat, setup_dlg)
    if res then
       local vecs = {}
       for n = 1, #names do
-         table.insert(vecs, {
-             mat:get(2, n + 1),
-             mat:get(3, n + 1),
-             mat:get(4, n + 1),
-         })
+         local v = {}
+         for i = 1, dim do
+            table.insert(v, mat:get(1 + i, n + 1))
+         end
+         table.insert(vecs, v)
       end
       return vecs
    end
@@ -132,7 +134,7 @@ local function run_line_line(ctrl)
       local nearest2 = string.format("%s+(dotp(%s-%s,%s)/dotp(%s,%s))*%s",
         p2, p1, p2, n1, d2, n1, d2)
       local distance = "norm(" .. nearest1 .. "-" .. nearest2 ..")"
-      local angle = "arccos(dotp(" .. d1 .. "," .. d2 .. ")/(norm(" .. d1 .. ")*norm(" .. d2 .. ")))"
+      local angle = "arccos(abs(dotp(" .. d1 .. "," .. d2 .. "))/(norm(" .. d1 .. ")*norm(" .. d2 .. ")))"
 
       -- Results
       local r = {}
@@ -187,7 +189,7 @@ local function run_line_plane(ctrl)
    local p0, n, l0, l = table.unpack(fn.imap(ask_n_vectors(ctrl, {"p0", "n", "l0", "ln"}), table_to_vec))
    if p0 and l0 then
       local parallel = "dotp(" .. n .. "," .. l .. ")=0"
-      local angle = "arccos(dotp(" .. n .. "," .. l .. ")/(norm(" .. n .. ")*norm(" .. l .. ")))"
+      local angle = "arcsin(abs(dotp(" .. n .. "," .. l .. "))/(norm(" .. n .. ")*norm(" .. l .. ")))"
       local d = string.format("dotp((%s-%s),%s)/dotp(%s,%s)", p0, l0, n, l, n)
       local dist = string.format("dotp((%s-%s),%s)/dotp(%s,%s)", p0, l0, n, n, n)
 
@@ -251,7 +253,7 @@ local function run_convert_plane(ctrl)
          items = {
             { title = 'Points (a,b,c)', result = 'points' },
             { title = 'Vector ((x-p)*n=0)', result = 'vector' },
-            --{ title = 'Equation (x+y+z=d)', result = 'equation' },
+            { title = 'Equation (x+y+z=d)', result = 'equation' },
             { title = 'Cancel', result = 'done' }
          }
       }
@@ -271,6 +273,26 @@ local function run_convert_plane(ctrl)
       end
    elseif from == "vector" then
       p0, n = table.unpack(fn.imap(ask_n_vectors(ctrl, { "p0", "n" }), table_to_vec))
+   elseif from == "equation" then
+      a, b, c, d = table.unpack(fn.imap(ask_n_vectors(ctrl, { "ax", "by", "cz", "d" }, 1), function(l) return l[1] end))
+
+      p0 = {}
+      local i = 1
+      for k, v in pairs({x = a, y = b, z = c}) do
+         local is_set = math.evalStr(v .. "=0") == 'false'
+         if is_set then
+            p0[i] = d .. "/" .. v
+         else
+            p0[i] = "0"
+         end
+      end
+
+      if #p0 > 0 then
+         p0 = table_to_vec(p0)
+         n = table_to_vec({a, b, c})
+      else
+         error("Invalid plane coefficients")
+      end
    end
 
    local r_eq = math.evalStr("dotp([[x][y][z]]," .. n .. ")") .. "=" .. math.evalStr("dotp(" .. p0 .. "," .. n .. ")")
@@ -294,9 +316,6 @@ local function run_convert_plane(ctrl)
       end
    end
 end
-
-apps.add('angle - 2vec', 'Angle - 2 Vectors', run_angle_2vec)
-apps.add('dist - 2pt',   'Dist. - 2 Points', run_dist_2pt)
 
 apps.add('AnaGeo: line-point', 'line-point', run_line_point)
 apps.add('AnaGeo: line-line',  'line-line',  run_line_line)
