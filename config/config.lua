@@ -36,5 +36,8 @@ return {
       neq = sym.NEQ,
       ii  = sym.IMAG,
       ee  = sym.EULER,
-   }
+   },
+
+   -- Enable rpnspire splash screen
+   enable_splash = true,
 }

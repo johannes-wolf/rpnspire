@@ -21,11 +21,11 @@ local function show_results(ctrl, items)
    while not action do
       action = choice({title = 'Results', items = items})
       if action == 'done' then
-         break
+         return action
       elseif type(action) == 'function' then
          action = action(ctrl)
       end
-      if action ~= '*' then
+      if action and action ~= '*' then
          ctrl:push_infix(action)
          action = nil
       end
