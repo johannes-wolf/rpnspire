@@ -69,6 +69,8 @@ function lexer.tokenize(input)
          i = i or ri
          j = rj
          token = (token or '')..rtoken
+      elseif j and input[j + 1] == '.' then
+         j = j + 1
       end
 
       if not i then return end

@@ -50,6 +50,7 @@ local function title_cell_constructor(list, col, data)
    local v = ui.label()
    v.font_size = list.font_size
    v.text = data.title
+   v.align = data.align or 0
    return v
 end
 
@@ -321,6 +322,13 @@ function ui.list:set_selection(row, col)
    local max_row = self:item_len()
    local roff, coff = self:get_header()
 
+   if row == 'end' then
+      row = max_row
+   end
+   if col == 'end' then
+      col = #self.columns
+   end
+
    row = math.max(row or self.sel or 1, roff)
    col = math.max(col or self.col or 1, coff)
    if row == 'end' then
@@ -331,10 +339,6 @@ function ui.list:set_selection(row, col)
       row = max_row
    elseif row > max_row then
       row = roff + 1
-   end
-
-   if col == 'end' then
-      col = #self.columns
    end
 
    if self.columns then

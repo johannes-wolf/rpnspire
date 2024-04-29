@@ -3,7 +3,9 @@ platform.apiLevel = '2.4'
 -- luacheck: ignore platform
 -- luacheck: ignore on
 
+local advice = require 'advice'
 local ui = require 'ui'
+local config = require 'config.config'
 require 'views.menu'
 require 'views.edit'
 require 'views.label'
@@ -17,6 +19,14 @@ require 'stringext'
 local dlg_error = require 'dialog.error'
 local rpn_controller = require 'rpn.controller'
 
+local function draw_logo(gc, frame)
+   local center = frame:center()
+   gc:set_font(nil, "b", 80)
+   gc:draw_text("rpn", 0, 0, frame.width/2, frame.height, 1, 0)
+   gc:set_font(nil, "bi", 80)
+   gc:draw_text("spire", frame.width/2, 0, frame.width/2, frame.height, -1, 0)
+ end
+
 local function build_main_view()
    local edit_height = 20
 
@@ -27,6 +37,13 @@ local function build_main_view()
    main_view:add_child(edit)
 
    local list = ui.list(ui.rel({ top = 0, bottom = edit_height, left = 0, right = 0 }))
+   if config.enable_splash then
+      list.draw_self = advice.after(list.draw_self, function(self, gc, dirty)
+         if not self.items or #self.items == 0 then
+            draw_logo(gc, self:frame())
+         end 
+      end)
+   end
    main_view:add_child(list)
 
    local controller = rpn_controller.new(main_view, edit, list)

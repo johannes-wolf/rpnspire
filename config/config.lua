@@ -29,6 +29,15 @@ return {
       inf = sym.INFTY,
       oo  = sym.INFTY,
       deg = sym.DEGREE,
-      to  = sym.CONVERT
-   }
+      rad = sym.RAD,
+      to  = sym.CONVERT,
+      leq = sym.LEQ,
+      geq = sym.GEQ,
+      neq = sym.NEQ,
+      ii  = sym.IMAG,
+      ee  = sym.EULER,
+   },
+
+   -- Enable rpnspire splash screen
+   enable_splash = true,
 }

@@ -115,6 +115,10 @@ function GC:set_font_size(s)
    self.gc:setFont('sansserif', 'r', s or 11)
 end
 
+function GC:set_font(f, st, s)
+   self.gc:setFont(f or 'sansserif', st or 'r', s or 11)
+end
+
 function GC:draw_text(text, x, y, w, h, halign, valign, color)
   halign = halign or -1
   valign = valign or -1
