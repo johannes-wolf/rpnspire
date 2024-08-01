@@ -6,6 +6,9 @@
 An RPN interface for the TI Nspire CX
 </p>
 
+As I really liked the rpn application for the TI-89 but could not find a usable RPN implementation for the TI nSpire, I've created rpnSpire, a powerful RPN implementation
+with many features such as searchable menus, autocompletion, an application framework in lua and many many more.
+
 ## Install
 
 Use the latest build from the *GitHub actions* and put it under `MyWidgets` on your nspire CX.
@@ -17,8 +20,6 @@ Building rpnspire depends on `luabundler` (install from `npm`) and `luna`.
     make tns
 
 ## Usage
-
-Feel free to submit PRs or ask for features and fixes 😊.
 
 <p align="center">
 <img src="https://github.com/johannes-wolf/rpnspire/blob/main/doc/rpn.gif" width="300px"></img>
@@ -75,8 +76,8 @@ top of the screen.
 | <kbd>down</kbd>              | Swap stack 1 & 2                                        |
 | <kbd>enter</kbd>             | Submit input; if empty: dup 1                           |
 | <kbd>tab</kbd>               | Start completion for current input                      |
-| <kbd>.</kbd><kbd>left</kbd>  | Roll up beginning                                         |
-| <kbd>.</kbd><kbd>right</kbd> | Roll down end                                               |
+| <kbd>.</kbd><kbd>left</kbd>  | Roll up beginning                                       |
+| <kbd>.</kbd><kbd>right</kbd> | Roll down end                                           |
 
 | Key                          | Function                                                |
 |------------------------------|---------------------------------------------------------|
@@ -93,7 +94,7 @@ top of the screen.
 | <kbd>.</kbd><kbd>a</kbd>     | Display apps/tool                                       |
 | <kbd>.</kbd><kbd>b</kbd>     | Display bindings                                        |
 | <kbd>.</kbd><kbd>m</kbd>     | Open matrix editor                                      |
-| <kbd>.</kbd><kbd>return</kbd>     | Show command palette editor                                      |
+| <kbd>.</kbd><kbd>return</kbd> | Show command palette editor                            |
 
 
 ### Stack
