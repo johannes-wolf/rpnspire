@@ -7,7 +7,7 @@ An RPN interface for the TI Nspire CX
 </p>
 
 As I really liked the rpn application for the TI-89 but could not find a usable RPN implementation for the TI nSpire, I've created rpnSpire, a powerful RPN implementation
-with many features such as searchable menus, autocompletion, an application framework in lua and many many more.
+with many features such as searchable menus, autocompletion, an application framework in lua, a matrix editor, and many more.
 
 ## Install
 
